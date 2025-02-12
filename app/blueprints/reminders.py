@@ -18,9 +18,9 @@ def send_email(to, subject, html_body):
 
 def check_and_send_reminders():
     """Checks for upcoming game nights and sends reminder emails to participants."""
-    from app import app  # Import the app instance to get the correct context
+    from flask import current_app  # Import the app instance to get the correct context
 
-    with app.app_context():  # Use the app context for database queries
+    with current_app.app_context():  # Use the app context for database queries
         central_timezone = pytz.timezone("America/Chicago")
         today_central = datetime.now(central_timezone).date()
 
