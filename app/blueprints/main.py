@@ -73,15 +73,12 @@ def index():
 
     # Fetch recent and future game nights using the optimized view
     if current_user.owner or current_user.admin:
-        query = "SELECT DISTINCT * FROM recent_future_game_nights ORDER BY date DESC"
+        query = "SELECT game_night_id, date, notes, final, closed FROM admin_recent_future_game_nights"
         all_game_nights = db.session.execute(text(query)).fetchall()
     else:
         query = """
-            SELECT * FROM recent_future_game_nights 
-            WHERE game_night_id IN (
-                SELECT game_night_id FROM public.game_nights_list WHERE user_id = :user_id
-            )
-            ORDER BY date DESC
+            SELECT game_night_id, date, notes, final, closed, user_id FROM user_recent_future_game_nights
+            WHERE user_id = :user_id
         """
         all_game_nights = db.session.execute(text(query), {"user_id": current_user.id}).mappings().all()
 
