@@ -154,19 +154,14 @@ class GamesIndex(db.Model):
     player_owner = db.Column(db.Boolean, nullable=True)
     user_owns_game = db.Column(db.Boolean, nullable=False)  # Precomputed boolean
 
-def get_table(table_name):
-    """Helper function to load tables within an app context."""
-    with current_app.app_context():
-        return Table(table_name, db.metadata, autoload_with=db.engine)
-
 class UserRecentFutureGameNight(db.Model):
-    __table__ = get_table("user_recent_future_game_nights")
+    __table__ = None  # Table will be assigned in create_app()
 
 class UserGameNightList(db.Model):
-    __table__ = get_table("user_game_nights_list")
+    __table__ = None
 
 class AdminGameNightList(db.Model):
-    __table__ = get_table("admin_game_nights_list")
+    __table__ = None
 
 class AdminRecentFutureGameNight(db.Model):
-    __table__ = get_table("admin_recent_future_game_nights")
+    __table__ = None

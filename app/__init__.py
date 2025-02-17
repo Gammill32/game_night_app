@@ -25,10 +25,32 @@ def create_app():
     logging.basicConfig(level=logging.DEBUG)
 
     # Initialize Database
-    from app.models import Person
-    with app.app_context():
-        db.create_all()
+    from app.models import (
+        Person, 
+        UserRecentFutureGameNight, 
+        UserGameNightList,
+        AdminGameNightList, 
+        AdminRecentFutureGameNight
+    )
+    from sqlalchemy import Table
 
+    with app.app_context():
+        db.create_all()  # Create tables if they don't exist
+
+        # Assign SQL views inside the app context
+        UserRecentFutureGameNight.__table__ = Table(
+            "user_recent_future_game_nights", db.metadata, autoload_with=db.engine
+        )
+        UserGameNightList.__table__ = Table(
+            "user_game_nights_list", db.metadata, autoload_with=db.engine
+        )
+        AdminGameNightList.__table__ = Table(
+            "admin_game_nights_list", db.metadata, autoload_with=db.engine
+        )
+        AdminRecentFutureGameNight.__table__ = Table(
+            "admin_recent_future_game_nights", db.metadata, autoload_with=db.engine
+        )
+        
     @login_manager.user_loader
     def load_user(user_id):
         return Person.query.get(int(user_id))
