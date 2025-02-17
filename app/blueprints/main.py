@@ -33,11 +33,11 @@ def index():
     end_date = start_date + timedelta(days=calendar.monthrange(year, month)[1] - 1)
 
     # Fetch game nights based on user role using SQL views
-    if current_user.owner or current_user.admin:
-        # Owners and admins see all game nights
+    if current_user.owner:
+        # Owners see all game nights
         query = """
             SELECT game_night_id, date, notes, final, closed 
-            FROM public.game_nights_list
+            FROM admin_game_nights_list
             WHERE date BETWEEN :start_date AND :end_date
             ORDER BY date ASC
         """
@@ -46,7 +46,7 @@ def index():
         # Regular users see only their game nights
         query = """
             SELECT game_night_id, date, notes, final, closed 
-            FROM public.game_nights_list
+            FROM user_game_nights_list
             WHERE user_id = :user_id
             AND date BETWEEN :start_date AND :end_date
             ORDER BY date ASC
@@ -72,7 +72,7 @@ def index():
     years = list(range(earliest_year, today_central.year + 11))
 
     # Fetch recent and future game nights using the optimized view
-    if current_user.owner or current_user.admin:
+    if current_user.owner:
         query = "SELECT game_night_id, date, notes, final, closed FROM admin_recent_future_game_nights"
         all_game_nights = db.session.execute(text(query)).fetchall()
     else:
@@ -103,20 +103,28 @@ def all_game_nights():
     """Displays all game nights based on user role."""
     with db.session.begin():
         if current_user.owner:
-            # Owners see all game nights
-            game_nights = GameNight.query.order_by(GameNight.date.asc()).all()
+            query = """
+                SELECT game_night_id, date, notes, final, closed 
+                FROM admin_game_nights_list
+                ORDER BY date DESC
+            """
+            game_nights = db.session.execute(text(query)).mappings().all()
         else:
             # Regular users and admins see only game nights they are part of
-            game_nights = GameNight.query.join(Player).filter(
-                Player.people_id == current_user.id
-            ).order_by(GameNight.date.asc()).all()
+            query = """
+                SELECT game_night_id, date 
+                FROM user_game_nights_list
+                WHERE user_id = :user_id
+                ORDER BY date DESC
+            """
+            game_nights = db.session.execute(
+                text(query), 
+                {"user_id": current_user.id}
+            ).mappings().all()
 
-    return render_template('all_game_nights.html', game_nights=game_nights)
+    # Create context dictionary
+    context = {
+        "game_nights": game_nights
+    }
 
-@main_bp.route("/db_test")
-def db_test():
-    try:
-        game_night_count = GameNight.query.count()  # No need for app context
-        return {"status": "ok", "game_night_count": game_night_count}, 200
-    except Exception as e:
-        return {"status": "error", "message": str(e)}, 500
+    return render_template('all_game_nights.html', **context)

@@ -10,7 +10,7 @@
     <ul class="game-nights">
         {% for gn in game_nights %}
             <li>
-                <a href="{{ url_for('game_night.view_game_night', game_night_id=gn.id) }}">
+                <a href="{{ url_for('game_night.view_game_night', game_night_id=gn.game_night_id) }}">
                     {{ gn.date.strftime('%B %d, %Y') }}
                 </a>
             </li>

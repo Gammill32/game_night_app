@@ -1,7 +1,7 @@
 # models.py
 
 #from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import ForeignKey, func
+from sqlalchemy import ForeignKey, func, Table
 from sqlalchemy.orm import relationship
 from flask_login import UserMixin
 from app.extensions import db
@@ -152,3 +152,16 @@ class GamesIndex(db.Model):
     owner_id = db.Column(db.Integer, db.ForeignKey("people.id"), nullable=True)
     player_owner = db.Column(db.Boolean, nullable=True)
     user_owns_game = db.Column(db.Boolean, nullable=False)  # Precomputed boolean
+
+#SQL Views
+class UserRecentFutureGameNight(db.Model):
+    __table__ = Table("user_recent_future_game_nights", db.metadata, autoload_with=db.engine)
+
+class UserGameNightList(db.Model):
+    __table__ = Table("user_game_nights_list", db.metadata, autoload_with=db.engine)
+
+class AdminGameNightList(db.Model):
+    __table__ = Table("admin_game_nights_list", db.metadata, autoload_with=db.engine)
+
+class AdminRecentFutureGameNight(db.Model):
+    __table__ = Table("admin_recent_future_game_nights", db.metadata, autoload_with=db.engine)
