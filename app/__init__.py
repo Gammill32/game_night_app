@@ -34,8 +34,8 @@ def create_app():
     )
     from sqlalchemy import Table
 
-    # with app.app_context():
-    #     db.create_all()  # Create tables if they don't exist
+    with app.app_context():
+        db.create_all()  # Create tables if they don't exist
 
     #     # Assign SQL views inside the app context
     #     UserRecentFutureGameNight.__table__ = Table(
