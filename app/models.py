@@ -5,6 +5,7 @@ from sqlalchemy import ForeignKey, func, Table
 from sqlalchemy.orm import relationship
 from flask_login import UserMixin
 from app.extensions import db
+from flask import current_app
 
 #db = SQLAlchemy()
 
@@ -153,15 +154,19 @@ class GamesIndex(db.Model):
     player_owner = db.Column(db.Boolean, nullable=True)
     user_owns_game = db.Column(db.Boolean, nullable=False)  # Precomputed boolean
 
-#SQL Views
+def get_table(table_name):
+    """Helper function to load tables within an app context."""
+    with current_app.app_context():
+        return Table(table_name, db.metadata, autoload_with=db.engine)
+
 class UserRecentFutureGameNight(db.Model):
-    __table__ = Table("user_recent_future_game_nights", db.metadata, autoload_with=db.engine)
+    __table__ = get_table("user_recent_future_game_nights")
 
 class UserGameNightList(db.Model):
-    __table__ = Table("user_game_nights_list", db.metadata, autoload_with=db.engine)
+    __table__ = get_table("user_game_nights_list")
 
 class AdminGameNightList(db.Model):
-    __table__ = Table("admin_game_nights_list", db.metadata, autoload_with=db.engine)
+    __table__ = get_table("admin_game_nights_list")
 
 class AdminRecentFutureGameNight(db.Model):
-    __table__ = Table("admin_recent_future_game_nights", db.metadata, autoload_with=db.engine)
+    __table__ = get_table("admin_recent_future_game_nights")
