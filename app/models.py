@@ -1,11 +1,10 @@
 # models.py
 
-#from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import ForeignKey, func, Table
 from sqlalchemy.orm import relationship
 from flask_login import UserMixin
 from app.extensions import db
-# from flask import current_app
+
 
 class GameNight(db.Model):
     __tablename__ = 'gamenights'
@@ -148,18 +147,43 @@ class GamesIndex(db.Model):
     min_players = db.Column(db.Integer, nullable=False)
     max_players = db.Column(db.Integer, nullable=False)
     playtime = db.Column(db.Integer, nullable=True)
-    owner_id = db.Column(db.Integer, db.ForeignKey("people.id"), nullable=True)
+    owner_id = db.Column(db.Integer, nullable=True)
     player_owner = db.Column(db.Boolean, nullable=True)
     user_owns_game = db.Column(db.Boolean, nullable=False)  # Precomputed boolean
 
-# class UserRecentFutureGameNight(db.Model):
-#     __table__ = None  # Table will be assigned in create_app()
+class UserRecentFutureGameNight(db.Model): #SQL View
+    __tablename__ = "user_recent_future_game_nights"
+    id = db.Column(db.Integer, primary_key=True)  # Artificial primary key from row_number()
+    game_night_id = db.Column(db.Integer, nullable=False)
+    date = db.Column(db.Date, nullable=False)
+    notes = db.Column(db.Text, nullable=True)
+    final = db.Column(db.Boolean, nullable=False)
+    closed = db.Column(db.Boolean, nullable=False)
+    user_id = db.Column(db.Integer, nullable=False)
 
-# class UserGameNightList(db.Model):
-#     __table__ = None
+class UserGameNightList(db.Model): #SQL View
+    __tablename__ = "user_game_nights_list"
+    id = db.Column(db.Integer, primary_key=True)  # Artificial primary key from row_number()
+    game_night_id = db.Column(db.Integer, nullable=False)
+    date = db.Column(db.Date, nullable=False)
+    notes = db.Column(db.Text, nullable=True)
+    final = db.Column(db.Boolean, nullable=False)
+    closed = db.Column(db.Boolean, nullable=False)
+    user_id = db.Column(db.Integer, nullable=False)
 
-# class AdminGameNightList(db.Model):
-#     __table__ = None
+class AdminRecentFutureGameNight(db.Model): #SQL View
+    __tablename__ = "admin_recent_future_game_nights"
+    game_night_id = db.Column(db.Integer, primary_key=True)  # Use game_night_id as PK since row_number() isn't used
+    date = db.Column(db.Date, nullable=False)
+    notes = db.Column(db.Text, nullable=True)
+    final = db.Column(db.Boolean, nullable=False)
+    closed = db.Column(db.Boolean, nullable=False)
 
-# class AdminRecentFutureGameNight(db.Model):
-#     __table__ = None
+class AdminGameNightList(db.Model): #SQL View
+    __tablename__ = "admin_game_nights_list"
+    id = db.Column(db.Integer, primary_key=True)  # Artificial primary key from row_number()
+    game_night_id = db.Column(db.Integer, nullable=False)
+    date = db.Column(db.Date, nullable=False)
+    notes = db.Column(db.Text, nullable=True)
+    final = db.Column(db.Boolean, nullable=False)
+    closed = db.Column(db.Boolean, nullable=False)
