@@ -1,4 +1,12 @@
 # app/services/__init__.py
+
+from .admin_services import (
+    get_all_people,
+    toggle_admin_status,
+    remove_user,
+    add_person
+)
+
 from .index_services import (
     get_game_nights,
     get_earliest_game_night,
