@@ -48,7 +48,7 @@
                                 <div class="calendar-cell-content">
                                     {% set game_day = game_nights | selectattr("date", "equalto", current_month.replace(day=day)) | list %}
                                     {% if game_day %}
-                                        <a href="{{ url_for('game_night.view_game_night', game_night_id=gn.game_night_id) }}">
+                                        <a href="{{ url_for('game_night.view_game_night', game_night_id=game_day.game_night_id) }}">
                                             <strong>{{ day }}</strong>
                                             <div class="dice-icon">🎲</div>
                                         </a>
