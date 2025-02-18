@@ -5,7 +5,7 @@ from flask_login import login_required, current_user
 from datetime import datetime, date
 import calendar
 import pytz
-from app.services import admin_services
+from app.services import index_services
 
 main_bp = Blueprint("main", __name__)
 
@@ -28,27 +28,27 @@ def index():
     end_date = start_date.replace(day=calendar.monthrange(year, month)[1])
 
     # Fetch game nights
-    game_nights = admin_services.get_game_nights(current_user, start_date, end_date)
+    game_nights = index_services.get_game_nights(current_user, start_date, end_date)
 
     # Get earliest game night
-    earliest_game_night = admin_services.get_earliest_game_night()
+    earliest_game_night = index_services.get_earliest_game_night()
     earliest_year = earliest_game_night.year if earliest_game_night else today_central.year
 
     # Calculate previous and next months
-    prev_month, next_month = admin_services.get_navigation_dates(start_date, earliest_game_night)
+    prev_month, next_month = index_services.get_navigation_dates(start_date, earliest_game_night)
 
     # Generate dropdown options
     months = [(i, calendar.month_name[i]) for i in range(1, 13)]
     years = list(range(earliest_year, today_central.year + 11))
 
     # Fetch recent and future game nights
-    all_game_nights = admin_services.get_recent_and_future_game_nights(current_user)
+    all_game_nights = index_services.get_recent_and_future_game_nights(current_user)
 
     # Create context dictionary
     context = {
         "game_nights": game_nights,
         "game_nights_list": all_game_nights,
-        "calendar": admin_services.get_calendar_data(year, month),
+        "calendar": index_services.get_calendar_data(year, month),
         "current_month": start_date,
         "prev_month": prev_month,
         "next_month": next_month,
@@ -63,7 +63,7 @@ def index():
 @login_required
 def all_game_nights():
     """Displays all game nights based on user role."""
-    game_nights = admin_services.get_game_nights(current_user)
+    game_nights = index_services.get_game_nights(current_user)
 
     # Create context dictionary
     context = {
