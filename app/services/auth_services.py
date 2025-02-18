@@ -2,7 +2,7 @@ from app.models import db, Person
 from app.extensions import bcrypt
 from sqlalchemy import func
 import secrets
-from utils import send_email
+from app.utils import send_email
 
 def login(email, password):
     """Authenticate user and return success status, message, and user instance."""
