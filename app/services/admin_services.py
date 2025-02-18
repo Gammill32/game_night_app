@@ -2,7 +2,7 @@ from app.models import db, Person
 
 def get_all_people():
     """Fetch all people from the database."""
-    return Person.query.all()
+    return Person.query.order_by(Person.last_name).all()
 
 def toggle_admin_status(user_id):
     """Toggle the admin status of a user."""

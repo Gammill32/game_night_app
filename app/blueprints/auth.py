@@ -1,33 +1,32 @@
 # blueprints/auth.py
 
-from flask import Blueprint, render_template, request, redirect, url_for, flash, session, current_app, jsonify
-from flask_login import login_user, logout_user, login_required, current_user, login_manager
-#from werkzeug.security import generate_password_hash, check_password_hash
-from app.models import Person, Result, GameNightGame, Game, Player
+from flask import Blueprint, render_template, request, redirect, url_for, flash
+from flask_login import login_user, logout_user, login_required, current_user
+from app.models import Result, GameNightGame, Game, Player
+from app.services import auth_services
 from app.utils import flash_if_no_action
 from sqlalchemy import func
-from app.extensions import db, bcrypt
-import sys
+from app.extensions import db
 
 auth_bp = Blueprint("auth", __name__)
 
 @auth_bp.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
-        email = request.form.get("email").strip().lower()
+        email = request.form.get("email", "").strip().lower()
         password = request.form.get("password")
-
-        user = Person.query.filter(func.lower(Person.email)==email).first()
-        if user and bcrypt.check_password_hash(user.password, password):
+        
+        success, message, user = auth_services.login(email, password)
+        
+        if success:
             login_user(user)
-
             if user.temp_pass:
                 flash("Please update your password.", "warning")
                 return redirect(url_for("auth.update_password"))
             return redirect(request.args.get("next") or url_for("main.index"))
         else:
-            flash("Invalid email or password.", "error")
-
+            flash(message, "error")
+    
     return render_template("login.html")
 
 @auth_bp.route("/logout", methods=["POST"])
@@ -37,63 +36,35 @@ def logout():
     flash("You have been logged out.", "success")
     return redirect(url_for("auth.login"))
 
-
 @auth_bp.route("/signup", methods=["GET", "POST"])
 @flash_if_no_action("Please provide all required fields to sign up.", "error")
 def signup():
     if request.method == "POST":
         first_name = request.form.get("first_name")
         last_name = request.form.get("last_name")
-        email = request.form.get("email").strip().lower()
+        email = request.form.get("email", "").strip().lower()
         password = request.form.get("password")
-
-        existing_user = Person.query.filter_by(email=email).first()
-        if existing_user:
-            flash("An account with this email already exists.", "error")
-            return redirect(url_for("auth.signup"))
-
-        hashed_password = bcrypt.generate_password_hash(password)
-        new_user = Person(first_name=first_name, last_name=last_name, email=email, password=hashed_password)
-        db.session.add(new_user)
-        db.session.commit()
-
-        flash("Account created successfully! Please log in.", "success")
-        return redirect(url_for("auth.login"))
-
+        
+        success, message = auth_services.signup(first_name, last_name, email, password)
+        flash(message, "success" if success else "error")
+        
+        if success:
+            return redirect(url_for("auth.login"))
+    
     return render_template("signup.html")
 
-
-@auth_bp.route("/forgot_password", methods=["GET", "POST"]) #UPDATE TO OLD FORMAT
+@auth_bp.route("/forgot_password", methods=["GET", "POST"])
 @flash_if_no_action("Please enter your email address to reset your password.", "error")
 def forgot_password():
-    from utils import send_email
-    import secrets
-
     if request.method == "POST":
-        email = request.form.get("email").strip().lower()
-        user = Person.query.filter_by(email=email).first()
-
-        if user:
-            temp_password = secrets.token_urlsafe(8)
-            user.password = bcrypt.generate_password_hash(temp_password).decode('utf-8')
-            user.temp_pass = True
-            db.session.commit()
-
-            subject = "Password Reset for Game Night App"
-            html_body = f"""
-            <p>Hello {user.first_name},</p>
-            <p>Your temporary password is: <strong>{temp_password}</strong></p>
-            <p>Please log in and change your password.</p>
-            """
-            send_email(user.email, subject, html_body)
-
-            flash("A temporary password has been sent to your email.", "success")
+        email = request.form.get("email", "").strip().lower()
+        success, message = auth_services.forgot_password(email)
+        flash(message, "success" if success else "error")
+        
+        if success:
             return redirect(url_for("auth.login"))
-        else:
-            flash("Email not found.", "error")
-
+    
     return render_template("forgot_password.html")
-
 
 @auth_bp.route("/update_password", methods=["GET", "POST"])
 @login_required
@@ -102,26 +73,14 @@ def update_password():
         current_password = request.form.get("current_password")
         new_password = request.form.get("new_password")
         confirm_password = request.form.get("confirm_password")
-
-        user = current_user
-
-        if not bcrypt.check_password_hash(user.password, current_password):
-            flash("Current password is incorrect.", "error")
-            return redirect(url_for("auth.update_password"))
-
-        if new_password != confirm_password:
-            flash("New passwords do not match.", "error")
-            return redirect(url_for("auth.update_password"))
-
-        user.password = bcrypt.generate_password_hash(new_password)
-        user.temp_pass = False
-        db.session.commit()
-
-        flash("Password updated successfully.", "success")
-        return redirect(url_for("main.index"))
-
+        
+        success, message = auth_services.update_password(current_user, current_password, new_password, confirm_password)
+        flash(message, "success" if success else "error")
+        
+        if success:
+            return redirect(url_for("main.index"))
+    
     return render_template("update_password.html")
-
 
 @auth_bp.route("/manage_user", methods=["GET", "POST"])
 @login_required
