@@ -94,7 +94,7 @@ def parse_log_results_form(form_data):
 
 def log_results(game_night_id, game_night_game_id, scores_positions):
     """Log results for a game night game."""
-    game_night_game = GameNightGame.query.filter_by(game_night_id=game_night_id, game_night_game_id=game_night_game_id).first_or_404()
+    game_night_game = GameNightGame.query.filter_by(game_night_id=game_night_id, id=game_night_game_id).first_or_404()
 
     for player_id, data in scores_positions.items():
         user_id = data["user_id"]
