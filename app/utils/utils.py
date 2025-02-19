@@ -2,12 +2,13 @@
 from app.models import db, Result, GameNightGame
 from sqlalchemy import func
 from flask_mail import Message
-from app import mail, app
+from app import mail
+from flask import current_app
 
 def send_email(to, subject, html_body):
     """Helper function to send emails."""
-    with app.app_context():  # Ensure the correct application context
-        msg = Message(subject, sender=app.config['MAIL_USERNAME'], recipients=[to])
+    with current_app.app_context():  # Ensure the correct application context
+        msg = Message(subject, sender=current_app.config['MAIL_USERNAME'], recipients=[to])
         msg.html = html_body
         mail.send(msg)
         
