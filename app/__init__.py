@@ -22,9 +22,7 @@ def create_app():
     logging.basicConfig(level=logging.DEBUG)
 
     # Initialize Database
-    from app.models import (
-        Person
-    )
+    from app.models import Person
 
     with app.app_context():
         db.create_all()  # Create tables if they don't exist
@@ -34,15 +32,15 @@ def create_app():
         return Person.query.get(int(user_id))
 
     # Register Blueprints
-    from app.blueprints import auth_bp, admin_bp, game_night_bp, games_bp, voting_bp, reminders_bp, main_bp, test_bp
-    app.register_blueprint(auth_bp)
-    app.register_blueprint(admin_bp)
-    app.register_blueprint(game_night_bp)
-    app.register_blueprint(games_bp)
-    app.register_blueprint(voting_bp)
-    app.register_blueprint(reminders_bp)
-    app.register_blueprint(main_bp)
-    app.register_blueprint(test_bp)
+    from app import blueprints
+    app.register_blueprint(blueprints.auth_bp)
+    app.register_blueprint(blueprints.admin_bp)
+    app.register_blueprint(blueprints.game_night_bp)
+    app.register_blueprint(blueprints.games_bp)
+    app.register_blueprint(blueprints.voting_bp)
+    app.register_blueprint(blueprints.reminders_bp)
+    app.register_blueprint(blueprints.main_bp)
+    app.register_blueprint(blueprints.test_bp)
 
     # Scheduler for reminders
     from app.services.reminders_services import start_scheduler
