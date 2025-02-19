@@ -1,6 +1,6 @@
 from app.models import db, GameNight, Player, GameNightGame, Result, Game
 from datetime import datetime
-from app.services.auth_services import get_all_people
+from app.services.admin_services import get_all_people
 
 def start_game_night(date_str, notes, attendees_ids):
     """Create a new game night and add attendees."""
