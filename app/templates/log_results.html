@@ -5,7 +5,7 @@
 {% block content %}
     <h1>Log Results for {{ game_night_game.game.name }} (Round {{ game_night_game.round }})</h1>
 
-    <form action="{{ url_for('game_night.log_results', game_night_id=game_night.id, game_night_game_id=game_night_game.id) }}" method="POST">
+    <form action="{{ url_for('game_night.log_results', game_night_id=game_night_id, game_night_game_id=game_night_game.id) }}" method="POST">
         <!-- Styled Table -->
         <table style="width: 100%; border-collapse: collapse; text-align: center;">
             <thead>
@@ -55,7 +55,7 @@
 
     <!-- Back Link -->
     <div style="text-align: center; margin-top: 20px;">
-        <a href="{{ url_for('game_night.view_game_night', game_night_id=game_night.id) }}" style="
+        <a href="{{ url_for('game_night.view_game_night', game_night_id=game_night_id) }}" style="
             color: #007BFF;
             text-decoration: none;
             font-weight: bold;">

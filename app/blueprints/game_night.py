@@ -223,7 +223,7 @@ def log_results(game_night_id, game_night_game_id):
         return redirect(url_for("game_night.view_game_night", game_night_id=game_night_id))
     
     game_night_game, players, existing_results = game_night_services.get_log_results_data(game_night_game_id)
-    return render_template("log_results.html", game_night_game=game_night_game, players=players, existing_results=existing_results)
+    return render_template("log_results.html", game_night_id=game_night_id, game_night_game=game_night_game, players=players, existing_results=existing_results)
 
 @game_night_bp.route("/game_night/<int:game_night_id>/toggle_results", methods=["POST"])
 @login_required
