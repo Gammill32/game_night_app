@@ -56,7 +56,7 @@ def create_app():
         return Person.query.get(int(user_id))
 
     # Register Blueprints
-    from app.blueprints import auth_bp, admin_bp, game_night_bp, games_bp, voting_bp, reminders_bp, main_bp
+    from app.blueprints import auth_bp, admin_bp, game_night_bp, games_bp, voting_bp, reminders_bp, main_bp, test_bp
     app.register_blueprint(auth_bp)
     app.register_blueprint(admin_bp)
     app.register_blueprint(game_night_bp)
@@ -64,6 +64,7 @@ def create_app():
     app.register_blueprint(voting_bp)
     app.register_blueprint(reminders_bp)
     app.register_blueprint(main_bp)
+    app.register_blueprint(test_bp)
 
     # Scheduler for reminders
     from app.blueprints.reminders import check_and_send_reminders
