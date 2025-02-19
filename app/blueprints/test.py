@@ -2,7 +2,7 @@ from flask import Blueprint, redirect, url_for, flash
 from app.utils import send_email
 from flask_login import login_required, current_user
 
-test_bp = Blueprint("admin", __name__)
+test_bp = Blueprint("test", __name__)
 
 @test_bp.route("/send_test_email", methods=["GET"])
 @login_required  # Ensure user is logged in
