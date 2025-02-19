@@ -1,7 +1,16 @@
 # utils/utils.py
 from app.models import db, Result, GameNightGame
 from sqlalchemy import func
+from flask_mail import Message
+from app import mail, app
 
+def send_email(to, subject, html_body):
+    """Helper function to send emails."""
+    with app.app_context():  # Ensure the correct application context
+        msg = Message(subject, sender=app.config['MAIL_USERNAME'], recipients=[to])
+        msg.html = html_body
+        mail.send(msg)
+        
 def determine_top_places(game_night_id):
     """Calculate top player rankings for a game night."""
     results = (
