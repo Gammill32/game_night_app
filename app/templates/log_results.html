@@ -69,7 +69,6 @@
 
             let formData = {};  // Store player data in structured format
 
-            // Loop through all score inputs and position inputs
             document.querySelectorAll(".score-input, .position-input").forEach(input => {
                 let playerId = input.dataset.playerId;
                 if (!formData[playerId]) {
@@ -88,11 +87,15 @@
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(formData)
             })
-            .then(response => response.json())
-            .then(data => {
-                alert(data.message); // Show success message
-                window.location.href = "{{ url_for('game_night.view_game_night', game_night_id=game_night_id) }}"; // Redirect after submission
+            .then(response => {
+                // If the response is a redirect, manually follow it
+                if (response.redirected) {
+                    window.location.href = response.url;
+                    return;
+                }
+                return response.text(); // If not redirected, log response for debugging
             })
+            .then(data => console.log("Response:", data))
             .catch(error => console.error("Error:", error));
         });
     </script>
