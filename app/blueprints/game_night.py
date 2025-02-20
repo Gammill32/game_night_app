@@ -2,12 +2,12 @@
 
 from flask import Blueprint, render_template, request, redirect, url_for, flash
 from flask_login import login_required, current_user
-from app.models import db, GameNight, Player, Game, GameNightGame, Result, OwnedBy, GameNominations, GameVotes, Person
+from app.models import db, GameNight, Player, Game, GameNightGame, Result, OwnedBy, GameNominations, GameVotes
 from app.utils import admin_required, game_night_access_required, flash_if_no_action, determine_top_places
 from sqlalchemy.orm import joinedload
 from sqlalchemy import func, and_, case
-from datetime import datetime
 from app.services import game_night_services, admin_services
+import json
 
 game_night_bp = Blueprint("game_night", __name__)
 
@@ -218,11 +218,15 @@ def remove_game_from_night(game_night_id, game_id):
 def log_results(game_night_id, game_night_game_id):
     if request.method == "POST":
         # Extract results from the form using the new service function
-        scores_positions = game_night_services.parse_log_results_form(request.form)
+        scores_positions, raw_results = game_night_services.parse_log_results_form(request.form)
+
+        # Convert raw_results to a JSON string for debugging
+        raw_results_str = json.dumps(raw_results, indent=2)  # Pretty format
 
         # Call the function to log results
         success, message = game_night_services.log_results(game_night_id, game_night_game_id, scores_positions)
         flash(message, "success" if success else "error")
+        flash(f"Raw Form Data: {raw_results_str}", "info")  # Debugging output
 
         return redirect(url_for("game_night.view_game_night", game_night_id=game_night_id))
 

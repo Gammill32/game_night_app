@@ -90,7 +90,7 @@ def parse_log_results_form(form_data):
             except ValueError:
                 print(f"Invalid player ID format: {player_id}")  # Debugging
 
-    return scores_positions
+    return scores_positions, raw_results
 
 def log_results(game_night_id, game_night_game_id, scores_positions):
     """Log results for a game night game."""
