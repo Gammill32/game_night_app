@@ -39,14 +39,16 @@ def view_game(game_id):
 @games_bp.route("/game/<int:game_id>/claim", methods=["POST"])
 @login_required
 def claim_game(game_id):
-    success, message = games_services.claim_game(current_user.id, game_id)
+    success, message = games_services.modify_ownership(current_user.id, game_id, add=True)
+    if success:
+        games_services.modify_wishlist(current_user.id, game_id, remove=True)  # Remove from wishlist if ownership is claimed
     flash(message, "success" if success else "error")
     return redirect(url_for("games.games_index"))
 
 @games_bp.route("/game/<int:game_id>/remove_ownership", methods=["POST"])
 @login_required
 def remove_ownership(game_id):
-    success, message = games_services.remove_ownership(current_user.id, game_id)
+    success, message = games_services.modify_ownership(current_user.id, game_id, add=False)
     flash(message, "success" if success else "error")
     return redirect(url_for("games.games_index"))
 
@@ -63,7 +65,7 @@ def add_to_wishlist():
         name = request.form.get("name", "").strip()
         bgg_id = request.form.get("bgg_id", "").strip()
         
-        success, message = games_services.add_to_wishlist(current_user.id, name, bgg_id)
+        success, message = games_services.add_game_to_wishlist(current_user.id, name, bgg_id)
         flash(message, "success" if success else "error")
         
         return redirect(url_for("games.wishlist"))
@@ -73,13 +75,6 @@ def add_to_wishlist():
 @games_bp.route("/wishlist/remove/<int:game_id>", methods=["POST"])
 @login_required
 def remove_from_wishlist(game_id):
-    success, message = games_services.remove_from_wishlist(current_user.id, game_id)
-    flash(message, "success" if success else "error")
-    return redirect(url_for("games.wishlist"))
-
-@games_bp.route("/wishlist/claim_and_remove/<int:game_id>", methods=["POST"])
-@login_required
-def claim_and_remove(game_id):
-    success, message = games_services.claim_and_remove(current_user.id, game_id)
+    success, message = games_services.modify_wishlist(current_user.id, game_id, remove=True)
     flash(message, "success" if success else "error")
     return redirect(url_for("games.wishlist"))
