@@ -112,7 +112,9 @@ def log_results(game_night_id, game_night_game_id, scores_positions):
         result.position = position
 
     db.session.commit()
-    return True, "Results logged successfully."
+    # Convert scores_positions to a string for the success message
+    scores_str = ", ".join([f"Player {k}: Score={v['score']}, Position={v['position']}" for k, v in scores_positions.items()])
+    return True, f"Results logged successfully: {scores_str}"
 
 def get_all_games():
     """Retrieve all available games."""
