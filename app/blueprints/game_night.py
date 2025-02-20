@@ -212,18 +212,23 @@ def remove_game_from_night(game_night_id, game_id):
     flash(message, "success" if success else "error")
     return redirect(url_for("game_night.view_game_night", game_night_id=game_night_id))
 
-@game_night_bp.route("/game_night/<int:game_night_id>/log_results/<int:game_night_game_id>", methods=["POST"])
+@game_night_bp.route("/game_night/<int:game_night_id>/log_results/<int:game_night_game_id>", methods=["GET", "POST"])
 @login_required
 @admin_required
 def log_results(game_night_id, game_night_game_id):
-    data = request.get_json()  # Get JSON data instead of form data
+    if request.method == "POST":
+        data = request.get_json()  # Get JSON data instead of form data
 
-    if not data:
-        return {"message": "No data received"}, 400  # Return plain dictionary
+        if not data:
+            return {"message": "No data received"}, 400
 
-    success, message = game_night_services.log_results(game_night_id, game_night_game_id, data)
-    
-    return {"message": message}, (200 if success else 400)  # Flask converts dict to JSON automatically (Test)
+        success, message = game_night_services.log_results(game_night_id, game_night_game_id, data)
+        
+        return {"message": message}, (200 if success else 400)
+
+    # If GET request, show the log results form
+    game_night_game, players, existing_results = game_night_services.get_log_results_data(game_night_game_id)
+    return render_template("log_results.html", game_night_id=game_night_id, game_night_game=game_night_game, players=players, existing_results=existing_results)
 
 
 @game_night_bp.route("/game_night/<int:game_night_id>/toggle_results", methods=["POST"])
