@@ -73,24 +73,6 @@ def remove_game_from_night(game_night_id, game_id):
     
     return False, "Game not found in this game night."
 
-def parse_log_results_form(form_data):
-    """Extract and structure game results from form submission."""
-    scores_positions = {}
-
-    if "results" in form_data:
-        raw_results = form_data.to_dict(flat=False)  # Convert form data into a dictionary
-        for player_id, values in raw_results["results"].items():
-            try:
-                player_id = int(player_id)  # Convert player_id to an integer
-                scores_positions[player_id] = {
-                    "user_id": player_id,
-                    "score": int(values.get("score", 0)) if values.get("score") else None,
-                    "position": int(values.get("position", 0)) if values.get("position") else None,
-                }
-            except ValueError:
-                print(f"Invalid player ID format: {player_id}")  # Debugging
-
-    return scores_positions, raw_results
 
 def log_results(game_night_id, game_night_game_id, scores_positions):
     """Log results for a game night game."""

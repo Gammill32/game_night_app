@@ -217,14 +217,16 @@ def remove_game_from_night(game_night_id, game_id):
 @admin_required
 def log_results(game_night_id, game_night_game_id):
     if request.method == "POST":
-        data = request.get_json()  # Get JSON data instead of form data
+        data = request.get_json()  # Get JSON data
 
         if not data:
-            return {"message": "No data received"}, 400
+            flash("No data received", "error")
+            return redirect(url_for("game_night.view_game_night", game_night_id=game_night_id))
 
         success, message = game_night_services.log_results(game_night_id, game_night_game_id, data)
-        
-        return {"message": message}, (200 if success else 400)
+
+        flash(message, "success" if success else "error")
+        return redirect(url_for("game_night.view_game_night", game_night_id=game_night_id))
 
     # If GET request, show the log results form
     game_night_game, players, existing_results = game_night_services.get_log_results_data(game_night_game_id)
