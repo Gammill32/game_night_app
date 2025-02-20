@@ -3,7 +3,7 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash
 from flask_login import login_required, current_user
 from app.models import db, GameNight, Player, Game, GameNightGame, Result, OwnedBy, GameNominations, GameVotes
-from app.utils import admin_required, game_night_access_required, flash_if_no_action, determine_top_places
+from app.utils import admin_required, game_night_access_required, flash_if_no_action
 from sqlalchemy.orm import joinedload
 from sqlalchemy import func, and_, case
 from app.services import game_night_services, admin_services
@@ -142,7 +142,7 @@ def view_game_night(game_night_id):
     # Determine top places if results are logged
     top_places = None
     if results_logged:
-        raw_places = determine_top_places(game_night_id)
+        raw_places = game_night_services.determine_top_places(game_night_id)
         top_places = [
             (place, [Player.query.get(player_id) for player_id in players if Player.query.get(player_id) is not None])
             for place, players in raw_places if players

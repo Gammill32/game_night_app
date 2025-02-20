@@ -1,6 +1,7 @@
-from app.models import db, GameNight, Player, GameNightGame, Result, Game
+from app.models import db, GameNight, Player, GameNightGame, Result, Game, GameNightRankings
 from datetime import datetime
 from app.services.admin_services import get_all_people
+from collections import defaultdict
 
 def start_game_night(date_str, notes, attendees_ids):
     """Create a new game night and add attendees."""
@@ -120,3 +121,25 @@ def toggle_voting(game_night_id):
     game_night.closed = not game_night.closed
     db.session.commit()
     return True, "Voting has been closed." if game_night.closed else "Voting has been reopened."
+
+def determine_top_places(game_night_id):
+    """Fetch precomputed rankings for a game night from the database."""
+    results = (
+        db.session.query(
+            GameNightRankings.rank, 
+            GameNightRankings.player_id
+        )
+        .filter(GameNightRankings.game_night_id == game_night_id)
+        .order_by(GameNightRankings.rank)
+        .all()
+    )
+
+    if not results:
+        return None
+
+    places = defaultdict(list)
+    for rank, player_id in results:
+        places[rank].append(player_id)
+
+    return sorted(places.items())  # Return as list of tuples (rank, [player_ids])
+

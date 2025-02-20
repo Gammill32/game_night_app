@@ -137,7 +137,7 @@ class Wishlist(db.Model):
     person = db.relationship('Person', back_populates='wishlist_items')
     game = db.relationship('Game', back_populates='wishlist_entries')
 
-class GamesIndex(db.Model):
+class GamesIndex(db.Model): #SQL View
     __tablename__ = "games_index"
     __table_args__ = {"extend_existing": True}  # Ensures no conflicts
 
@@ -187,3 +187,23 @@ class AdminGameNightList(db.Model): #SQL View
     notes = db.Column(db.Text, nullable=True)
     final = db.Column(db.Boolean, nullable=False)
     closed = db.Column(db.Boolean, nullable=False)
+
+class GameNightRankings(db.Model):  # SQL View
+    __tablename__ = "game_night_rankings_view"
+
+    id = db.Column(db.Integer, primary_key=True)  # Artificial primary key from row_number()
+    game_night_id = db.Column(db.Integer, nullable=False)
+    player_id = db.Column(db.Integer, nullable=False)
+    position_counts = db.Column(db.ARRAY(db.Integer), nullable=False)  # Array of position counts
+    overall_score = db.Column(db.Integer, nullable=False)
+    rank = db.Column(db.Integer, nullable=False)
+    
+class GameNightRankings(db.Model):  # SQL View
+    __tablename__ = "game_night_rankings_view"
+
+    id = db.Column(db.Integer, primary_key=True)  # Artificial primary key from row_number()
+    game_night_id = db.Column(db.Integer, nullable=False)
+    player_id = db.Column(db.Integer, nullable=False)
+    position_counts = db.Column(db.ARRAY(db.Integer), nullable=False)  # Array of position counts
+    overall_score = db.Column(db.Integer, nullable=False)
+    rank = db.Column(db.Integer, nullable=False)
