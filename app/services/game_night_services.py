@@ -97,7 +97,7 @@ def log_results(game_night_id, game_night_game_id, scores_positions):
     game_night_game = GameNightGame.query.filter_by(game_night_id=game_night_id, id=game_night_game_id).first_or_404()
 
     for player_id, data in scores_positions.items():
-        user_id = data["user_id"]
+        user_id = int(data["user_id"])
         score = data["score"]
         position = data["position"]
 
@@ -112,9 +112,7 @@ def log_results(game_night_id, game_night_game_id, scores_positions):
         result.position = position
 
     db.session.commit()
-    # Convert scores_positions to a string for the success message
-    scores_str = ", ".join([f"Player {k}: Score={v['score']}, Position={v['position']}" for k, v in scores_positions.items()])
-    return True, f"Results logged successfully: {scores_str}"
+    return True, "Results logged successfully."
 
 def get_all_games():
     """Retrieve all available games."""

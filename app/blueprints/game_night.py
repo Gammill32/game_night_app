@@ -212,27 +212,18 @@ def remove_game_from_night(game_night_id, game_id):
     flash(message, "success" if success else "error")
     return redirect(url_for("game_night.view_game_night", game_night_id=game_night_id))
 
-@game_night_bp.route("/game_night/<int:game_night_id>/log_results/<int:game_night_game_id>", methods=["GET", "POST"])
+@game_night_bp.route("/game_night/<int:game_night_id>/log_results/<int:game_night_game_id>", methods=["POST"])
 @login_required
 @admin_required
 def log_results(game_night_id, game_night_game_id):
-    if request.method == "POST":
-        # Extract results from the form using the new service function
-        scores_positions, raw_results = game_night_services.parse_log_results_form(request.form)
+    data = request.get_json()  # Get JSON data instead of form data
 
-        # Convert raw_results to a JSON string for debugging
-        raw_results_str = json.dumps(raw_results, indent=2)  # Pretty format
+    if not data:
+        return {"message": "No data received"}, 400  # Return plain dictionary
 
-        # Call the function to log results
-        success, message = game_night_services.log_results(game_night_id, game_night_game_id, scores_positions)
-        flash(message, "success" if success else "error")
-        flash(f"Raw Form Data: {raw_results_str}", "info")  # Debugging output
-
-        return redirect(url_for("game_night.view_game_night", game_night_id=game_night_id))
-
-    # If GET request, load data for rendering
-    game_night_game, players, existing_results = game_night_services.get_log_results_data(game_night_game_id)
-    return render_template("log_results.html", game_night_id=game_night_id, game_night_game=game_night_game, players=players, existing_results=existing_results)
+    success, message = game_night_services.log_results(game_night_id, game_night_game_id, data)
+    
+    return {"message": message}, (200 if success else 400)  # Flask converts dict to JSON automatically
 
 
 @game_night_bp.route("/game_night/<int:game_night_id>/toggle_results", methods=["POST"])
