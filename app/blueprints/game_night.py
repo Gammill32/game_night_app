@@ -118,19 +118,25 @@ def toggle_game_night_field(game_night_id, field):
 @admin_required
 def add_game_to_night(game_night_id):
     """Render the page for selecting a game and round to add to the game night."""
-    game_night = game_night_services.get_game_night_by_id(game_night_id)  # Fetch the game night
-    games = game_night_services.get_all_games()  # Fetch all available games
+    game_night = game_night_services.get_game_night_by_id(game_night_id)  # Fetch game night details
 
-    # Capture filters from request args (if any)
-    filters = {
-        "name": request.args.get("name", ""),
-        "players": request.args.get("players", ""),
-        "playtime": request.args.get("playtime", "")
-    }
+    # Capture filters from request args
+    name_filter = request.args.get("name", "").strip()
+    players_filter = request.args.get("players", type=int)
+    playtime_filter = request.args.get("playtime", type=int)
+
+    # Fetch games that match criteria
+    games = game_night_services.get_filtered_games_for_game_night(
+        game_night_id, name_filter, players_filter, playtime_filter
+    )
 
     context = {
         "game_night": game_night,
         "games": games,
-        "filters": filters  # Ensure filters exist
+        "filters": {
+            "name": name_filter,
+            "players": players_filter,
+            "playtime": playtime_filter,
+        },
     }
     return render_template("add_game_to_night.html", **context)

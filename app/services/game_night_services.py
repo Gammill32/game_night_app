@@ -290,3 +290,24 @@ def get_view_game_night_details(game_night_id, current_user_id):
         "user_votes": user_votes,
         "top_places": top_places
     }
+
+def get_filtered_games_for_game_night(game_night_id, name_filter=None, players_filter=None, playtime_filter=None):
+    """Retrieve filtered games based on ownership by game night attendees."""
+    game_night = GameNight.query.get_or_404(game_night_id)
+    player_ids = [player.people_id for player in game_night.players]  # Get attendees
+
+    # Get game IDs owned by any attendees
+    owned_game_ids = db.session.query(OwnedBy.game_id).filter(OwnedBy.person_id.in_(player_ids)).subquery()
+    
+    # Query games based on owned game IDs
+    query = Game.query.filter(Game.id.in_(owned_game_ids))
+
+    # Apply optional filters
+    if name_filter:
+        query = query.filter(Game.name.ilike(f"%{name_filter}%"))
+    if players_filter is not None:
+        query = query.filter(Game.min_players <= players_filter, Game.max_players >= players_filter)
+    if playtime_filter is not None:
+        query = query.filter(Game.playtime <= playtime_filter)
+
+    return query.order_by(Game.name).all()
