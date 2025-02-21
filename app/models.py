@@ -197,13 +197,3 @@ class GameNightRankings(db.Model):  # SQL View
     position_counts = db.Column(db.ARRAY(db.Integer), nullable=False)  # Array of position counts
     overall_score = db.Column(db.Integer, nullable=False)
     rank = db.Column(db.Integer, nullable=False)
-    
-class GameNightRankings(db.Model):  # SQL View
-    __tablename__ = "game_night_rankings_view"
-
-    id = db.Column(db.Integer, primary_key=True)  # Artificial primary key from row_number()
-    game_night_id = db.Column(db.Integer, nullable=False)
-    player_id = db.Column(db.Integer, nullable=False)
-    position_counts = db.Column(db.ARRAY(db.Integer), nullable=False)  # Array of position counts
-    overall_score = db.Column(db.Integer, nullable=False)
-    rank = db.Column(db.Integer, nullable=False)
