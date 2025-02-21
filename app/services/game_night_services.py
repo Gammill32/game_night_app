@@ -149,6 +149,10 @@ def determine_top_places(game_night_id):
 
     return sorted(places.items())  # Return as list of tuples (rank, [player_ids])
 
+def get_game_night_by_id(game_night_id):
+    """Retrieve a game night by ID or return 404 if not found."""
+    return GameNight.query.get_or_404(game_night_id)
+
 def get_view_game_night_details(game_night_id, current_user_id):
     """Fetch all necessary data for viewing a game night."""
 

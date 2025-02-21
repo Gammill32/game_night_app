@@ -118,10 +118,11 @@ def toggle_game_night_field(game_night_id, field):
 @admin_required
 def add_game_to_night(game_night_id):
     """Render the page for selecting a game and round to add to the game night."""
-    games = game_night_services.get_all_games()
+    game_night = game_night_services.get_game_night_by_id(game_night_id)  # Fetch the game night
+    games = game_night_services.get_all_games()  # Fetch all available games
 
     context = {
-        "games": games,
-        "game_night_id": game_night_id
+        "game_night": game_night,
+        "games": games
     }
     return render_template("add_game_to_night.html", **context)
