@@ -112,3 +112,16 @@ def toggle_game_night_field(game_night_id, field):
     success, message = game_night_services.toggle_game_night_field(game_night_id, field)
     flash(message, "success" if success else "error")
     return redirect(url_for("game_night.view_game_night", game_night_id=game_night_id))
+
+@game_night_bp.route("/game_night/<int:game_night_id>/add_game", methods=["GET"])
+@login_required
+@admin_required
+def add_game_to_night(game_night_id):
+    """Render the page for selecting a game and round to add to the game night."""
+    games = game_night_services.get_all_games()
+
+    context = {
+        "games": games,
+        "game_night_id": game_night_id
+    }
+    return render_template("add_game_to_night.html", **context)
