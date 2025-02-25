@@ -35,6 +35,7 @@ class Person(db.Model, UserMixin):
     players = relationship('Player', back_populates='person', cascade='all, delete-orphan')
     owned_games = relationship('OwnedBy', back_populates='person', cascade='all, delete-orphan')
     wishlist_items = db.relationship('Wishlist', back_populates='person', cascade='all, delete-orphan')
+    rankings = relationship('GameRankings', back_populates='person', cascade='all, delete-orphan')
 
     @property
     def is_admin_or_owner(self):
@@ -57,6 +58,7 @@ class Game(db.Model):
     nominations = db.relationship('GameNominations', back_populates='game', cascade='all, delete-orphan')
     votes = db.relationship('GameVotes', back_populates='game', cascade='all, delete-orphan')
     wishlist_entries = db.relationship('Wishlist', back_populates='game', cascade='all, delete-orphan')
+    rankings = relationship('GameRankings', back_populates='game', cascade='all, delete-orphan')
 
 class OwnedBy(db.Model):
     __tablename__ = 'ownedby'
@@ -74,8 +76,8 @@ class GameRankings(db.Model):
     person_id = db.Column(db.Integer, ForeignKey('people.id'), nullable=False)
     ranking = db.Column(db.Integer)
 
-    game = relationship('Game', back_populates='owners')
-    person = relationship('Person', back_populates='owned_games')
+    game = relationship('Game', back_populates='rankings')
+    person = relationship('Person', back_populates='rankings')
 
 class Player(db.Model):
     __tablename__ = 'players'
