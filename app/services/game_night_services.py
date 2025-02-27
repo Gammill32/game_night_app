@@ -212,7 +212,7 @@ def get_view_game_night_details(game_night_id, current_user_id):
     ]
 
     # Get eligible games for nomination (exclude already nominated games)
-    nominated_game_ids = {n.game_id for n in nominations}
+    nominated_game_ids = {n["game_id"] for n in nominations}
     eligible_games = db.session.query(Game).join(
         OwnedBy, Game.id == OwnedBy.game_id
     ).filter(
