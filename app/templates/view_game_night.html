@@ -31,7 +31,7 @@
                         <div class="game-details">
                             <strong>{{ gng.game_name }}</strong> (Round {{ gng.round }})
                             {% if not game_night.final and (current_user.admin or current_user.owner) %}
-                                <a href="{{ url_for('game_night.log_results', game_night_id=game_night.id, game_night_game_id=gng.id) }}" class="btn-log-results">Log Results</a>
+                            <a href="{{ url_for('game_night.log_results', game_night_id=game_night.id, game_night_game_id=gng.game_night_game_id) }}" class="btn-log-results">Log Results</a>
                                 <form action="{{ url_for('game_night.manage_game_in_night', game_night_id=game_night.id, game_id=gng.game_id, action='remove') }}" method="POST" class="form-inline">
                                     <button type="submit" class="btn-remove-game">Remove Game</button>
                                 </form>
