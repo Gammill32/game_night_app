@@ -230,5 +230,6 @@ class GameNightNominationsVotes(db.Model):  # SQL View
     game_night_id = db.Column(db.Integer, primary_key=True)
     game_id = db.Column(db.Integer, primary_key=True)
     game_name = db.Column(db.String, nullable=False)
+    image_url = db.Column(db.String, nullable=True) 
     total_nominations = db.Column(db.Integer, nullable=False)
     vote_score = db.Column(db.Integer, nullable=False)
