@@ -231,7 +231,9 @@ def get_view_game_night_details(game_night_id, current_user_id):
         "eligible_games": eligible_games,
         "user_nomination": user_nomination,
         "user_votes": user_votes,
-        "top_places": None if not results_logged else determine_top_places(game_night_id),
+        "top_places": None if not results_logged else [
+            (rank, player_ids) for rank, player_ids in determine_top_places(game_night_id) if rank in {1, 2, 3}
+        ],
     }
 
 def get_filtered_games_for_game_night(game_night_id, name_filter=None, players_filter=None, playtime_filter=None):

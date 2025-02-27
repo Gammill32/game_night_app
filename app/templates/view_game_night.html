@@ -116,19 +116,20 @@
                 <h2>Top Places</h2>
                 {% if top_places %}
                     <div class="podium-container">
-                        {% for place, players in top_places %}
-                            {% if players %}
+                        {% for place, player_ids in top_places %}
+                            {% if player_ids %}
                                 <div class="podium-place place-{{ place }}">
                                     {% if place == 1 %}
                                         <span class="crown">👑</span>
                                     {% endif %}
                                     <h3>{{ place }}{{ 'st' if place == 1 else 'nd' if place == 2 else 'rd' if place == 3 else 'th' }} Place</h3>
                                     <ul>
-                                        {% for player in players %}
+                                        {% for player_id in player_ids %}
+                                            {% set player = players | selectattr("id", "equalto", player_id) | first %}
                                             {% if player and player.person %}
                                                 <li>{{ player.person.first_name }} {{ player.person.last_name }}</li>
                                             {% else %}
-                                                <li>Unknown Player (ID: {{ player.id }})</li>
+                                                <li>Unknown Player (ID: {{ player_id }})</li>
                                             {% endif %}
                                         {% endfor %}
                                     </ul>
