@@ -142,7 +142,7 @@ def determine_top_places(game_night_id):
     )
 
     if not results:
-        return None
+        return []
 
     places = defaultdict(list)
     for rank, player_id in results:
