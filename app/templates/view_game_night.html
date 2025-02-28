@@ -95,12 +95,16 @@
                                 </a>
                                 <strong>{{ nomination.game_name }}</strong>
                                 <p>Votes: {{ nomination.vote_score or 0 }}</p>
+                        
                                 <label for="votes[{{ nomination.game_id }}]">Your Rank:</label>
+                        
+                                {% set user_vote = user_votes.get(nomination.game_id) if user_votes else None %}
+                        
                                 <select name="votes[{{ nomination.game_id }}]" class="dropdown-vote">
-                                    <option value="" {% if not user_votes or user_votes.get(nomination.game_id) is None %}selected{% endif %}>No Vote</option>
-                                    <option value="1" {% if user_votes and user_votes.get(nomination.game_id) == 1 %}selected{% endif %}>1</option>
-                                    <option value="2" {% if user_votes and user_votes.get(nomination.game_id) == 2 %}selected{% endif %}>2</option>
-                                    <option value="3" {% if user_votes and user_votes.get(nomination.game_id) == 3 %}selected{% endif %}>3</option>
+                                    <option value="" {% if user_vote == None %}selected{% endif %}>No Vote</option>
+                                    <option value="1" {% if user_vote == 1 %}selected{% endif %}>1</option>
+                                    <option value="2" {% if user_vote == 2 %}selected{% endif %}>2</option>
+                                    <option value="3" {% if user_vote == 3 %}selected{% endif %}>3</option>
                                 </select>
                             </div>
                         {% endfor %}

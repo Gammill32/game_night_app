@@ -34,9 +34,10 @@ def vote_game(game_night_id, user_id, votes_dict):
 
     used_ranks = set()
     for game_id, rank in votes_dict.items():
-        if rank in used_ranks:
-            return False, f"Rank {rank} is already used for another game. Each rank can only be assigned once."
-        used_ranks.add(rank)
+        if rank is not None:
+            if rank in used_ranks:
+                return False, f"Rank {rank} is already used for another game. Each rank can only be assigned once."
+            used_ranks.add(rank)
     
     for game_id, rank in votes_dict.items():
         existing_vote = GameVotes.query.filter_by(
