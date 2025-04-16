@@ -30,7 +30,7 @@ services:
       - "traefik.enable=true"
 
       # Router for game night app
-      - "traefik.http.routers.game_night.rule=Host(`game_night.sgammill.com`)"
+      - "traefik.http.routers.game_night.rule=Host(`gamenight.sgammill.com`)"
       - "traefik.http.routers.game_night.entrypoints=websecure"
       - "traefik.http.routers.game_night.tls.certresolver=cloudflare"
       - "traefik.http.routers.game_night.middlewares=authelia-forward-auth@file"
