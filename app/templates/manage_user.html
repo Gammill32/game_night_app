@@ -1,69 +1,122 @@
-{% extends "base.html" %}
+{% extends "base.html" %} {% block title %}Manage Account{% endblock %} {% block
+content %}
+<h1>Manage Your Account</h1>
 
-{% block title %}Manage Account{% endblock %}
+<!-- Overall Stats -->
+<div
+  style="
+    display: flex;
+    justify-content: space-around;
+    margin-bottom: 20px;
+    text-align: center;
+  "
+>
+  <div
+    style="background: #f2f2f2; padding: 20px; border-radius: 10px; width: 30%"
+  >
+    <h2>{{ stats.games_played }}</h2>
+    <p>Games Played</p>
+  </div>
+  <div
+    style="background: #d4edda; padding: 20px; border-radius: 10px; width: 30%"
+  >
+    <h2>{{ stats.wins }}</h2>
+    <p>Total Wins</p>
+  </div>
+  <div
+    style="background: #f8d7da; padding: 20px; border-radius: 10px; width: 30%"
+  >
+    <h2>{{ stats.win_percentage }}%</h2>
+    <p>Win Percentage</p>
+  </div>
+</div>
 
-{% block content %}
-    <h1>Manage Your Account</h1>
+<!-- Most Played Game -->
+{% if stats.most_played_game %}
+<div
+  style="
+    background: #e9ecef;
+    padding: 20px;
+    border-radius: 10px;
+    text-align: center;
+    margin-bottom: 20px;
+  "
+>
+  <h2>Most Played Game</h2>
+  <img
+    src="{{ stats.most_played_game.image_url }}"
+    alt="{{ stats.most_played_game.name }}"
+    style="width: 150px; height: 150px; border-radius: 10px"
+  />
+  <h3>{{ stats.most_played_game.name }}</h3>
+  <p>Wins: <strong>{{ stats.most_played_stats[0] }}</strong></p>
+  <p>Win Percentage: <strong>{{ stats.most_played_stats[1] }}%</strong></p>
+  <p>Average Finish: <strong>{{ stats.most_played_stats[2] }}</strong></p>
+</div>
+{% endif %}
 
-    <!-- Overall Stats -->
-    <div style="display: flex; justify-content: space-around; margin-bottom: 20px; text-align: center;">
-        <div style="background: #f2f2f2; padding: 20px; border-radius: 10px; width: 30%;">
-            <h2>{{ stats.games_played }}</h2>
-            <p>Games Played</p>
-        </div>
-        <div style="background: #d4edda; padding: 20px; border-radius: 10px; width: 30%;">
-            <h2>{{ stats.wins }}</h2>
-            <p>Total Wins</p>
-        </div>
-        <div style="background: #f8d7da; padding: 20px; border-radius: 10px; width: 30%;">
-            <h2>{{ stats.win_percentage }}%</h2>
-            <p>Win Percentage</p>
-        </div>
-    </div>
+<!-- Most Wins Game -->
+{% if stats.most_wins_game %}
+<div
+  style="
+    background: #fff3cd;
+    padding: 20px;
+    border-radius: 10px;
+    text-align: center;
+  "
+>
+  <h2>Game With Most Wins</h2>
+  <img
+    src="{{ stats.most_wins_game.image_url }}"
+    alt="{{ stats.most_wins_game.name }}"
+    style="width: 150px; height: 150px; border-radius: 10px"
+  />
+  <h3>{{ stats.most_wins_game.name }}</h3>
+  <p>Wins: <strong>{{ stats.most_wins_stats[0] }}</strong></p>
+  <p>Win Percentage: <strong>{{ stats.most_wins_stats[1] }}%</strong></p>
+  <p>Average Finish: <strong>{{ stats.most_wins_stats[2] }}</strong></p>
+</div>
+{% endif %}
 
-    <!-- Most Played Game -->
-    {% if stats.most_played_game %}
-        <div style="background: #e9ecef; padding: 20px; border-radius: 10px; text-align: center; margin-bottom: 20px;">
-            <h2>Most Played Game</h2>
-            <img src="{{ stats.most_played_game.image_url }}" 
-                 alt="{{ stats.most_played_game.name }}" 
-                 style="width: 150px; height: 150px; border-radius: 10px;">
-            <h3>{{ stats.most_played_game.name }}</h3>
-            <p>Wins: <strong>{{ stats.most_played_stats[0] }}</strong></p>
-            <p>Win Percentage: <strong>{{ stats.most_played_stats[1] }}%</strong></p>
-            <p>Average Finish: <strong>{{ stats.most_played_stats[2] }}</strong></p>
-        </div>
-    {% endif %}
+<!-- User Details Form -->
+<form
+  action="{{ url_for('auth.manage_user') }}"
+  method="POST"
+  style="margin-top: 20px"
+>
+  <label for="email">Email:</label><br />
+  <input
+    type="email"
+    name="email"
+    id="email"
+    value="{{ person.email }}"
+    required
+  /><br /><br />
 
-    <!-- Most Wins Game -->
-    {% if stats.most_wins_game %}
-        <div style="background: #fff3cd; padding: 20px; border-radius: 10px; text-align: center;">
-            <h2>Game With Most Wins</h2>
-            <img src="{{ stats.most_wins_game.image_url }}" 
-                 alt="{{ stats.most_wins_game.name }}" 
-                 style="width: 150px; height: 150px; border-radius: 10px;">
-            <h3>{{ stats.most_wins_game.name }}</h3>
-            <p>Wins: <strong>{{ stats.most_wins_stats[0] }}</strong></p>
-            <p>Win Percentage: <strong>{{ stats.most_wins_stats[1] }}%</strong></p>
-            <p>Average Finish: <strong>{{ stats.most_wins_stats[2] }}</strong></p>
-        </div>
-    {% endif %}
+  <label for="new_password">New Password:</label><br />
+  <input type="password" name="new_password" id="new_password" /><br /><br />
 
-    <!-- User Details Form -->
-    <form action="{{ url_for('admin.manage_user') }}" method="POST" style="margin-top: 20px;">
-        <label for="email">Email:</label><br>
-        <input type="email" name="email" id="email" value="{{ person.email }}" required><br><br>
+  <label for="confirm_password">Confirm New Password:</label><br />
+  <input
+    type="password"
+    name="confirm_password"
+    id="confirm_password"
+  /><br /><br />
 
-        <label for="new_password">New Password:</label><br>
-        <input type="password" name="new_password" id="new_password"><br><br>
-
-        <label for="confirm_password">Confirm New Password:</label><br>
-        <input type="password" name="confirm_password" id="confirm_password"><br><br>
-
-        <button type="submit" style="padding: 10px 20px; background: #333; color: #fff; border: none; border-radius: 5px; cursor: pointer;">
-            Update
-        </button>
-    </form>
-    <br>
-    <a href="{{ url_for('main.index') }}">Back to Home</a>
+  <button
+    type="submit"
+    style="
+      padding: 10px 20px;
+      background: #333;
+      color: #fff;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    "
+  >
+    Update
+  </button>
+</form>
+<br />
+<a href="{{ url_for('main.index') }}">Back to Home</a>
 {% endblock %}
