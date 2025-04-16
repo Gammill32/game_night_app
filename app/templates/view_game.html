@@ -12,6 +12,7 @@ block content %}
 <p><strong>Description:</strong></p>
 <p style="white-space: pre-wrap">{{ game.description | safe }}</p>
 
+{% if current_user.is_admin_or_owner %}
 <h2>Owners</h2>
 <ul>
   {% for owner in game.owners %}
@@ -20,6 +21,7 @@ block content %}
   <li>No owners listed.</li>
   {% endfor %}
 </ul>
+{% endif %}
 
 <h2>Leaderboard (Top 3 Players)</h2>
 <ul>
@@ -33,7 +35,7 @@ block content %}
   {% endfor %}
 </ul>
 
-<h2>Game Nights Where Played</h2>
+<!-- <h2>Previous Results</h2>
 <ul>
   {% for game_night in game_nights %}
   <li>
@@ -66,7 +68,7 @@ block content %}
   {% else %}
   <li>No game nights found for this game.</li>
   {% endfor %}
-</ul>
+</ul> -->
 
 <br />
 <a href="{{ url_for('games.games_index') }}">Back to Games</a>
