@@ -35,7 +35,7 @@
                                     <a href="{{ url_for('game_night.log_results', game_night_id=game_night.id, game_night_game_id=gng.game_night_game_id) }}" class="btn-log-results">Log Results</a>
                                     <form action="{{ url_for('game_night.manage_game_in_night', game_night_id=game_night.id) }}" method="POST" class="form-inline">
                                         <input type="hidden" name="action" value="remove">
-                                        <input type="hidden" name="game_night_game_id" value="{{ gng.id }}">
+                                        <input type="hidden" name="game_night_game_id" value="{{ gng.game_night_game_id }}">
                                         <button type="submit" class="btn-remove-game">Remove Game</button>
                                     </form>
                                 {% endif %}
