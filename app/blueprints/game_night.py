@@ -4,6 +4,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash
 from flask_login import login_required, current_user
 from app.utils import admin_required, game_night_access_required, flash_if_no_action
 from app.services import game_night_services, admin_services
+from app.models import GameNightGame
 
 game_night_bp = Blueprint("game_night", __name__)
 
@@ -155,6 +156,12 @@ def add_game_to_night(game_night_id):
         current_user_id=current_user.id
     )
 
+    # ✅ Get the next round number
+    existing_rounds = [
+        gng.round for gng in GameNightGame.query.filter_by(game_night_id=game_night_id).all()
+    ]
+    next_round = max(existing_rounds, default=0) + 1
+
     context = {
         "game_night": game_night,
         "games": games,
@@ -163,6 +170,7 @@ def add_game_to_night(game_night_id):
             "players": players_filter,
             "playtime": playtime_filter,
         },
+        "next_round": next_round
     }
     return render_template("add_game_to_night.html", **context)
 
