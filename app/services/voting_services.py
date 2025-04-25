@@ -1,4 +1,5 @@
-from app.models import db, GameNominations, GameVotes, Player, GameNight, Game, OwnedBy, GameNightNominationsVotes
+from app.models import db, GameNominations, GameVotes, Player, GameNight, Game, OwnedBy, GameNightNominationsVotes, Wishlist
+from flask import request
 
 def nominate_game(game_night_id, user_id, game_id):
     """Handles nomination of a game for an upcoming game night."""
@@ -71,15 +72,23 @@ def vote_game(game_night_id, user_id, votes_dict):
     db.session.commit()
     return True, "Your votes have been updated successfully."
 
+
 def get_nominate_game_page_context(game_night_id, current_user_id):
     """Fetch all data needed to render the nominate a game page."""
-
     game_night = GameNight.query.get_or_404(game_night_id)
 
-    # Eligible games
-    eligible_games = get_eligible_games_for_nomination(game_night_id)
+    # Pull filters from the request
+    name_filter = request.args.get("name", "").strip()
+    players_filter = request.args.get("players", type=int)
+    playtime_filter = request.args.get("playtime", type=int)
 
-    # User's existing nomination
+    eligible_games = get_eligible_games_for_nomination(
+        game_night_id,
+        name_filter=name_filter,
+        players_filter=players_filter,
+        playtime_filter=playtime_filter
+    )
+
     current_player = Player.query.filter_by(game_night_id=game_night_id, people_id=current_user_id).first()
     user_nomination_id = None
     if current_player:
@@ -87,14 +96,24 @@ def get_nominate_game_page_context(game_night_id, current_user_id):
         if nomination:
             user_nomination_id = nomination.game_id
 
+    wishlist_game_ids = {
+        w.game_id for w in Wishlist.query.filter_by(person_id=current_user_id).all()
+    }
+
     return {
         "eligible_games": eligible_games,
         "game_night": game_night,
         "user_nomination_id": user_nomination_id,
+        "wishlist_game_ids": wishlist_game_ids,
+        "filters": {
+            "name": name_filter,
+            "players": players_filter,
+            "playtime": playtime_filter,
+        },
     }
 
-def get_eligible_games_for_nomination(game_night_id):
-    """Fetch games user can nominate."""
+def get_eligible_games_for_nomination(game_night_id, name_filter=None, players_filter=None, playtime_filter=None):
+    """Fetch games user can nominate, applying optional filters."""
     game_night = GameNight.query.get_or_404(game_night_id)
     player_ids = [player.people_id for player in game_night.players]
 
@@ -102,9 +121,20 @@ def get_eligible_games_for_nomination(game_night_id):
         n.game_id for n in GameNightNominationsVotes.query.filter_by(game_night_id=game_night_id).all()
     }
 
-    eligible_games = db.session.query(Game).join(OwnedBy).filter(
-        OwnedBy.person_id.in_(player_ids),
-        ~Game.id.in_(nominated_game_ids)
-    ).order_by(Game.name).all()
+    owned_game_ids = db.session.query(OwnedBy.game_id).filter(
+        OwnedBy.person_id.in_(player_ids)
+    ).subquery()
 
-    return eligible_games
+    query = db.session.query(Game).filter(
+        Game.id.in_(owned_game_ids),
+        ~Game.id.in_(nominated_game_ids)
+    )
+
+    if name_filter:
+        query = query.filter(Game.name.ilike(f"%{name_filter}%"))
+    if players_filter is not None:
+        query = query.filter(Game.min_players <= players_filter, Game.max_players >= players_filter)
+    if playtime_filter is not None:
+        query = query.filter(Game.playtime <= playtime_filter)
+
+    return query.order_by(Game.name).all()

@@ -2,6 +2,44 @@
 block content %}
 <h1>Nominate a Game for {{ game_night.date.strftime('%B %d, %Y') }}</h1>
 
+<!-- Filters -->
+<button id="filter-toggle" class="button">Filters</button>
+<div id="filter-section" class="filters">
+  <form method="GET">
+    <label for="name">Game Name:</label>
+    <input type="text" name="name" value="{{ filters.name }}" />
+
+    <label for="players">Number of Players:</label>
+    <input
+      id="players-slider"
+      type="range"
+      name="players"
+      min="1"
+      max="20"
+      step="1"
+      value="{{ filters.players or 4 }}"
+    />
+    <span id="players-value">{{ filters.players or 4 }}</span>
+
+    <label for="playtime">Maximum Playtime (minutes):</label>
+    <input
+      id="playtime-slider"
+      type="range"
+      name="playtime"
+      min="15"
+      max="300"
+      step="15"
+      value="{{ filters.playtime or 30 }}"
+    />
+    <span id="playtime-value">{{ filters.playtime or 30 }}</span>
+
+    <button type="submit">Apply Filters</button>
+  </form>
+</div>
+
+<hr />
+
+<!-- Game List -->
 <form
   method="POST"
   action="{{ url_for('voting.nominate_game', game_night_id=game_night.id) }}"
@@ -19,6 +57,19 @@ block content %}
             Players: {{ game.min_players or '?' }} - {{ game.max_players or '?'
             }}
           </p>
+
+          {% if game.id in wishlist_game_ids %}
+          <p class="wishlist-status">In your wishlist</p>
+          {% else %}
+          <form
+            method="POST"
+            action="{{ url_for('games.toggle_wishlist', game_id=game.id) }}"
+          >
+            <button type="submit" class="btn-wishlist-toggle">
+              Add to Wishlist
+            </button>
+          </form>
+          {% endif %}
         </div>
       </div>
     </li>
@@ -29,7 +80,8 @@ block content %}
 
   <input type="hidden" name="game_id" id="selected-game-id" />
 
-  <div class="nominate-footer">
+  <!-- Sticky Footer -->
+  <div class="nominate-game-footer">
     <button type="submit">Nominate Selected Game</button>
     <a
       href="{{ url_for('game_night.view_game_night', game_night_id=game_night.id) }}"
@@ -40,10 +92,31 @@ block content %}
   </div>
 </form>
 
+<!-- JavaScript -->
 <script>
   document.addEventListener("DOMContentLoaded", () => {
-    const selectedGameId = "{{ user_nomination_id or '' }}"; // Highlight existing nomination
+    // Toggle Filters Section
+    document.getElementById("filter-toggle").addEventListener("click", () => {
+      const filterSection = document.getElementById("filter-section");
+      filterSection.classList.toggle("active");
+    });
 
+    // Update Players Slider Value
+    const playersSlider = document.getElementById("players-slider");
+    const playersValue = document.getElementById("players-value");
+    playersSlider.addEventListener("input", () => {
+      playersValue.textContent = playersSlider.value;
+    });
+
+    // Update Playtime Slider Value
+    const playtimeSlider = document.getElementById("playtime-slider");
+    const playtimeValue = document.getElementById("playtime-value");
+    playtimeSlider.addEventListener("input", () => {
+      playtimeValue.textContent = playtimeSlider.value;
+    });
+
+    // Highlight previously selected nomination
+    const selectedGameId = "{{ user_nomination_id or '' }}";
     if (selectedGameId) {
       const previouslySelected = document.querySelector(
         `.game-item[data-game-id="${selectedGameId}"]`
@@ -54,6 +127,7 @@ block content %}
       }
     }
 
+    // Make each game item selectable
     document.querySelectorAll(".game-item").forEach((item) => {
       item.addEventListener("click", () => {
         document
@@ -65,6 +139,7 @@ block content %}
       });
     });
 
+    // Validate form submission
     document
       .getElementById("nominate-game-form")
       .addEventListener("submit", (e) => {
