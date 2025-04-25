@@ -71,15 +71,13 @@
   </ul>
 
   <input type="hidden" name="game_id" id="selected-game-id" />
-  <label for="round">Round:</label>
-  <input
-    type="number"
-    name="round"
-    min="1"
-    value="{{ next_round }}"
-  /><br /><br />
 
-  <button type="submit">Add Game</button>
+  <!-- Sticky Footer -->
+  <div class="footer">
+    <label for="round">Round:</label>
+    <input type="number" name="round" min="1" value="{{ next_round }}" />
+    <button type="submit">Add Game</button>
+  </div>
 </form>
 
 <br />
