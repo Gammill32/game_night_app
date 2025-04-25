@@ -93,10 +93,15 @@ def get_nominate_game_page_context(game_night_id, current_user_id):
         w.game_id for w in Wishlist.query.filter_by(person_id=current_user_id).all()
     }
 
+    owned_game_ids = {
+        o.game_id for o in OwnedBy.query.filter_by(person_id=current_user_id).all()
+    }
+
     eligible_games = [
         {
             "game": game,
-            "in_wishlist": game.id in wishlist_game_ids
+            "in_wishlist": game.id in wishlist_game_ids,
+            "owned": game.id in owned_game_ids,
         }
         for game in raw_games
     ]
@@ -112,7 +117,6 @@ def get_nominate_game_page_context(game_night_id, current_user_id):
         "eligible_games": eligible_games,
         "game_night": game_night,
         "user_nomination_id": user_nomination_id,
-        "wishlist_game_ids": wishlist_game_ids,
         "filters": {
             "name": name_filter,
             "players": players_filter,

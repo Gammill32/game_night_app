@@ -29,9 +29,9 @@ block content %}
       min="15"
       max="300"
       step="15"
-      value="{{ filters.playtime or 30 }}"
+      value="{{ filters.playtime or 300 }}"
     />
-    <span id="playtime-value">{{ filters.playtime or 30 }}</span>
+    <span id="playtime-value">{{ filters.playtime or 300 }}</span>
 
     <button type="submit">Apply Filters</button>
   </form>
@@ -58,17 +58,28 @@ block content %}
             }}
           </p>
 
-          {% if item.in_wishlist %}
-          <p class="wishlist-status">⭐ In your wishlist</p>
-          {% else %}
-          <button
-            type="button"
-            class="btn-wishlist-toggle"
-            onclick="addToWishlist({{ game.id }})"
-          >
-            Add to Wishlist
-          </button>
-          {% endif %}
+          <div class="game-actions">
+            <a
+              href="{{ url_for('games.view_game', game_id=game.id) }}"
+              class="btn-view-game"
+            >
+              View Game Details
+            </a>
+
+            {% if item.owned %}
+            <p class="owned-status">✅ You own this game</p>
+            {% elif item.in_wishlist %}
+            <p class="wishlist-status">⭐ In your wishlist</p>
+            {% else %}
+            <button
+              type="button"
+              class="btn-wishlist-toggle"
+              onclick="addToWishlist({{ game.id }})"
+            >
+              Add to Wishlist
+            </button>
+            {% endif %}
+          </div>
         </div>
       </div>
     </li>
