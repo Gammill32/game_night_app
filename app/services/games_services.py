@@ -4,14 +4,27 @@ from app.utils import fetch_and_parse_bgg_data
 
 
 def get_or_create_game(game_name, bgg_id=None):
-    """Retrieve a game from the database or create it if it does not exist.
-    
-    If `bgg_id` is provided, fetch data from BGG and update game details.
-    """
+    """Retrieve a game from the database by name or BGG ID, or create it if not found."""
+
+    # Check if game already exists by BGG ID first
+    if bgg_id:
+        existing_by_bgg = Game.query.filter_by(bgg_id=bgg_id).first()
+        if existing_by_bgg:
+            return existing_by_bgg, None
+
+    # Otherwise check by name (case insensitive)
     game = Game.query.filter(func.lower(Game.name) == func.lower(game_name)).first()
 
     if not game:
-        game_details = {"name": game_name, "description": None, "min_players": None, "max_players": None, "playtime": None, "image_url": None}
+        # If still no match, create it
+        game_details = {
+            "name": game_name,
+            "description": None,
+            "min_players": None,
+            "max_players": None,
+            "playtime": None,
+            "image_url": None
+        }
 
         if bgg_id:
             try:
