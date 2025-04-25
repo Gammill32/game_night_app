@@ -66,19 +66,23 @@ block content %}
               View Game Details
             </a>
 
-            {% if item.owned %}
-            <p class="owned-status">✅ You own this game</p>
-            {% elif item.in_wishlist %}
-            <p class="wishlist-status">⭐ In your wishlist</p>
+            {% if not item.owned %} {% if item.in_wishlist %}
+            <button
+              type="button"
+              class="btn-wishlist-toggle"
+              onclick="toggleWishlist({{ game.id }})"
+            >
+              Remove from Wishlist
+            </button>
             {% else %}
             <button
               type="button"
               class="btn-wishlist-toggle"
-              onclick="addToWishlist({{ game.id }})"
+              onclick="toggleWishlist({{ game.id }})"
             >
               Add to Wishlist
             </button>
-            {% endif %}
+            {% endif %} {% endif %}
           </div>
         </div>
       </div>

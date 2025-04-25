@@ -1033,6 +1033,43 @@ body {
   background-color: #218838;
 }
 
+.btn-view-game {
+  background-color: #6c757d;
+  color: white;
+  padding: 6px 12px;
+  font-size: 14px;
+  border: none;
+  border-radius: 4px;
+  text-decoration: none;
+  margin-top: 6px;
+  display: inline-block;
+}
+
+.btn-view-game:hover {
+  background-color: #5a6268;
+}
+
+.btn-wishlist-toggle {
+  background-color: #28a745;
+  color: white;
+  padding: 6px 12px;
+  font-size: 14px;
+  border: none;
+  border-radius: 4px;
+  margin-top: 6px;
+  cursor: pointer;
+}
+
+.btn-wishlist-toggle:hover {
+  background-color: #218838;
+}
+
+.owned-status,
+.wishlist-status {
+  margin-top: 6px;
+  font-weight: bold;
+}
+
 /* Media Queries */
 @media (min-width: 768px) {
   .navbar {
