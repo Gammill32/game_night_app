@@ -48,7 +48,7 @@ def get_or_create_game(game_name, bgg_id=None):
     return game, None
 
 
-def get_filtered_games(user_id, name_filter=None, players_filter=None, playtime_filter=None):
+def get_filtered_games(user_id, name_filter=None, players_filter=None, playtime_filter=None, min_rating_filter=None):
     user = Person.query.get(user_id)
 
     # Base query
@@ -86,15 +86,24 @@ def get_filtered_games(user_id, name_filter=None, players_filter=None, playtime_
         r.game_id: r.ranking for r in GameRatings.query.filter_by(person_id=user_id).all()
     }
 
-    return [
-        {
+    # Build the list
+    filtered_games = []
+    for game in games:
+        user_rating = ratings_by_game_id.get(game.game_id)
+        
+        # Apply the rating filter (if set)
+        if min_rating_filter is not None:
+            if user_rating is None or user_rating < min_rating_filter:
+                continue
+
+        filtered_games.append({
             "game": game,
             "user_owns_game": game.game_id in owned_game_ids,
             "in_wishlist": game.game_id in wishlist_game_ids,
-            "user_rating": ratings_by_game_id.get(game.game_id),
-        }
-        for game in games
-    ]
+            "user_rating": user_rating
+        })
+
+    return filtered_games
 
 
 def add_game(user_id, game_name, bgg_id=None):
@@ -197,10 +206,10 @@ def get_game_details(game_id, user_id):
     return game, leaderboard, game_nights, user_rating
 
 
-
 def get_wishlist(user_id):
     """Displays the user's wishlist."""
     return Game.query.join(Wishlist).filter(Wishlist.person_id == user_id).order_by(Game.name).all()
+
 
 def update_game_rating(game_id, user_id, ranking):
     """Update or create a game rating for a user."""

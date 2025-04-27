@@ -34,6 +34,16 @@ block content %}
       value="{{ request.args.get('playtime', '') }}"
     />
 
+    <label for="min_rating">Minimum Rating:</label>
+    <input
+      id="min_rating"
+      type="number"
+      name="min_rating"
+      min="0"
+      max="10"
+      value="{{ request.args.get('min_rating', '') }}"
+    />
+
     <button type="submit">Apply Filters</button>
   </form>
 </div>
