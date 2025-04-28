@@ -1218,3 +1218,109 @@ body {
     font-size: 18px;
   }
 }
+
+/* Form Groups */
+.form-group {
+  margin-bottom: 20px;
+}
+
+/* Inputs and Search Box */
+.form-control {
+  width: 100%;
+  padding: 10px;
+  font-size: 16px;
+  border: 1px solid var(--border-color);
+  border-radius: 5px;
+  margin-top: 5px;
+  box-sizing: border-box;
+}
+
+/* Attendees Container */
+.attendees-container {
+  border: 1px solid var(--border-color);
+  border-radius: 5px;
+  background-color: var(--light-color);
+  height: 300px;
+  overflow-y: scroll;
+  padding: 10px;
+}
+
+/* Pagination Controls */
+.pagination-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.pagination-button {
+  background-color: var(--primary-color);
+  color: var(--light-color);
+  border: none;
+  padding: 8px 12px;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.pagination-button:hover {
+  background-color: var(--dark-color);
+}
+
+.pagination-info {
+  font-size: 16px;
+  font-weight: bold;
+}
+
+/* Selected Count */
+.selected-count {
+  margin-top: 10px;
+  font-weight: bold;
+  text-align: center;
+}
+
+/* Submit Button */
+.submit-button {
+  width: 100%;
+  padding: 12px;
+  font-size: 18px;
+  background-color: var(--primary-color);
+  color: var(--light-color);
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+.submit-button:hover {
+  background-color: var(--dark-color);
+}
+
+/* Attendee List */
+.attendee-label {
+  display: flex;
+  align-items: center;
+  padding: 6px;
+  margin-bottom: 5px;
+  background-color: var(--light-color);
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.attendee-checkbox {
+  margin-right: 10px;
+}
+
+/* Selected attendee */
+.attendee-selected {
+  background-color: var(--success-color) !important;
+  color: var(--light-color);
+}
+
+/* Highlighted attendee (keyboard navigation) */
+.attendee-highlighted {
+  background-color: var(--info-color) !important;
+  color: var(--light-color);
+}

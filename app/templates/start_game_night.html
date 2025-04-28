@@ -2,57 +2,72 @@
 block content %}
 <h1>Start a New Game Night</h1>
 
-<form action="{{ url_for('game_night.start_game_night') }}" method="POST">
-  <label for="date">Date:</label>
-  <input type="date" name="date" id="dateInput" required /><br /><br />
-
-  <label for="notes">Notes:</label><br />
-  <textarea name="notes" rows="4" cols="50"></textarea><br /><br />
-
-  <h3>Attendees:</h3>
-
-  <!-- Search box -->
-  <input
-    type="text"
-    id="searchBox"
-    placeholder="Search for a name..."
-    autocomplete="off"
-  />
-  <br /><br />
-
-  <!-- Attendees list container -->
-  <div
-    id="attendeesContainer"
-    style="
-      border: 1px solid #ccc;
-      height: 300px;
-      overflow-y: scroll;
-      padding: 10px;
-    "
-  >
-    <!-- People checkboxes will be inserted here by JavaScript -->
+<form
+  action="{{ url_for('game_night.start_game_night') }}"
+  method="POST"
+  id="startGameNightForm"
+>
+  <div class="form-group">
+    <label for="dateInput">Date:</label>
+    <input
+      type="date"
+      name="date"
+      id="dateInput"
+      class="form-control"
+      required
+    />
   </div>
 
-  <!-- Pagination controls -->
-  <div id="pagination" style="margin-top: 10px">
-    <button type="button" id="prevPage">Previous</button>
-    <span id="pageInfo"></span>
-    <button type="button" id="nextPage">Next</button>
+  <div class="form-group">
+    <label for="notesInput">Notes:</label><br />
+    <textarea
+      name="notes"
+      id="notesInput"
+      rows="4"
+      cols="50"
+      class="form-control"
+    ></textarea>
   </div>
 
-  <!-- Selected attendees count -->
-  <div id="selectedCount" style="margin-top: 10px; font-weight: bold">
-    0 Attendees Selected
+  <div class="form-group">
+    <h3>Attendees:</h3>
+
+    <input
+      type="text"
+      id="searchBox"
+      class="form-control"
+      placeholder="Search for a name..."
+      autocomplete="off"
+    />
+    <br />
+
+    <div id="attendeesContainer" class="attendees-container">
+      <!-- People checkboxes will be inserted here by JavaScript -->
+    </div>
+
+    <div id="pagination" class="pagination-controls">
+      <button type="button" id="prevPage" class="pagination-button">
+        Previous
+      </button>
+      <span id="pageInfo" class="pagination-info"></span>
+      <button type="button" id="nextPage" class="pagination-button">
+        Next
+      </button>
+    </div>
+
+    <div id="selectedCount" class="selected-count">0 Attendees Selected</div>
   </div>
 
-  <br />
-  <button type="submit" id="submitButton" disabled>Start Game Night</button>
+  <div class="form-group">
+    <button type="submit" id="submitButton" class="submit-button">
+      Start Game Night
+    </button>
+  </div>
 </form>
 
 <br />
-<a href="{{ url_for('main.index') }}">Back to Home</a>
+<a href="{{ url_for('main.index') }}" class="back-link">Back to Home</a>
 
-<!-- JavaScript to handle search, pagination, selection, form control -->
 <script>
   const people = [
       {% for person in people %}
@@ -71,22 +86,11 @@ block content %}
   const pageInfo = document.getElementById('pageInfo');
   const prevPage = document.getElementById('prevPage');
   const nextPage = document.getElementById('nextPage');
-  const submitButton = document.getElementById('submitButton');
-  const dateInput = document.getElementById('dateInput');
 
   function updateSelectedCount() {
       const count = selectedPeople.size;
       const text = `${count} Attendee${count !== 1 ? 's' : ''} Selected`;
       document.getElementById('selectedCount').textContent = text;
-  }
-
-  function updateSubmitButtonState() {
-      const dateValue = dateInput.value;
-      if (selectedPeople.size > 0 && dateValue) {
-          submitButton.disabled = false;
-      } else {
-          submitButton.disabled = true;
-      }
   }
 
   function renderAttendees() {
@@ -103,16 +107,17 @@ block content %}
 
       pagePeople.forEach((person, index) => {
           const label = document.createElement('label');
-          label.style.display = 'block';
+          label.className = 'attendee-label';
           label.dataset.index = index;
           const checkbox = document.createElement('input');
           checkbox.type = 'checkbox';
           checkbox.name = 'attendees';
           checkbox.value = person.id;
+          checkbox.className = 'attendee-checkbox';
 
           if (selectedPeople.has(person.id)) {
               checkbox.checked = true;
-              label.style.backgroundColor = '#d4edda'; // light green if selected
+              label.classList.add('attendee-selected');
           }
 
           checkbox.addEventListener('change', () => {
@@ -123,7 +128,6 @@ block content %}
               }
               updateSelectedCount();
               renderAttendees();
-              updateSubmitButtonState(); // << added
           });
 
           label.appendChild(checkbox);
@@ -134,7 +138,6 @@ block content %}
       pageInfo.textContent = `Page ${currentPage} of ${Math.ceil(filteredPeople.length / pageSize)}`;
       highlightTopMatch();
       updateSelectedCount();
-      updateSubmitButtonState(); // << added
   }
 
   function updateFilter() {
@@ -148,12 +151,13 @@ block content %}
   function highlightTopMatch() {
       const labels = attendeesContainer.querySelectorAll('label');
       labels.forEach(label => {
-          label.style.backgroundColor = selectedPeople.has(Number(label.querySelector('input').value)) ? '#d4edda' : '';
+          label.classList.toggle('attendee-selected', selectedPeople.has(Number(label.querySelector('input').value)));
+          label.classList.remove('attendee-highlighted');
       });
 
       if (labels.length > 0) {
           labels[highlightedIndex]?.scrollIntoView({ block: "nearest" });
-          labels[highlightedIndex].style.backgroundColor = '#92dbff'; // light blue for highlighted
+          labels[highlightedIndex].classList.add('attendee-highlighted');
       }
   }
 
@@ -182,16 +186,15 @@ block content %}
               const person = filteredPeople[(currentPage - 1) * pageSize + highlightedIndex];
               if (person) {
                   if (e.shiftKey) {
-                      selectedPeople.delete(person.id); // Shift+Enter → DESELECT
+                      selectedPeople.delete(person.id);
                   } else {
-                      selectedPeople.add(person.id);   // Enter → SELECT
+                      selectedPeople.add(person.id);
                   }
               }
               searchBox.value = '';
               highlightedIndex = 0;
               updateFilter();
               searchBox.focus();
-              updateSubmitButtonState(); // << added
           }
       } else if (e.key === 'ArrowDown') {
           e.preventDefault();
@@ -208,16 +211,14 @@ block content %}
       }
   });
 
-  dateInput.addEventListener('input', updateSubmitButtonState); // << added
-
-  document.querySelector('form').addEventListener('submit', (e) => {
+  document.getElementById('startGameNightForm').addEventListener('submit', (e) => {
       document.querySelectorAll('input[name="attendees"][type="hidden"]').forEach(el => el.remove());
       selectedPeople.forEach(id => {
           const hiddenInput = document.createElement('input');
           hiddenInput.type = 'hidden';
           hiddenInput.name = 'attendees';
           hiddenInput.value = id;
-          document.querySelector('form').appendChild(hiddenInput);
+          document.getElementById('startGameNightForm').appendChild(hiddenInput);
       });
   });
 
