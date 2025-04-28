@@ -59,17 +59,14 @@ def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
 
-    # Initialize components
     setup_logging()
     init_extensions(app)
     setup_database(app)
     register_blueprints(app)
 
-    # Only start the scheduler in *one* worker
-    if os.environ.get("SCHEDULER_ACTIVE") == "1":
-        # Only allow scheduler if we are the "main" worker (lowest PID)
-        if os.getpid() == min(multiprocessing.active_children(), key=lambda p: p.pid).pid:
-            from app.services.reminders_services import start_scheduler
-            start_scheduler(app)
+    # Start scheduler ONLY if we're in main process
+    if os.environ.get("SCHEDULER_ACTIVE") == "1" and os.environ.get("RUN_MAIN") == "true":
+        from app.services.reminders_services import start_scheduler
+        start_scheduler(app)
 
     return app
