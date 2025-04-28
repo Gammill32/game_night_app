@@ -53,6 +53,13 @@ block content %}
       value="{{ request.args.get('min_rating', 0) }}"
     />
     <span id="min-rating-value">{{ request.args.get('min_rating', 0) }}</span>
+
+    <div class="filter-actions">
+      <button type="submit" class="button" style="margin-top: 10px;">Apply Filters</button>
+    </div>
+
+    <a href="{{ url_for('games.games_index') }}" class="button" style="margin-top: 10px; margin-left: 10px;">Reset Filters</a>
+    
   </form>
 </div>
 
