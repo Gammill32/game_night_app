@@ -122,34 +122,37 @@
     });
 
     searchBox.addEventListener('keydown', (e) => {
-        const labels = attendeesContainer.querySelectorAll('label');
+    const labels = attendeesContainer.querySelectorAll('label');
 
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            if (labels.length > 0) {
-                const checkbox = labels[highlightedIndex].querySelector('input[type="checkbox"]');
-                if (checkbox && !checkbox.checked) {
-                    checkbox.checked = true;
-                }
-                searchBox.value = '';
-                highlightedIndex = 0;
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        if (labels.length > 0) {
+            const checkbox = labels[highlightedIndex].querySelector('input[type="checkbox"]');
+            if (checkbox && !checkbox.checked) {
+                checkbox.checked = true;
+            }
+            searchBox.value = '';
+            highlightedIndex = 0;
+            updateFilter(); // MOVE updateFilter after a tiny delay
+            setTimeout(() => {
+                searchBox.focus();
                 updateFilter();
-                setTimeout(() => searchBox.focus(), 10); // auto-focus back
-            }
-        } else if (e.key === 'ArrowDown') {
-            e.preventDefault();
-            if (highlightedIndex < labels.length - 1) {
-                highlightedIndex++;
-                highlightTopMatch();
-            }
-        } else if (e.key === 'ArrowUp') {
-            e.preventDefault();
-            if (highlightedIndex > 0) {
-                highlightedIndex--;
-                highlightTopMatch();
-            }
+            }, 10);
         }
-    });
+    } else if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        if (highlightedIndex < labels.length - 1) {
+            highlightedIndex++;
+            highlightTopMatch();
+        }
+    } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        if (highlightedIndex > 0) {
+            highlightedIndex--;
+            highlightTopMatch();
+        }
+    }
+});
 
     // Initial render
     renderAttendees();
