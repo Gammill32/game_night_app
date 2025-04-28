@@ -18,33 +18,41 @@ block content %}
     <label for="name">Game Name:</label>
     <input type="text" name="name" value="{{ request.args.get('name', '') }}" />
 
-    <label for="players">Number of Players:</label>
+    <label for="players-slider">Number of Players:</label>
     <input
       id="players-slider"
-      type="text"
+      type="range"
       name="players"
-      value="{{ request.args.get('players', '') }}"
+      min="1"
+      max="20"
+      step="1"
+      value="{{ request.args.get('players', 4) }}"
     />
-
-    <label for="playtime">Maximum Playtime (minutes):</label>
+    <span id="players-value">{{ request.args.get('players', 4) }}</span>
+    
+    <label for="playtime-slider">Maximum Playtime (minutes):</label>
     <input
       id="playtime-slider"
-      type="text"
+      type="range"
       name="playtime"
-      value="{{ request.args.get('playtime', '') }}"
+      min="15"
+      max="300"
+      step="15"
+      value="{{ request.args.get('playtime', 30) }}"
     />
-
-    <label for="min_rating">Minimum Rating:</label>
-    <div id="min-rating-slider"></div>
+    <span id="playtime-value">{{ request.args.get('playtime', 30) }}</span>
+    
+    <label for="min-rating-slider">Minimum Rating:</label>
     <input
-      type="hidden"
+      id="min-rating-slider"
+      type="range"
       name="min_rating"
-      id="min_rating"
-      value="{{ request.args.get('min_rating', '') }}"
+      min="0"
+      max="10"
+      step="1"
+      value="{{ request.args.get('min_rating', 0) }}"
     />
-    <span id="min-rating-value">{{ request.args.get('min_rating', '0') }}</span>/10
-
-    <button type="submit">Apply Filters</button>
+    <span id="min-rating-value">{{ request.args.get('min_rating', 0) }}</span>
   </form>
 </div>
 
@@ -116,69 +124,57 @@ block content %}
 </div>
 
 <script>
-  document.getElementById("filter-toggle").addEventListener("click", () => {
-    const filterSection = document.getElementById("filter-section");
-    // Toggle the 'active' class to show/hide the filters
-    if (filterSection.classList.contains("active")) {
-      filterSection.classList.remove("active");
-      filterSection.style.display = "none";
-    } else {
-      filterSection.classList.add("active");
-      filterSection.style.display = "block";
+  document.addEventListener("DOMContentLoaded", () => {
+    // Toggle Filters Section
+    document.getElementById("filter-toggle").addEventListener("click", () => {
+      const filterSection = document.getElementById("filter-section");
+      filterSection.classList.toggle("active");
+    });
+
+    // Update Players Slider Value
+    const playersSlider = document.getElementById("players-slider");
+    const playersValue = document.getElementById("players-value");
+    playersSlider.addEventListener("input", () => {
+      playersValue.textContent = playersSlider.value;
+    });
+
+    // Update Playtime Slider Value
+    const playtimeSlider = document.getElementById("playtime-slider");
+    const playtimeValue = document.getElementById("playtime-value");
+    playtimeSlider.addEventListener("input", () => {
+      playtimeValue.textContent = playtimeSlider.value;
+    });
+
+    // Update Minimum Rating Slider Value
+    const minRatingSlider = document.getElementById("min-rating-slider");
+    const minRatingValue = document.getElementById("min-rating-value");
+    minRatingSlider.addEventListener("input", () => {
+      minRatingValue.textContent = minRatingSlider.value;
+    });
+
+    // (Optional) If you have selectable game items and a form
+    if (document.getElementById("game-selection-form")) {
+      document.querySelectorAll(".game-item").forEach((item) => {
+        item.addEventListener("click", () => {
+          document
+            .querySelectorAll(".game-item")
+            .forEach((i) => i.classList.remove("selected"));
+          item.classList.add("selected");
+          document.getElementById("selected-game-id").value =
+            item.getAttribute("data-game-id");
+        });
+      });
+
+      document
+        .getElementById("game-selection-form")
+        .addEventListener("submit", (e) => {
+          if (!document.getElementById("selected-game-id").value) {
+            e.preventDefault();
+            alert("Please select a game before submitting.");
+          }
+        });
     }
   });
-
-  // Initialize Sliders
-  const playersSlider = document.getElementById("players-slider");
-  noUiSlider.create(playersSlider, {
-    start: [4], // Default value
-    connect: true,
-    range: {
-      min: 1,
-      max: 20,
-    },
-    step: 1,
-  });
-
-  playersSlider.noUiSlider.on("update", (value) => {
-    document.querySelector('input[name="players"]').value = Math.round(
-      value[0]
-    );
-  });
-
-  const playtimeSlider = document.getElementById("playtime-slider");
-  noUiSlider.create(playtimeSlider, {
-    start: [30], // Default minimum
-    connect: true,
-    range: {
-      min: 15,
-      max: 300,
-    },
-    step: 15,
-  });
-
-  playtimeSlider.noUiSlider.on("update", (value) => {
-    document.querySelector('input[name="playtime"]').value = Math.round(
-      value[0]
-    );
-  });
-
-  const minRatingSlider = document.getElementById("min-rating-slider");
-  noUiSlider.create(minRatingSlider, {
-    start: [{{ request.args.get('min_rating', 0) }}], // Default to 0 if none
-    connect: true,
-    range: {
-      min: 0,
-      max: 10,
-    },
-    step: 1,
-  });
-
-  minRatingSlider.noUiSlider.on("update", (value) => {
-    document.getElementById("min_rating").value = Math.round(value[0]);
-    document.getElementById("min-rating-value").textContent = Math.round(value[0]);
-  });
-
 </script>
 
 {% endblock %}
