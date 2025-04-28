@@ -6,6 +6,8 @@ from sqlalchemy import func
 from app.utils import send_email
 from app.extensions import scheduler
 from apscheduler.triggers.cron import CronTrigger
+import os
+import logging
 
 # Define timezone globally
 central = pytz.timezone("America/Chicago")
@@ -68,13 +70,23 @@ def check_and_send_reminders():
                 leader=leader_data
             )
 
-            send_email(user.email, "Game Night Reminder", html_body)
-
-from pytz import timezone
+            try:
+                send_email(user.email, "Game Night Reminder", html_body)
+                logging.info(f"Reminder email sent to {user.email}")
+            except Exception as e:
+                logging.error(f"Failed to send reminder email to {user.email}: {e}")
 
 def start_scheduler(app):
     """Start the background scheduler for reminders."""
-    from app.services.reminders_services import check_and_send_reminders
+
+    # Only start scheduler in one worker (e.g., first worker PID = parent PID + 1)
+    if os.getenv("RUN_MAIN") == "true" or os.getenv("FLASK_ENV") == "development":
+        # Skip in dev reload parent
+        return
+
+    # Only start if this is worker 1 (you can refine this later)
+    if int(os.environ.get("GUNICORN_WORKER_ID", "1")) != 1:
+        return
 
     central = timezone("America/Chicago")
 
@@ -84,12 +96,11 @@ def start_scheduler(app):
         with app.app_context():
             check_and_send_reminders()
 
-    with app.app_context():
-        scheduler.add_job(
-            func=job_with_app_context,
-            trigger=CronTrigger(hour=11, minute=20, timezone=central),
-            id="daily_game_night_reminder",
-            replace_existing=True
-        )
+    scheduler.add_job(
+        func=job_with_app_context,
+        trigger=CronTrigger(hour=11, minute=27, timezone=central),
+        id="daily_game_night_reminder",
+        replace_existing=True
+    )
 
     scheduler.start()
