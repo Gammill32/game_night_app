@@ -33,5 +33,8 @@ EXPOSE 8000
 # Set environment variable for Flask
 ENV FLASK_APP=app:app
 
+# Scheduler
+ENV SCHEDULER_ACTIVE=1
+
 # Run cron in the background and the Flask app
-CMD ["sh", "-c", "cron && gunicorn -w 4 -b 0.0.0.0:8000 -c gunicorn_conf.py 'app:create_app()'"]
+CMD ["sh", "-c", "cron && gunicorn -w 4 -b 0.0.0.0:8000 'app:create_app()'"]
