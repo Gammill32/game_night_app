@@ -62,6 +62,6 @@ def create_app():
     init_extensions(app)
     setup_database(app)
     register_blueprints(app)
-    start_schedulers()
+    start_schedulers(app)
 
     return app

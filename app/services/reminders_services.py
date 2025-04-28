@@ -4,7 +4,7 @@ from datetime import datetime
 import pytz
 from sqlalchemy import func
 from app.utils import send_email
-from apscheduler.schedulers.background import BackgroundScheduler
+from app.extensions import scheduler
 from apscheduler.triggers.cron import CronTrigger
 
 def check_and_send_reminders():
@@ -68,14 +68,18 @@ def check_and_send_reminders():
 
             send_email(user.email, "Game Night Reminder", html_body)
 
-def start_scheduler():
-    """Starts the scheduler to send reminders for game nights."""
-    dallas_timezone = pytz.timezone("America/Chicago")
-    scheduler = BackgroundScheduler()
-    scheduler.add_job(
-        func=check_and_send_reminders,
-        trigger=CronTrigger(hour=10, minute=0, timezone=dallas_timezone),
-        id="daily_game_night_reminder",
-        replace_existing=True
-    )
+def start_scheduler(app):
+    """Start the background scheduler for reminders."""
+    from app.services.reminders_services import check_and_send_reminders
+
+    scheduler.configure(timezone="America/Chicago")
+
+    with app.app_context():  # Create jobs within the app context
+        scheduler.add_job(
+            func=check_and_send_reminders,
+            trigger=CronTrigger(hour=10, minute=18),
+            id="daily_game_night_reminder",
+            replace_existing=True
+        )
+
     scheduler.start()
