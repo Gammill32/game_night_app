@@ -78,18 +78,6 @@ def check_and_send_reminders():
 
 def start_scheduler(app):
     """Start the background scheduler for reminders."""
-
-    # Only start scheduler in one worker (e.g., first worker PID = parent PID + 1)
-    if os.getenv("RUN_MAIN") == "true" or os.getenv("FLASK_ENV") == "development":
-        # Skip in dev reload parent
-        return
-
-    # Only start if this is worker 1 (you can refine this later)
-    if int(os.environ.get("GUNICORN_WORKER_ID", "1")) != 1:
-        return
-
-    central = pytz.timezone("America/Chicago")
-
     scheduler.configure(timezone=central)
 
     def job_with_app_context():
@@ -98,7 +86,7 @@ def start_scheduler(app):
 
     scheduler.add_job(
         func=job_with_app_context,
-        trigger=CronTrigger(hour=11, minute=29, timezone=central),
+        trigger=CronTrigger(hour=10, minute=0, timezone=central),
         id="daily_game_night_reminder",
         replace_existing=True
     )
