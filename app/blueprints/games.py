@@ -11,9 +11,9 @@ games_bp = Blueprint("games", __name__)
 @login_required
 def games_index():
     name_filter = request.args.get("name", "").strip()
-    players_filter = request.args.get("players", type=int)
-    playtime_filter = request.args.get("playtime", type=int)
-    min_rating_filter = request.args.get("min_rating", type=int)
+    players_filter = request.args.get("players", type=int) if request.args.get("players_enabled") else None
+    playtime_filter = request.args.get("playtime", type=int) if request.args.get("playtime_enabled") else None
+    min_rating_filter = request.args.get("min_rating", type=int) if request.args.get("min_rating_enabled") else None
     
     games_with_ownership = games_services.get_filtered_games(current_user.id, name_filter, players_filter, playtime_filter, min_rating_filter)
     

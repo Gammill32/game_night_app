@@ -15,51 +15,61 @@ block content %}
 <button id="filter-toggle" class="button">Filters</button>
 <div id="filter-section" class="filters">
   <form method="GET">
-    <label for="name">Game Name:</label>
-    <input type="text" name="name" value="{{ request.args.get('name', '') }}" />
 
-    <label for="players-slider">Number of Players:</label>
-    <input
-      id="players-slider"
-      type="range"
-      name="players"
-      min="1"
-      max="20"
-      step="1"
-      value="{{ request.args.get('players', 4) }}"
-    />
-    <span id="players-value">{{ request.args.get('players', 4) }}</span>
-    
-    <label for="playtime-slider">Maximum Playtime (minutes):</label>
-    <input
-      id="playtime-slider"
-      type="range"
-      name="playtime"
-      min="15"
-      max="300"
-      step="15"
-      value="{{ request.args.get('playtime', 30) }}"
-    />
-    <span id="playtime-value">{{ request.args.get('playtime', 30) }}</span>
-    
-    <label for="min-rating-slider">Minimum Rating:</label>
-    <input
-      id="min-rating-slider"
-      type="range"
-      name="min_rating"
-      min="0"
-      max="10"
-      step="1"
-      value="{{ request.args.get('min_rating', 0) }}"
-    />
-    <span id="min-rating-value">{{ request.args.get('min_rating', 0) }}</span>
-
-    <div class="filter-actions">
-      <button type="submit" class="button" style="margin-top: 10px;">Apply Filters</button>
+    <div class="filter-group">
+      <input type="checkbox" id="players-filter-toggle" name="players_enabled" {% if request.args.get('players_enabled') %}checked{% endif %}>
+      <label for="players-slider">Number of Players:</label>
+      <input
+        id="players-slider"
+        type="range"
+        name="players"
+        min="1"
+        max="20"
+        step="1"
+        value="{{ request.args.get('players', 4) }}"
+        {% if not request.args.get('players_enabled') %}disabled{% endif %}
+      />
+      <span id="players-value">{{ request.args.get('players', 4) }}</span>
     </div>
 
-    <a href="{{ url_for('games.games_index') }}" class="button" style="margin-top: 10px; margin-left: 10px;">Reset Filters</a>
-    
+    <div class="filter-group">
+      <input type="checkbox" id="playtime-filter-toggle" name="playtime_enabled" {% if request.args.get('playtime_enabled') %}checked{% endif %}>
+      <label for="playtime-slider">Maximum Playtime (minutes):</label>
+      <input
+        id="playtime-slider"
+        type="range"
+        name="playtime"
+        min="15"
+        max="300"
+        step="15"
+        value="{{ request.args.get('playtime', 30) }}"
+        {% if not request.args.get('playtime_enabled') %}disabled{% endif %}
+      />
+      <span id="playtime-value">{{ request.args.get('playtime', 30) }}</span>
+    </div>
+
+    <div class="filter-group">
+      <input type="checkbox" id="min-rating-filter-toggle" name="min_rating_enabled" {% if request.args.get('min_rating_enabled') %}checked{% endif %}>
+      <label for="min-rating-slider">Minimum Rating:</label>
+      <input
+        id="min-rating-slider"
+        type="range"
+        name="min_rating"
+        min="0"
+        max="10"
+        step="1"
+        value="{{ request.args.get('min_rating', 0) }}"
+        {% if not request.args.get('min_rating_enabled') %}disabled{% endif %}
+      />
+      <span id="min-rating-value">{{ request.args.get('min_rating', 0) }}</span>
+    </div>
+
+    <!-- Buttons -->
+    <div class="filter-actions" style="margin-top: 10px;">
+      <button type="submit" class="button">Apply Filters</button>
+      <a href="{{ url_for('games.games_index') }}" class="button" style="margin-left: 10px;">Reset Filters</a>
+    </div>
+
   </form>
 </div>
 
@@ -134,9 +144,21 @@ block content %}
   document.addEventListener("DOMContentLoaded", () => {
     // Toggle Filters Section
     document.getElementById("filter-toggle").addEventListener("click", () => {
-      const filterSection = document.getElementById("filter-section");
-      filterSection.classList.toggle("active");
+      document.getElementById("filter-section").classList.toggle("active");
     });
+
+    // Generic function to link a toggle and slider
+    function setupToggle(toggleId, sliderId) {
+      const toggle = document.getElementById(toggleId);
+      const slider = document.getElementById(sliderId);
+      toggle.addEventListener("change", () => {
+        slider.disabled = !toggle.checked;
+      });
+    }
+
+    setupToggle("players-filter-toggle", "players-slider");
+    setupToggle("playtime-filter-toggle", "playtime-slider");
+    setupToggle("min-rating-filter-toggle", "min-rating-slider");
 
     // Update Players Slider Value
     const playersSlider = document.getElementById("players-slider");
@@ -158,29 +180,6 @@ block content %}
     minRatingSlider.addEventListener("input", () => {
       minRatingValue.textContent = minRatingSlider.value;
     });
-
-    // (Optional) If you have selectable game items and a form
-    if (document.getElementById("game-selection-form")) {
-      document.querySelectorAll(".game-item").forEach((item) => {
-        item.addEventListener("click", () => {
-          document
-            .querySelectorAll(".game-item")
-            .forEach((i) => i.classList.remove("selected"));
-          item.classList.add("selected");
-          document.getElementById("selected-game-id").value =
-            item.getAttribute("data-game-id");
-        });
-      });
-
-      document
-        .getElementById("game-selection-form")
-        .addEventListener("submit", (e) => {
-          if (!document.getElementById("selected-game-id").value) {
-            e.preventDefault();
-            alert("Please select a game before submitting.");
-          }
-        });
-    }
   });
 </script>
 
