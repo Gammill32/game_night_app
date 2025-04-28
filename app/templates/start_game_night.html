@@ -1,162 +1,228 @@
-{% extends "base.html" %}
-
-{% block title %}Start Game Night{% endblock %}
-
-{% block content %}
+{% extends "base.html" %} {% block title %}Start Game Night{% endblock %} {%
+block content %}
 <h1>Start a New Game Night</h1>
 
 <form action="{{ url_for('game_night.start_game_night') }}" method="POST">
-    <label for="date">Date:</label>
-    <input type="date" name="date" required><br><br>
+  <label for="date">Date:</label>
+  <input type="date" name="date" id="dateInput" required /><br /><br />
 
-    <label for="notes">Notes:</label><br>
-    <textarea name="notes" rows="4" cols="50"></textarea><br><br>
+  <label for="notes">Notes:</label><br />
+  <textarea name="notes" rows="4" cols="50"></textarea><br /><br />
 
-    <h3>Attendees:</h3>
+  <h3>Attendees:</h3>
 
-    <!-- Search box -->
-    <input type="text" id="searchBox" placeholder="Search for a name..." autocomplete="off">
-    <br><br>
+  <!-- Search box -->
+  <input
+    type="text"
+    id="searchBox"
+    placeholder="Search for a name..."
+    autocomplete="off"
+  />
+  <br /><br />
 
-    <!-- Attendees list container -->
-    <div id="attendeesContainer" style="border: 1px solid #ccc; height: 300px; overflow-y: scroll; padding: 10px;">
-        <!-- People checkboxes will be inserted here by JavaScript -->
-    </div>
+  <!-- Attendees list container -->
+  <div
+    id="attendeesContainer"
+    style="
+      border: 1px solid #ccc;
+      height: 300px;
+      overflow-y: scroll;
+      padding: 10px;
+    "
+  >
+    <!-- People checkboxes will be inserted here by JavaScript -->
+  </div>
 
-    <!-- Pagination controls -->
-    <div id="pagination" style="margin-top: 10px;">
-        <button type="button" id="prevPage">Previous</button>
-        <span id="pageInfo"></span>
-        <button type="button" id="nextPage">Next</button>
-    </div>
+  <!-- Pagination controls -->
+  <div id="pagination" style="margin-top: 10px">
+    <button type="button" id="prevPage">Previous</button>
+    <span id="pageInfo"></span>
+    <button type="button" id="nextPage">Next</button>
+  </div>
 
-    <br>
-    <button type="submit">Start Game Night</button>
+  <!-- Selected attendees count -->
+  <div id="selectedCount" style="margin-top: 10px; font-weight: bold">
+    0 Attendees Selected
+  </div>
+
+  <br />
+  <button type="submit" id="submitButton" disabled>Start Game Night</button>
 </form>
 
-<br>
+<br />
 <a href="{{ url_for('main.index') }}">Back to Home</a>
 
-<!-- JavaScript to handle search, pagination, enter-to-select -->
+<!-- JavaScript to handle search, pagination, selection, form control -->
 <script>
-    const people = [
-        {% for person in people %}
-            { id: {{ person.id }}, name: "{{ person.first_name }} {{ person.last_name }}" },
-        {% endfor %}
-    ];
+  const people = [
+      {% for person in people %}
+          { id: {{ person.id }}, name: "{{ person.first_name }} {{ person.last_name }}" },
+      {% endfor %}
+  ];
 
-    let filteredPeople = [...people];
-    let currentPage = 1;
-    const pageSize = 25;
-    let highlightedIndex = 0; // NEW: track which name is highlighted
+  let filteredPeople = [...people];
+  let currentPage = 1;
+  const pageSize = 25;
+  let highlightedIndex = 0;
+  const selectedPeople = new Set();
 
-    const attendeesContainer = document.getElementById('attendeesContainer');
-    const searchBox = document.getElementById('searchBox');
-    const pageInfo = document.getElementById('pageInfo');
-    const prevPage = document.getElementById('prevPage');
-    const nextPage = document.getElementById('nextPage');
+  const attendeesContainer = document.getElementById('attendeesContainer');
+  const searchBox = document.getElementById('searchBox');
+  const pageInfo = document.getElementById('pageInfo');
+  const prevPage = document.getElementById('prevPage');
+  const nextPage = document.getElementById('nextPage');
+  const submitButton = document.getElementById('submitButton');
+  const dateInput = document.getElementById('dateInput');
 
-    function renderAttendees() {
-        attendeesContainer.innerHTML = '';
-        const start = (currentPage - 1) * pageSize;
-        const end = start + pageSize;
-        const pagePeople = filteredPeople.slice(start, end);
+  function updateSelectedCount() {
+      const count = selectedPeople.size;
+      const text = `${count} Attendee${count !== 1 ? 's' : ''} Selected`;
+      document.getElementById('selectedCount').textContent = text;
+  }
 
-        if (pagePeople.length === 0 && currentPage > 1) {
-            currentPage--;
-            renderAttendees();
-            return;
-        }
+  function updateSubmitButtonState() {
+      const dateValue = dateInput.value;
+      if (selectedPeople.size > 0 && dateValue) {
+          submitButton.disabled = false;
+      } else {
+          submitButton.disabled = true;
+      }
+  }
 
-        pagePeople.forEach((person, index) => {
-            const label = document.createElement('label');
-            label.style.display = 'block';
-            label.dataset.index = index;
-            const checkbox = document.createElement('input');
-            checkbox.type = 'checkbox';
-            checkbox.name = 'attendees';
-            checkbox.value = person.id;
-            label.appendChild(checkbox);
-            label.appendChild(document.createTextNode(' ' + person.name));
-            attendeesContainer.appendChild(label);
-        });
+  function renderAttendees() {
+      attendeesContainer.innerHTML = '';
+      const start = (currentPage - 1) * pageSize;
+      const end = start + pageSize;
+      const pagePeople = filteredPeople.slice(start, end);
 
-        pageInfo.textContent = `Page ${currentPage} of ${Math.ceil(filteredPeople.length / pageSize)}`;
-        highlightTopMatch(); // highlight the first one after rendering
-    }
+      if (pagePeople.length === 0 && currentPage > 1) {
+          currentPage--;
+          renderAttendees();
+          return;
+      }
 
-    function updateFilter() {
-        const searchTerm = searchBox.value.toLowerCase();
-        filteredPeople = people.filter(person => person.name.toLowerCase().includes(searchTerm));
-        currentPage = 1;
-        highlightedIndex = 0;
-        renderAttendees();
-    }
+      pagePeople.forEach((person, index) => {
+          const label = document.createElement('label');
+          label.style.display = 'block';
+          label.dataset.index = index;
+          const checkbox = document.createElement('input');
+          checkbox.type = 'checkbox';
+          checkbox.name = 'attendees';
+          checkbox.value = person.id;
 
-    function highlightTopMatch() {
-        const labels = attendeesContainer.querySelectorAll('label');
-        labels.forEach(label => label.style.backgroundColor = ''); // clear previous highlight
+          if (selectedPeople.has(person.id)) {
+              checkbox.checked = true;
+              label.style.backgroundColor = '#d4edda'; // light green if selected
+          }
 
-        if (labels.length > 0) {
-            labels[highlightedIndex]?.scrollIntoView({ block: "nearest" });
-            labels[highlightedIndex].style.backgroundColor = '#92dbff'; // light blue highlight
-        }
-    }
+          checkbox.addEventListener('change', () => {
+              if (checkbox.checked) {
+                  selectedPeople.add(person.id);
+              } else {
+                  selectedPeople.delete(person.id);
+              }
+              updateSelectedCount();
+              renderAttendees();
+              updateSubmitButtonState(); // << added
+          });
 
-    searchBox.addEventListener('input', updateFilter);
+          label.appendChild(checkbox);
+          label.appendChild(document.createTextNode(' ' + person.name));
+          attendeesContainer.appendChild(label);
+      });
 
-    prevPage.addEventListener('click', () => {
-        if (currentPage > 1) {
-            currentPage--;
-            highlightedIndex = 0;
-            renderAttendees();
-        }
-    });
+      pageInfo.textContent = `Page ${currentPage} of ${Math.ceil(filteredPeople.length / pageSize)}`;
+      highlightTopMatch();
+      updateSelectedCount();
+      updateSubmitButtonState(); // << added
+  }
 
-    nextPage.addEventListener('click', () => {
-        if (currentPage * pageSize < filteredPeople.length) {
-            currentPage++;
-            highlightedIndex = 0;
-            renderAttendees();
-        }
-    });
+  function updateFilter() {
+      const searchTerm = searchBox.value.toLowerCase();
+      filteredPeople = people.filter(person => person.name.toLowerCase().includes(searchTerm));
+      currentPage = 1;
+      highlightedIndex = 0;
+      renderAttendees();
+  }
 
-    searchBox.addEventListener('keydown', (e) => {
-    const labels = attendeesContainer.querySelectorAll('label');
+  function highlightTopMatch() {
+      const labels = attendeesContainer.querySelectorAll('label');
+      labels.forEach(label => {
+          label.style.backgroundColor = selectedPeople.has(Number(label.querySelector('input').value)) ? '#d4edda' : '';
+      });
 
-    if (e.key === 'Enter') {
-        e.preventDefault();
-        if (filteredPeople.length > 0) {
-            const person = filteredPeople[(currentPage - 1) * pageSize + highlightedIndex];
-            if (person) {
-                const checkbox = attendeesContainer.querySelector(`input[value="${person.id}"]`);
-                if (checkbox && !checkbox.checked) {
-                    checkbox.checked = true;
-                }
-            }
-            searchBox.value = '';
-            highlightedIndex = 0;
-            searchBox.focus(); // refocus immediately
-            highlightTopMatch(); // highlight the first item again
-            // NO updateFilter() here
-        }
-    } else if (e.key === 'ArrowDown') {
-        e.preventDefault();
-        if (highlightedIndex < Math.min(pageSize, filteredPeople.length - (currentPage - 1) * pageSize) - 1) {
-            highlightedIndex++;
-            highlightTopMatch();
-        }
-    } else if (e.key === 'ArrowUp') {
-        e.preventDefault();
-        if (highlightedIndex > 0) {
-            highlightedIndex--;
-            highlightTopMatch();
-        }
-    }
-});
+      if (labels.length > 0) {
+          labels[highlightedIndex]?.scrollIntoView({ block: "nearest" });
+          labels[highlightedIndex].style.backgroundColor = '#92dbff'; // light blue for highlighted
+      }
+  }
 
-    // Initial render
-    renderAttendees();
+  searchBox.addEventListener('input', updateFilter);
+
+  prevPage.addEventListener('click', () => {
+      if (currentPage > 1) {
+          currentPage--;
+          highlightedIndex = 0;
+          renderAttendees();
+      }
+  });
+
+  nextPage.addEventListener('click', () => {
+      if (currentPage * pageSize < filteredPeople.length) {
+          currentPage++;
+          highlightedIndex = 0;
+          renderAttendees();
+      }
+  });
+
+  searchBox.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+          e.preventDefault();
+          if (filteredPeople.length > 0) {
+              const person = filteredPeople[(currentPage - 1) * pageSize + highlightedIndex];
+              if (person) {
+                  if (e.shiftKey) {
+                      selectedPeople.delete(person.id); // Shift+Enter → DESELECT
+                  } else {
+                      selectedPeople.add(person.id);   // Enter → SELECT
+                  }
+              }
+              searchBox.value = '';
+              highlightedIndex = 0;
+              updateFilter();
+              searchBox.focus();
+              updateSubmitButtonState(); // << added
+          }
+      } else if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          if (highlightedIndex < Math.min(pageSize, filteredPeople.length - (currentPage - 1) * pageSize) - 1) {
+              highlightedIndex++;
+              highlightTopMatch();
+          }
+      } else if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          if (highlightedIndex > 0) {
+              highlightedIndex--;
+              highlightTopMatch();
+          }
+      }
+  });
+
+  dateInput.addEventListener('input', updateSubmitButtonState); // << added
+
+  document.querySelector('form').addEventListener('submit', (e) => {
+      document.querySelectorAll('input[name="attendees"][type="hidden"]').forEach(el => el.remove());
+      selectedPeople.forEach(id => {
+          const hiddenInput = document.createElement('input');
+          hiddenInput.type = 'hidden';
+          hiddenInput.name = 'attendees';
+          hiddenInput.value = id;
+          document.querySelector('form').appendChild(hiddenInput);
+      });
+  });
+
+  // Initial render
+  renderAttendees();
 </script>
 
 {% endblock %}
