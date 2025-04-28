@@ -97,12 +97,19 @@
                                     <img src="{{ nomination.image_url }}" alt="{{ nomination.game_name }}" class="vote-thumbnail">
                                 </a>
                                 <strong>{{ nomination.game_name }}</strong>
+                            
+                                {% if nomination.avg_rating is not none %}
+                                    <p>Avg Rating: {{ nomination.avg_rating }}/10</p>
+                                {% else %}
+                                    <p>Avg Rating: No ratings yet</p>
+                                {% endif %}
+                            
                                 <p>Votes: {{ nomination.vote_score or 0 }}</p>
-                        
+                            
                                 <label for="votes[{{ nomination.game_id }}]">Your Rank:</label>
-                        
+                            
                                 {% set user_vote = user_votes.get(nomination.game_id) if user_votes else None %}
-                        
+                            
                                 <select name="votes[{{ nomination.game_id }}]" class="dropdown-vote">
                                     <option value="" {% if user_vote == None %}selected{% endif %}>No Vote</option>
                                     <option value="1" {% if user_vote == 1 %}selected{% endif %}>1</option>

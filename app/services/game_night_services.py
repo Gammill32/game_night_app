@@ -1,4 +1,4 @@
-from app.models import db, GameNight, Player, GameNightGame, Result, Game, GameNightRankings, GameNominations, GameVotes, OwnedBy, GameNightNominationsVotes, GameNightGameResults, Wishlist
+from app.models import db, GameNight, Player, GameNightGame, Result, Game, GameNightRankings, GameNominations, GameVotes, OwnedBy, GameNightNominationsVotes, GameNightGameResults, Wishlist, GameRatings
 from datetime import datetime
 from app.services.admin_services import get_all_people
 from collections import defaultdict
@@ -247,6 +247,29 @@ def get_view_game_night_details(game_night_id, current_user_id):
         ob.game_id for ob in OwnedBy.query.filter_by(person_id=current_user_id).all()
     }
     
+        # Get player IDs in the game night
+    player_people_ids = [player.people_id for player in players]
+
+    # Fetch average ratings for nominated games, only by players attending
+    avg_ratings_query = (
+        db.session.query(
+            GameRatings.game_id,
+            func.avg(GameRatings.ranking).label("avg_rating")
+        )
+        .filter(
+            GameRatings.person_id.in_(player_people_ids),
+            GameRatings.game_id.in_(nominated_game_ids)
+        )
+        .group_by(GameRatings.game_id)
+        .all()
+    )
+
+    avg_ratings_by_game_id = {game_id: round(avg_rating, 1) for game_id, avg_rating in avg_ratings_query}
+
+    # Add avg_rating to each nomination
+    for nomination in nominations:
+        nomination["avg_rating"] = avg_ratings_by_game_id.get(nomination["game_id"])
+        
     return {
         "game_night": game_night,
         "players": players,
