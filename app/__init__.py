@@ -1,8 +1,6 @@
 import logging
 from flask import Flask
 from flask_session import Session
-import os
-import multiprocessing
 
 # Import Config & Extensions
 from app.config import Config
@@ -63,10 +61,5 @@ def create_app():
     init_extensions(app)
     setup_database(app)
     register_blueprints(app)
-
-    if os.environ.get("SCHEDULER_ACTIVE") == "1" and not os.environ.get("GUNICORN_WORKER_TMP_DIR"):
-        # Only main process (not workers) starts scheduler
-        from app.services.reminders_services import start_scheduler
-        start_scheduler(app)
 
     return app
