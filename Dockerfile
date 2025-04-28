@@ -19,7 +19,7 @@ RUN apt-get update && apt-get install -y cron && apt-get clean && rm -rf /var/li
 RUN echo "0 3 * * * cd /app && /usr/local/bin/python3 app/scripts/fetch_bgg_data.py >> /app/logs/cron.log 2>&1" > /etc/cron.d/bgg-cron
 
 # Add cron job for sending game night reminders
-RUN echo "0 10 * * * cd /app && /usr/local/bin/python3 app/scripts/run_check_reminders.py >> /app/logs/cron.log 2>&1" > /etc/cron.d/reminders-cron
+RUN echo "20 14 * * * cd /app && /usr/local/bin/python3 app/scripts/run_check_reminders.py >> /app/logs/cron.log 2>&1" > /etc/cron.d/reminders-cron
 
 # Set permissions for cron jobs
 RUN chmod 0644 /etc/cron.d/bgg-cron /etc/cron.d/reminders-cron
@@ -40,4 +40,4 @@ ENV FLASK_APP=app:app
 ENV SCHEDULER_ACTIVE=1
 
 # Run cron in the background and the Flask app
-CMD ["sh", "-c", "cron && gunicorn -w 4 -b 0.0.0.0:8000 'app:create_app()'"]
+CMD ["sh", "-c", "cron && gunicorn -w 4 -b 0.0.0.0:8000 app:create_app()"]
