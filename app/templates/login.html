@@ -1,19 +1,23 @@
-{% extends "auth_base.html" %}
+{% extends "auth_base.html" %} {% block title %}Login{% endblock %} {% block
+content %}
+<h1>Login</h1>
 
-{% block title %}Login{% endblock %}
+<form method="POST" class="auth-form">
+  <div class="form-group">
+    <label for="email">Email:</label>
+    <input class="form-control" type="email" name="email" required />
+  </div>
 
-{% block content %}
-    <h1>Login</h1>
+  <div class="form-group">
+    <label for="password">Password:</label>
+    <input class="form-control" type="password" name="password" required />
+  </div>
 
-    <form method="POST">
-        <label for="email">Email:</label>
-        <input type="email" name="email" required><br><br>
+  <button type="submit">Login</button>
+</form>
 
-        <label for="password">Password:</label>
-        <input type="password" name="password" required><br><br>
-
-        <button type="submit">Login</button>
-    </form>
-    <a href="{{ url_for('auth.signup') }}">Sign Up</a><br>
-    <a href="{{ url_for('auth.forgot_password') }}">Forgot Password?</a>
+<div class="auth-links mt-1">
+  <a href="{{ url_for('auth.signup') }}">Sign Up</a>
+  <a href="{{ url_for('auth.forgot_password') }}">Forgot Password?</a>
+</div>
 {% endblock %}

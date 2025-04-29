@@ -1,0 +1,1286 @@
+/* Module: Navigation */
+.navbar a,
+.navbar button {
+  color: var(--light-color);
+  text-decoration: none;
+  margin: 5px;
+  padding: 8px 12px;
+  border-radius: 5px;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.navbar a:hover,
+.navbar button:hover {
+  background-color: var(--light-color);
+  color: var(--primary-color);
+}
+
+.navbar .hamburger {
+  display: block;
+  background: none;
+  border: none;
+  font-size: 24px;
+  color: var(--light-color);
+  cursor: pointer;
+}
+
+.navbar .navbar-links {
+  display: none;
+  flex-direction: column;
+  position: absolute;
+  top: 60px;
+  left: 0;
+  width: 40%;
+  padding: 10px;
+  background-color: var(--primary-color);
+  z-index: 999;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  border-radius: 5px;
+}
+
+.navbar .navbar-links.show {
+  display: flex;
+  max-height: 300px;
+}
+
+.navbar .navbar-links a {
+  display: block;
+  text-align: center;
+  margin: 10px 0;
+}
+
+/* Component: Buttons */
+button,
+a.button {
+  background-color: var(--primary-color);
+  color: var(--light-color);
+  padding: 10px 15px;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  text-decoration: none;
+  text-align: center;
+  display: inline-block;
+  font-size: 16px;
+  margin: 10px 5px;
+}
+
+button:hover,
+a.button:hover {
+  background-color: var(--dark-color);
+}
+
+/* Component: Calendar */
+.calendar {
+  max-width: 90%;
+  margin: 20px auto;
+  background-color: var(--light-color);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  font-family: Arial, sans-serif;
+}
+
+.calendar table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  text-align: center;
+}
+
+.calendar th {
+  background-color: var(--primary-color);
+  color: var(--light-color);
+  font-weight: bold;
+  padding: 10px;
+}
+
+.calendar td {
+  position: relative;
+  padding: 0;
+  border: 1px solid var(--border-color);
+  vertical-align: top;
+}
+
+.calendar-cell {
+  width: 14.28%;
+  height: 100px;
+  padding-top: 14.28%;
+  box-sizing: border-box;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+.calendar-cell:hover {
+  background-color: var(--secondary-color);
+  color: var(--light-color);
+}
+
+.calendar-cell-content {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: bold;
+  color: var(--text-color);
+}
+
+.calendar-cell-content a {
+  text-decoration: none;
+  color: var(--primary-color);
+  font-size: 14px;
+}
+
+.calendar-cell-content a:hover {
+  color: var(--success-color);
+}
+
+.calendar-cell-content.today {
+  background-color: var(--info-color);
+  color: var(--light-color);
+  border-radius: 5px;
+  padding: 5px;
+}
+
+.calendar-cell-content.event {
+  background-color: var(--success-color);
+  color: var(--light-color);
+  border-radius: 5px;
+  padding: 5px;
+}
+
+/* Component: Calendar Navigation */
+.calendar-navigation {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px;
+  background-color: var(--light-color);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.calendar-navigation button {
+  background-color: var(--primary-color);
+  color: var(--light-color);
+  border: none;
+  border-radius: 5px;
+  padding: 5px 10px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background-color 0.3s ease;
+}
+
+.calendar-navigation button:hover {
+  background-color: var(--dark-color);
+}
+
+.calendar-navigation span {
+  font-size: 16px;
+  font-weight: bold;
+  color: var(--text-color);
+}
+
+/* Component: Game Nights */
+.game-nights {
+  margin: 20px auto;
+  padding: 0;
+  list-style: none;
+  max-width: 600px;
+}
+
+.game-nights li {
+  background-color: var(--light-color);
+  margin: 10px 0;
+  padding: 15px;
+  border-radius: 8px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.game-nights li:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.game-nights li a {
+  text-decoration: none;
+  color: var(--primary-color);
+  font-size: 18px;
+  font-weight: bold;
+  display: block;
+  text-align: center;
+  transition: color 0.2s ease;
+}
+
+.game-nights li a:hover {
+  color: var(--dark-color);
+}
+
+.game-nights .no-game-nights {
+  color: var(--danger-color);
+  font-style: italic;
+  text-align: center;
+  padding: 10px;
+  background: none;
+  box-shadow: none;
+}
+
+/* Component: Buttons */
+button,
+a.button {
+  background-color: var(--primary-color);
+  color: var(--light-color);
+  padding: 10px 15px;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  text-decoration: none;
+  text-align: center;
+  display: inline-block;
+  font-size: 16px;
+  margin: 10px 5px;
+}
+
+button:hover,
+a.button:hover {
+  background-color: var(--dark-color);
+}
+
+/* Component: Available Games */
+.available-games-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.filters {
+  display: none;
+  padding: 20px;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  background-color: var(--light-color);
+  margin-bottom: 20px;
+}
+
+.filters.active {
+  display: block;
+}
+
+.filters label {
+  display: block;
+  margin-bottom: 10px;
+  font-weight: bold;
+}
+
+.filters input {
+  width: 100%;
+  margin-bottom: 15px;
+  padding: 8px;
+  border: 1px solid var(--border-color);
+  border-radius: 5px;
+}
+
+.filters button {
+  width: 100%;
+  padding: 10px;
+  background-color: var(--primary-color);
+  color: white;
+  border: none;
+  border-radius: 5px;
+  font-size: 16px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+.filters button:hover {
+  background-color: var(--dark-color);
+}
+
+.game-list {
+  list-style: none;
+  padding: 0;
+}
+
+.game-list li {
+  margin-bottom: 20px;
+  padding: 15px;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  background-color: var(--light-color);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.game-list li:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.game-list img {
+  width: 100px;
+  height: 100px;
+  margin-right: 15px;
+  border-radius: 5px;
+  object-fit: cover;
+}
+
+.game-list .game-info {
+  display: flex;
+  align-items: center;
+}
+
+.game-list .game-info div {
+  flex: 1;
+}
+
+.game-list .game-info a {
+  text-decoration: none;
+  color: var(--primary-color);
+  font-size: 18px;
+  font-weight: bold;
+  transition: color 0.2s ease;
+}
+
+.game-list .game-info a:hover {
+  color: var(--dark-color);
+}
+
+.game-list .game-info p {
+  margin: 5px 0;
+}
+
+.game-list button {
+  padding: 8px 12px;
+  border: none;
+  border-radius: 5px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+.game-list button.own-game {
+  background-color: var(--success-color);
+  color: white;
+}
+
+.game-list button.own-game:hover {
+  background-color: #218838;
+}
+
+.game-list button.remove-ownership {
+  background-color: var(--danger-color);
+  color: white;
+}
+
+.game-list button.remove-ownership:hover {
+  background-color: #c82333;
+}
+
+.game-item {
+  margin-bottom: 20px;
+  padding: 15px;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  background-color: var(--light-color);
+  cursor: pointer;
+  transition: background-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.game-item:hover {
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  background-color: var(--secondary-color);
+  color: var(--light-color);
+}
+
+.game-item.selected {
+  background-color: var(--info-color);
+  color: var(--dark-color);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.game-night-container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 20px;
+  background-color: var(--light-color);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.game-night-container h1,
+.game-night-container h2 {
+  font-size: 24px;
+  font-weight: bold;
+  margin-bottom: 15px;
+  color: var(--dark-color);
+}
+
+.game-night-container h2 {
+  margin-top: 30px;
+  font-size: 20px;
+}
+
+.players-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.players-list li {
+  padding: 10px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.players-list li:last-child {
+  border-bottom: none;
+}
+
+.games-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.game-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 15px;
+  padding: 15px;
+  margin-bottom: 20px;
+  background-color: var(--light-color);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  transition: box-shadow 0.3s ease, transform 0.3s ease;
+}
+
+.game-item:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.game-thumbnail {
+  width: 100px;
+  height: 100px;
+  border-radius: 5px;
+  object-fit: cover;
+}
+
+.game-details {
+  flex: 1;
+}
+
+.game-details strong {
+  font-size: 18px;
+  color: var(--dark-color);
+}
+
+.results-list {
+  list-style: none;
+  padding: 0;
+  margin-top: 10px;
+}
+
+.results-list li {
+  font-size: 14px;
+  color: var(--text-color);
+  margin-bottom: 5px;
+}
+
+.btn-log-results,
+.btn-remove-game {
+  display: inline-block;
+  padding: 5px 10px;
+  font-size: 14px;
+  color: var(--light-color);
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+  margin-left: 5px;
+}
+
+.btn-log-results {
+  background-color: var(--success-color);
+}
+
+.btn-log-results:hover {
+  background-color: #218838;
+}
+
+.btn-remove-game {
+  background-color: var(--danger-color);
+}
+
+.btn-remove-game:hover {
+  background-color: #c82333;
+}
+
+.votes-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+}
+
+.vote-option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  width: 200px;
+  padding: 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  background-color: var(--light-color);
+  transition: box-shadow 0.3s ease, transform 0.3s ease;
+}
+
+.vote-option:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.vote-thumbnail {
+  width: 150px;
+  height: 150px;
+  border-radius: 5px;
+  object-fit: cover;
+  margin-bottom: 10px;
+}
+
+.dropdown-vote {
+  width: 100%;
+  padding: 5px;
+  border: 1px solid var(--border-color);
+  border-radius: 5px;
+  margin-top: 5px;
+}
+
+.winner-section {
+  text-align: center;
+  margin-top: 30px;
+  padding: 20px;
+  background-color: var(--success-color);
+  color: var(--light-color);
+  border-radius: 10px;
+}
+
+.btn-back-home {
+  display: inline-block;
+  padding: 10px 15px;
+  background-color: var(--primary-color);
+  color: var(--light-color);
+  border-radius: 5px;
+  text-decoration: none;
+  font-size: 16px;
+  margin-top: 20px;
+}
+
+.btn-back-home:hover {
+  background-color: var(--dark-color);
+  color: var(--light-color);
+}
+
+/* Admin Panel Styles */
+.admin-panel-container {
+  max-width: 100%;
+  margin: 10px auto;
+  padding: 15px;
+  background-color: var(--light-color);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.admin-panel-title {
+  font-size: 24px;
+  font-weight: bold;
+  color: var(--dark-color);
+  margin-bottom: 10px;
+  text-align: center;
+}
+
+.admin-panel-description {
+  font-size: 14px;
+  color: var(--text-color);
+  margin-bottom: 15px;
+  text-align: center;
+}
+
+.admin-panel-add-person {
+  text-align: center;
+  margin-bottom: 15px;
+}
+
+.admin-panel-table {
+  display: block;
+  overflow-x: auto;
+  width: 100%;
+  white-space: nowrap;
+  border-collapse: collapse;
+  background-color: var(--light-color);
+}
+
+.admin-panel-table th,
+.admin-panel-table td {
+  text-align: left;
+  font-size: 14px;
+  padding: 8px;
+  border: 1px solid var(--border-color);
+}
+
+.admin-panel-table th {
+  background-color: var(--primary-color);
+  color: var(--light-color);
+  font-weight: bold;
+}
+
+.admin-panel-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  align-items: stretch;
+}
+
+.inline-form button {
+  width: 100%;
+  padding: 10px;
+  font-size: 14px;
+  border-radius: 5px;
+  text-align: center;
+}
+
+.btn {
+  display: inline-block;
+  padding: 8px 12px;
+  font-size: 14px;
+  font-weight: bold;
+  border-radius: 5px;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.btn-primary {
+  background-color: var(--primary-color);
+  color: var(--light-color);
+  border: none;
+}
+
+.btn-primary:hover {
+  background-color: var(--dark-color);
+}
+
+.btn-success {
+  background-color: var(--success-color);
+  color: var(--light-color);
+}
+
+.btn-success:hover {
+  background-color: #218838;
+}
+
+.btn-danger {
+  background-color: var(--danger-color);
+  color: var(--light-color);
+}
+
+.btn-danger:hover {
+  background-color: #c82333;
+}
+
+.admin-panel-back-home {
+  text-align: center;
+  margin-top: 15px;
+}
+
+/* All Game Nights Container */
+.all-game-nights-container {
+  max-width: 800px;
+  margin: 20px auto;
+  padding: 20px;
+  background-color: var(--light-color);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  text-align: center;
+}
+
+.all-game-nights-container h1 {
+  font-size: 28px;
+  font-weight: bold;
+  color: var(--dark-color);
+  margin-bottom: 20px;
+}
+
+/* Game Nights List */
+.game-nights {
+  list-style: none;
+  padding: 0;
+  margin: 0 auto;
+  max-width: 600px;
+}
+
+.game-nights li {
+  background-color: var(--light-color);
+  margin: 10px 0;
+  padding: 15px;
+  border-radius: 8px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.game-nights li:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.game-nights li a {
+  text-decoration: none;
+  color: var(--primary-color);
+  font-size: 18px;
+  font-weight: bold;
+  display: block;
+  text-align: center;
+  transition: color 0.2s ease;
+}
+
+.game-nights li a:hover {
+  color: var(--dark-color);
+}
+
+.game-nights .no-game-nights {
+  color: var(--danger-color);
+  font-style: italic;
+  text-align: center;
+  padding: 10px;
+  background: none;
+  box-shadow: none;
+}
+
+/* Back to Home Button */
+.back-to-home {
+  margin-top: 20px;
+  text-align: center;
+}
+
+.back-to-home .button {
+  background-color: var(--primary-color);
+  color: var(--light-color);
+  padding: 10px 15px;
+  border: none;
+  border-radius: 5px;
+  text-decoration: none;
+  font-size: 16px;
+  display: inline-block;
+  transition: background-color 0.3s ease;
+}
+
+.back-to-home .button:hover {
+  background-color: var(--dark-color);
+  color: var(--light-color);
+}
+
+/* Utility Classes */
+.text-center {
+  text-align: center;
+}
+.mt-1 {
+  margin-top: 1rem;
+}
+.mb-1 {
+  margin-bottom: 1rem;
+}
+
+.podium {
+  text-align: center;
+  margin-top: 20px;
+}
+
+.podium-container {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  align-items: flex-end;
+}
+
+.podium-place {
+  text-align: center;
+  padding: 10px;
+  border: 2px solid #ccc;
+  border-radius: 5px;
+  background-color: #f9f9f9;
+  min-width: 100px;
+}
+
+.place-1 {
+  background-color: gold;
+  font-weight: bold;
+}
+
+.place-2 {
+  background-color: silver;
+}
+
+.place-3 {
+  background-color: #cd7f32; /* Bronze color */
+}
+
+.crown {
+  font-size: 2rem;
+  display: block;
+  margin-bottom: 10px;
+}
+
+ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.add-game-to-night-footer {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: white;
+  padding: 10px;
+  border-top: 1px solid #ccc;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  justify-content: center;
+  z-index: 1000;
+}
+
+body {
+  padding-bottom: 80px; /* Make sure page content doesn't hide behind the footer */
+}
+
+.add-game-to-night-footer button,
+.add-game-to-night-footer a.button {
+  padding: 8px 16px;
+  font-size: 16px;
+  border: none;
+  background-color: #007bff;
+  color: white;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.add-game-to-night-footer a.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.add-game-to-night-footer button:hover,
+.add-game-to-night-footer a.button:hover {
+  background-color: #0056b3;
+}
+
+.add-game-to-night-footer input[type="number"] {
+  width: 70px;
+  padding: 5px;
+  font-size: 16px;
+}
+
+.game-info img {
+  width: 60px;
+  height: 60px;
+  object-fit: cover;
+  border-radius: 4px;
+}
+
+.nominate-footer {
+  margin-top: 30px;
+  display: flex;
+  gap: 15px;
+  justify-content: center;
+  align-items: center;
+}
+
+.nominate-footer button,
+.nominate-footer .button {
+  background-color: #007bff;
+  color: white;
+  padding: 10px 18px;
+  font-size: 16px;
+  border: none;
+  border-radius: 6px;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.nominate-footer button:hover,
+.nominate-footer .button:hover {
+  background-color: #0056b3;
+}
+
+.btn-add-game,
+.btn-nominate {
+  display: inline-block;
+  background-color: #007bff;
+  color: white;
+  padding: 10px 18px;
+  font-size: 16px;
+  text-align: center;
+  border: none;
+  border-radius: 6px;
+  text-decoration: none;
+  transition: background-color 0.2s ease-in-out;
+}
+
+.btn-add-game:hover,
+.btn-nominate:hover {
+  background-color: #0056b3;
+}
+
+.nominate-game-footer {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: white;
+  padding: 12px 20px;
+  border-top: 1px solid #ccc;
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  z-index: 1000;
+}
+
+body {
+  padding-bottom: 80px; /* Prevent content from hiding behind sticky footer */
+}
+
+.nominate-game-footer button,
+.nominate-game-footer .button {
+  background-color: #007bff;
+  color: white;
+  padding: 10px 16px;
+  font-size: 16px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.nominate-game-footer button:hover,
+.nominate-game-footer .button:hover {
+  background-color: #0056b3;
+}
+
+.btn-wishlist-toggle {
+  background-color: #28a745;
+  color: white;
+  padding: 6px 12px;
+  font-size: 14px;
+  border: none;
+  border-radius: 4px;
+  margin-top: 6px;
+  cursor: pointer;
+}
+
+.btn-wishlist-toggle:hover {
+  background-color: #218838;
+}
+
+.btn-view-game {
+  background-color: #6c757d;
+  color: white;
+  padding: 6px 12px;
+  font-size: 14px;
+  border: none;
+  border-radius: 4px;
+  text-decoration: none;
+  margin-top: 6px;
+  display: inline-block;
+}
+
+.btn-view-game:hover {
+  background-color: #5a6268;
+}
+
+.btn-wishlist-toggle {
+  background-color: #28a745;
+  color: white;
+  padding: 6px 12px;
+  font-size: 14px;
+  border: none;
+  border-radius: 4px;
+  margin-top: 6px;
+  cursor: pointer;
+}
+
+.btn-wishlist-toggle:hover {
+  background-color: #218838;
+}
+
+.owned-status,
+.wishlist-status {
+  margin-top: 6px;
+  font-weight: bold;
+}
+
+/* Media Queries */
+@media (min-width: 768px) {
+  .navbar {
+    padding: 15px 30px;
+  }
+
+  .navbar .navbar-links {
+    display: flex;
+    flex-direction: row;
+    position: static;
+    top: auto;
+    left: auto;
+    width: auto;
+    padding: 0;
+    background-color: transparent;
+    z-index: auto;
+    box-shadow: none;
+    border-radius: 0;
+  }
+
+  .navbar .hamburger {
+    display: none;
+  }
+
+  .navbar .navbar-links.show {
+    display: flex;
+    max-height: none;
+  }
+
+  .navbar .navbar-links a {
+    margin: 0;
+    text-align: left;
+  }
+
+  .calendar-cell {
+    padding-top: 14.28%;
+  }
+
+  .calendar-cell-content {
+    font-size: 14px;
+  }
+
+  .calendar-navigation button {
+    font-size: 16px;
+    padding: 10px 15px;
+  }
+
+  .filters {
+    display: none;
+  }
+
+  .filters.active {
+    display: flex;
+    flex-wrap: wrap;
+  }
+
+  .game-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+  }
+
+  .game-list li {
+    flex: 1 1 calc(33.333% - 20px);
+  }
+
+  .admin-panel-container {
+    max-width: 700px;
+    padding: 20px;
+  }
+
+  .admin-panel-title {
+    font-size: 28px;
+  }
+
+  .admin-panel-description {
+    font-size: 16px;
+  }
+
+  .admin-panel-add-person {
+    text-align: right;
+  }
+
+  .admin-panel-table {
+    display: table;
+    width: 100%;
+  }
+
+  .admin-panel-table th,
+  .admin-panel-table td {
+    text-align: center;
+    font-size: 15px;
+    padding: 10px;
+  }
+
+  .admin-panel-actions {
+    flex-direction: row;
+    justify-content: center;
+    gap: 10px;
+  }
+
+  .inline-form button {
+    width: auto;
+    padding: 8px 12px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .navbar .navbar-links a {
+    font-size: 18px;
+  }
+
+  button,
+  a.button {
+    font-size: 18px;
+    padding: 12px 20px;
+  }
+
+  .calendar-cell {
+    padding-top: 14.28%;
+  }
+
+  .calendar-cell-content {
+    font-size: 12px;
+  }
+
+  .calendar-navigation button {
+    font-size: 18px;
+    padding: 12px 20px;
+  }
+
+  .filters {
+    max-width: 800px;
+    margin: 0 auto;
+  }
+
+  .admin-panel-container {
+    max-width: 900px;
+  }
+
+  .admin-panel-title {
+    font-size: 30px;
+  }
+
+  .admin-panel-description {
+    font-size: 18px;
+  }
+}
+
+/* Form Groups */
+.form-group {
+  margin-bottom: 20px;
+}
+
+/* Inputs and Search Box */
+.form-control {
+  width: 100%;
+  padding: 10px;
+  font-size: 16px;
+  border: 1px solid var(--border-color);
+  border-radius: 5px;
+  margin-top: 5px;
+  box-sizing: border-box;
+}
+
+/* Attendees Container */
+.attendees-container {
+  border: 1px solid var(--border-color);
+  border-radius: 5px;
+  background-color: var(--light-color);
+  height: 300px;
+  overflow-y: scroll;
+  padding: 10px;
+}
+
+/* Pagination Controls */
+.pagination-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.pagination-button {
+  background-color: var(--primary-color);
+  color: var(--light-color);
+  border: none;
+  padding: 8px 12px;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.pagination-button:hover {
+  background-color: var(--dark-color);
+}
+
+.pagination-info {
+  font-size: 16px;
+  font-weight: bold;
+}
+
+/* Selected Count */
+.selected-count {
+  margin-top: 10px;
+  font-weight: bold;
+  text-align: center;
+}
+
+/* Submit Button */
+.submit-button {
+  width: 100%;
+  padding: 12px;
+  font-size: 18px;
+  background-color: var(--primary-color);
+  color: var(--light-color);
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+.submit-button:hover {
+  background-color: var(--dark-color);
+}
+
+/* Attendee List */
+.attendee-label {
+  display: flex;
+  align-items: center;
+  padding: 6px;
+  margin-bottom: 5px;
+  background-color: var(--light-color);
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.attendee-checkbox {
+  margin-right: 10px;
+}
+
+/* Selected attendee */
+.attendee-selected {
+  background-color: var(--success-color) !important;
+  color: var(--light-color);
+}
+
+/* Highlighted attendee (keyboard navigation) */
+.attendee-highlighted {
+  background-color: var(--info-color) !important;
+  color: var(--light-color);
+}

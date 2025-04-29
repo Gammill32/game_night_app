@@ -3,7 +3,7 @@
 <h1>Add a Game to Game Night on {{ game_night.date.strftime('%B %d, %Y') }}</h1>
 
 <!-- Filters -->
-<button id="filter-toggle" class="button">Filters</button>
+<button id="filter-toggle" class="btn">Filters</button>
 <div id="filter-section" class="filters">
   <form method="GET">
     <label for="name">Game Name:</label>
@@ -33,7 +33,7 @@
     />
     <span id="playtime-value">{{ filters.playtime or 30 }}</span>
 
-    <button type="submit">Apply Filters</button>
+    <button type="submit" class="btn">Apply Filters</button>
   </form>
 </div>
 
@@ -43,17 +43,23 @@
 <form method="POST" id="game-selection-form">
   <ul class="game-list">
     {% for item in games %} {% set game = item.game %}
-    <li class="game-item" data-game-id="{{ game.id }}">
-      <div class="game-info">
-        <img src="{{ game.image_url }}" alt="{{ game.name }}" />
-        <div>
-          <strong>{{ game.name }}</strong>
-          <p>Playtime: {{ game.playtime or 'N/A' }} minutes</p>
-          <p>
+    <li class="game-list__item" data-game-id="{{ game.id }}">
+      <div class="game-list__info">
+        <img
+          src="{{ game.image_url }}"
+          alt="{{ game.name }}"
+          class="game-list__thumbnail"
+        />
+        <div class="game-list__info-content">
+          <a href="#" class="game-list__title">{{ game.name }}</a>
+          <p class="game-list__description">
+            Playtime: {{ game.playtime or 'N/A' }} minutes
+          </p>
+          <p class="game-list__description">
             Players: {{ game.min_players or '?' }} - {{ game.max_players or '?'
             }}
           </p>
-          <p>Owned by:</p>
+          <p class="game-list__description">Owned by:</p>
           <ul>
             {% for owner in game.owners %}
             <li>{{ owner.person.first_name }} {{ owner.person.last_name }}</li>
@@ -77,12 +83,11 @@
     <label for="round">Round:</label>
     <input type="number" name="round" min="1" value="{{ next_round }}" />
 
-    <button type="submit">Add Game</button>
+    <button type="submit" class="btn">Add Game</button>
 
     <a
       href="{{ url_for('game_night.view_game_night', game_night_id=game_night.id) }}"
-      class="button"
-      style="text-decoration: none"
+      class="btn"
     >
       Back to Game Night
     </a>
@@ -91,44 +96,33 @@
 
 <script>
   document.addEventListener("DOMContentLoaded", () => {
-    // Toggle Filters Section
     document.getElementById("filter-toggle").addEventListener("click", () => {
-      const filterSection = document.getElementById("filter-section");
-      filterSection.classList.toggle("active");
+      document.getElementById("filter-section").classList.toggle("active");
     });
 
-    // Update Players Slider Value
     const playersSlider = document.getElementById("players-slider");
     const playersValue = document.getElementById("players-value");
     playersSlider.addEventListener("input", () => {
       playersValue.textContent = playersSlider.value;
     });
 
-    // Update Playtime Slider Value
     const playtimeSlider = document.getElementById("playtime-slider");
     const playtimeValue = document.getElementById("playtime-value");
     playtimeSlider.addEventListener("input", () => {
       playtimeValue.textContent = playtimeSlider.value;
     });
 
-    // Make each game item selectable
-    document.querySelectorAll(".game-item").forEach((item) => {
+    document.querySelectorAll(".game-list__item").forEach((item) => {
       item.addEventListener("click", () => {
-        // Deselect all items
         document
-          .querySelectorAll(".game-item")
-          .forEach((i) => i.classList.remove("selected"));
-
-        // Select the clicked item
-        item.classList.add("selected");
-
-        // Update the hidden input value
+          .querySelectorAll(".game-list__item")
+          .forEach((i) => i.classList.remove("is-selected"));
+        item.classList.add("is-selected");
         document.getElementById("selected-game-id").value =
           item.getAttribute("data-game-id");
       });
     });
 
-    // Ensure form cannot be submitted without a selected game
     document
       .getElementById("game-selection-form")
       .addEventListener("submit", (e) => {

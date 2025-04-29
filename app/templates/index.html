@@ -7,84 +7,83 @@
 
 <!-- Calendar Navigation -->
 <div class="calendar-navigation">
-    <form action="{{ url_for('main.index') }}" method="GET" class="calendar-form">
-        <select name="month" onchange="this.form.submit()" class="calendar-select">
-            {% for month_num, month_name in months %}
-                <option value="{{ month_num }}" {% if current_month.month == month_num %}selected{% endif %}>
-                    {{ month_name }}
-                </option>
-            {% endfor %}
-        </select>
-        <select name="year" onchange="this.form.submit()" class="calendar-select">
-            {% for year in years %}
-                <option value="{{ year }}" {% if current_month.year == year %}selected{% endif %}>
-                    {{ year }}
-                </option>
-            {% endfor %}
-        </select>
-    </form>
+  <form action="{{ url_for('main.index') }}" method="GET" class="calendar__form">
+    <select name="month" onchange="this.form.submit()" class="form-control calendar__select">
+      {% for month_num, month_name in months %}
+      <option value="{{ month_num }}" {% if current_month.month == month_num %}selected{% endif %}>
+        {{ month_name }}
+      </option>
+      {% endfor %}
+    </select>
+    <select name="year" onchange="this.form.submit()" class="form-control calendar__select">
+      {% for year in years %}
+      <option value="{{ year }}" {% if current_month.year == year %}selected{% endif %}>
+        {{ year }}
+      </option>
+      {% endfor %}
+    </select>
+  </form>
 </div>
 
 <div class="calendar">
-    <table>
-        <thead>
-            <tr>
-                <th>Sun</th>
-                <th>Mon</th>
-                <th>Tue</th>
-                <th>Wed</th>
-                <th>Thu</th>
-                <th>Fri</th>
-                <th>Sat</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for week in calendar %}
-                <tr>
-                    {% for day in week %}
-                        {% set is_today = (day == today.day and current_month.month == today.month and current_month.year == today.year) %}
-                        <td class="calendar-cell" style="{% if is_today %} background-color: var(--warning-color); {% endif %}">
-                            {% if day %}
-                                <div class="calendar-cell-content">
-                                    {% set game_days = game_nights | selectattr("date", "equalto", current_month.replace(day=day)) | list %}
-                                    {% if game_days %}
-                                        {% for game in game_days %}
-                                            <a href="{{ url_for('game_night.view_game_night', game_night_id=game.game_night_id) }}">
-                                                <strong>{{ day }}</strong>
-                                                <div class="dice-icon">🎲</div>
-                                            </a>
-                                        {% endfor %}
-                                    {% else %}
-                                        <strong>{{ day }}</strong>
-                                    {% endif %}
-                                </div>
-                            {% endif %}
-                        </td>
-                    {% endfor %}
-                </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+  <table>
+    <thead>
+      <tr>
+        <th>Sun</th>
+        <th>Mon</th>
+        <th>Tue</th>
+        <th>Wed</th>
+        <th>Thu</th>
+        <th>Fri</th>
+        <th>Sat</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for week in calendar %}
+      <tr>
+        {% for day in week %}
+        {% set is_today = (day == today.day and current_month.month == today.month and current_month.year == today.year) %}
+        <td class="calendar__cell {% if is_today %}calendar__cell--today{% endif %}">
+          {% if day %}
+          <div class="calendar__cell-content {% if is_today %}calendar__cell-content--today{% endif %}">
+            {% set game_days = game_nights | selectattr("date", "equalto", current_month.replace(day=day)) | list %}
+            {% if game_days %}
+              {% for game in game_days %}
+              <a href="{{ url_for('game_night.view_game_night', game_night_id=game.game_night_id) }}">
+                <strong>{{ day }}</strong>
+                <div class="dice-icon">🎲</div>
+              </a>
+              {% endfor %}
+            {% else %}
+              <strong>{{ day }}</strong>
+            {% endif %}
+          </div>
+          {% endif %}
+        </td>
+        {% endfor %}
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
 </div>
 
 <h2>Game Nights</h2>
 <ul class="game-nights">
-    {% for gn in game_nights_list %}
-        <li>
-            <a href="{{ url_for('game_night.view_game_night', game_night_id=gn.game_night_id) }}">
-                {{ gn.date.strftime('%B %d, %Y') }}
-            </a>
-        </li>
-    {% else %}
-        <li class="no-game-nights">No game nights found.</li>
-    {% endfor %}
+  {% for gn in game_nights_list %}
+  <li>
+    <a href="{{ url_for('game_night.view_game_night', game_night_id=gn.game_night_id) }}">
+      {{ gn.date.strftime('%B %d, %Y') }}
+    </a>
+  </li>
+  {% else %}
+  <li class="empty-state">No game nights found.</li>
+  {% endfor %}
 </ul>
 
-
-<div style="text-align: center;">
-    <a href="{{ url_for('main.all_game_nights') }}" class="button">See All Game Nights</a>
-    {% if current_user.admin or current_user.owner %}
-        <a href="{{ url_for('game_night.start_game_night') }}" class="button" style="background-color: var(--success-color);">Start a New Game Night</a>
-    {% endif %}
+<div class="text-center mt-1">
+  <a href="{{ url_for('main.all_game_nights') }}" class="btn">See All Game Nights</a>
+  {% if current_user.admin or current_user.owner %}
+  <a href="{{ url_for('game_night.start_game_night') }}" class="btn btn--success">Start a New Game Night</a>
+  {% endif %}
 </div>
 {% endblock %}

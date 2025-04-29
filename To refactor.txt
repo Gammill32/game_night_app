@@ -1,0 +1,17 @@
+add game
+add person
+add to wishlist
+admin page
+all game nights
+edit game night
+forgot password
+games index
+log results
+manage user
+nominate game
+signup
+start game night
+update password
+view game night
+view game
+wishlist
