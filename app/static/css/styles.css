@@ -260,15 +260,17 @@ ul {
 .calendar__cell {
   width: 14.28%;
   height: 100px;
-  padding-top: 14.28%;
+  padding: 0;
   box-sizing: border-box;
-  cursor: pointer;
-  transition: background-color 0.3s ease;
+  position: relative;
 }
 
-.calendar__cell:hover {
+.calendar__cell--clickable {
+  cursor: pointer;
+}
+
+.calendar__cell--clickable:hover {
   background-color: var(--secondary-color);
-  color: var(--light-color);
 }
 
 .calendar__cell-content {
@@ -285,14 +287,29 @@ ul {
   color: var(--text-color);
 }
 
-.calendar__cell-content a {
-  text-decoration: none;
-  color: var(--primary-color);
-  font-size: 14px;
+.calendar__cell-content strong {
+  font-size: 18px;
 }
 
-.calendar__cell-content a:hover {
-  color: var(--success-color);
+.calendar__cell-link {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  width: 100%;
+  height: 100%;
+  color: var(--primary-color);
+  font-weight: bold;
+}
+
+.calendar__cell-link:hover {
+  color: var(--light-color);
+}
+
+.calendar__cell--today {
+  background-color: var(--info-color);
+  color: var(--light-color);
 }
 
 .calendar__cell-content--today {
@@ -302,11 +319,9 @@ ul {
   padding: 5px;
 }
 
-.calendar__cell-content--event {
-  background-color: var(--success-color);
-  color: var(--light-color);
-  border-radius: 5px;
-  padding: 5px;
+.dice-icon {
+  font-size: 20px;
+  margin-top: 5px;
 }
 
 /* Game List */
