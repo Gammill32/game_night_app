@@ -67,6 +67,7 @@ ul {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: wrap;
   padding: 10px 20px;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
   position: sticky;
@@ -82,7 +83,8 @@ ul {
 
 /* Navigation Bar */
 .navbar__button,
-.navbar__links a {
+.navbar__links a,
+.navbar__user a {
   color: var(--light-color);
   text-decoration: none;
   margin: 5px;
@@ -92,7 +94,8 @@ ul {
 }
 
 .navbar__button:hover,
-.navbar__links a:hover {
+.navbar__links a:hover,
+.navbar__user a:hover {
   background-color: var(--light-color);
   color: var(--primary-color);
 }
@@ -106,6 +109,7 @@ ul {
   cursor: pointer;
 }
 
+/* Group the links */
 .navbar__links {
   display: none;
   flex-direction: column;
@@ -120,6 +124,7 @@ ul {
   border-radius: 5px;
 }
 
+/* Show links when toggled */
 .navbar__links--show {
   display: flex;
   max-height: 300px;
@@ -129,6 +134,17 @@ ul {
   display: block;
   text-align: center;
   margin: 10px 0;
+}
+
+/* User section on the right */
+.navbar__user {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.navbar__user form {
+  display: inline-block;
 }
 
 /* Buttons */
@@ -146,7 +162,7 @@ ul {
 }
 
 .btn:hover {
-  background-color: var(--dark-color);
+  background-color: var(--primary-hover-color);
 }
 
 .btn--success {
@@ -410,6 +426,49 @@ ul {
 /* ==================================================
    4. Modules
 ================================================== */
+
+/* ----------------------
+   Game Nights List
+----------------------- */
+.game-nights {
+  list-style: none;
+  padding: 0;
+  margin: 20px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.game-nights li {
+  background-color: var(--light-color);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 12px 20px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  transition: background-color 0.3s ease, transform 0.3s ease;
+}
+
+.game-nights li:hover {
+  background-color: var(--tertiary-color);
+  transform: translateY(-2px);
+}
+
+.game-nights a {
+  color: var(--primary-color);
+  text-decoration: none;
+  font-weight: bold;
+  font-size: 16px;
+}
+
+.game-nights a:hover {
+  color: var(--dark-color);
+}
+
+.empty-state {
+  text-align: center;
+  color: var(--text-color);
+  font-style: italic;
+}
 
 /* ----------------------
    Game Night
@@ -842,7 +901,7 @@ ul {
     position: static;
     width: auto;
     padding: 0;
-    background-color: transparent;
+    background: transparent;
     box-shadow: none;
     border-radius: 0;
   }
@@ -852,8 +911,7 @@ ul {
   }
 
   .navbar__links a {
-    margin: 0;
-    text-align: left;
+    margin: 0 10px;
   }
 
   /* Components: Calendar */
