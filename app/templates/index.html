@@ -32,47 +32,49 @@
     </form>
   </div>
 
-<div class="calendar">
-  <table>
-    <thead>
-      <tr>
-        <th>Sun</th>
-        <th>Mon</th>
-        <th>Tue</th>
-        <th>Wed</th>
-        <th>Thu</th>
-        <th>Fri</th>
-        <th>Sat</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for week in calendar %}
-      <tr>
-        {% for day in week %}
-            {% set is_today = (day == today.day and current_month.month == today.month and current_month.year == today.year) %}
-            {% set game_days = game_nights | selectattr("date", "equalto", current_month.replace(day=day)) | list %}
-            <td class="calendar__cell {% if is_today %}calendar__cell--today{% endif %} {% if game_days %}calendar__cell--clickable{% endif %}">
-                {% if day %}
+  <div class="calendar">
+    <table>
+      <thead>
+        <tr>
+          <th>Sun</th>
+          <th>Mon</th>
+          <th>Tue</th>
+          <th>Wed</th>
+          <th>Thu</th>
+          <th>Fri</th>
+          <th>Sat</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for week in calendar %}
+        <tr>
+          {% for day in week %}
+            {% if day %}
+              {% set is_today = (day == today.day and current_month.month == today.month and current_month.year == today.year) %}
+              {% set game_days = game_nights | selectattr("date", "equalto", current_month.replace(day=day)) | list %}
+              <td class="calendar__cell {% if is_today %}calendar__cell--today{% endif %} {% if game_days %}calendar__cell--clickable{% endif %}">
                 {% if game_days %}
-                    <a href="{{ url_for('game_night.view_game_night', game_night_id=game_days[0].game_night_id) }}" class="calendar__cell-link">
+                  <a href="{{ url_for('game_night.view_game_night', game_night_id=game_days[0].game_night_id) }}" class="calendar__cell-link">
                     <div class="calendar__cell-content">
-                        <strong>{{ day }}</strong>
-                        <div class="dice-icon">🎲</div>
+                      <strong>{{ day }}</strong>
+                      <div class="dice-icon">🎲</div>
                     </div>
-                    </a>
+                  </a>
                 {% else %}
-                    <div class="calendar__cell-content">
+                  <div class="calendar__cell-content">
                     <strong>{{ day }}</strong>
-                    </div>
+                  </div>
                 {% endif %}
-                {% endif %}
-            </td>
-            {% endfor %}
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-</div>
+              </td>
+            {% else %}
+              <td class="calendar__cell"></td>
+            {% endif %}
+          {% endfor %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
 
 <h2 class="text-center">Game Nights</h2>
 
