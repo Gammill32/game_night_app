@@ -1,21 +1,25 @@
-<!-- game_night_app/templates/add_person.html -->
-
 {% extends "base.html" %}
 
 {% block title %}Add Person{% endblock %}
 
 {% block content %}
-    <h1>Add a Person</h1>
+  <h1>Add a Person</h1>
 
-    <form action="{{ url_for('admin.add_person') }}" method="POST">
-        <label for="first_name">First Name:</label>
-        <input type="text" name="first_name" required><br><br>
+  <form action="{{ url_for('admin.add_person') }}" method="POST" class="auth-form">
+    <div class="form-group">
+      <label for="first_name">First Name:</label>
+      <input type="text" id="first_name" name="first_name" class="form-control" required>
+    </div>
 
-        <label for="last_name">Last Name:</label>
-        <input type="text" name="last_name" required><br><br>
+    <div class="form-group">
+      <label for="last_name">Last Name:</label>
+      <input type="text" id="last_name" name="last_name" class="form-control" required>
+    </div>
 
-        <button type="submit">Add Person</button>
-    </form>
-    <br>
+    <button type="submit" class="btn">Add Person</button>
+  </form>
+
+  <div class="auth-links">
     <a href="{{ url_for('admin.admin_page') }}">Back to Admin Panel</a>
+  </div>
 {% endblock %}

@@ -4,7 +4,6 @@ add to wishlist
 admin page
 all game nights
 edit game night
-forgot password
 games index
 log results
 manage user
