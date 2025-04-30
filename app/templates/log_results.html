@@ -3,100 +3,79 @@
 {% block title %}Log Results{% endblock %}
 
 {% block content %}
-    <h1>Log Results for {{ game_night_game.game.name }} (Round {{ game_night_game.round }})</h1>
+<h1>Log Results for {{ game_night_game.game.name }} (Round {{ game_night_game.round }})</h1>
 
-    <form id="resultsForm">
-        <!-- Styled Table -->
-        <table style="width: 100%; border-collapse: collapse; text-align: center;">
-            <thead>
-                <tr style="background-color: #f2f2f2;">
-                    <th style="border: 1px solid #ddd; padding: 10px;">Player</th>
-                    <th style="border: 1px solid #ddd; padding: 10px;">Score</th>
-                    <th style="border: 1px solid #ddd; padding: 10px;">Position</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for player in players %}
-                    <tr style="border-bottom: 1px solid #ddd; transition: background-color 0.3s;">
-                        <td style="border: 1px solid #ddd; padding: 10px;">
-                            {{ player.person.first_name }} {{ player.person.last_name }}
-                        </td>
-                        <td style="border: 1px solid #ddd; padding: 10px;">
-                            <input type="number" class="score-input" data-player-id="{{ player.id }}" 
-                                   value="{{ existing_results[player.id].score if player.id in existing_results else '' }}" 
-                                   style="width: 100%; padding: 5px;">
-                        </td>
-                        <td style="border: 1px solid #ddd; padding: 10px;">
-                            <input type="number" class="position-input" data-player-id="{{ player.id }}" 
-                                   value="{{ existing_results[player.id].position if player.id in existing_results else '' }}" 
-                                   min="1" style="width: 100%; padding: 5px;">
-                        </td>
-                    </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-        <br>
+<form id="resultsForm">
+  <table class="styled-table">
+    <thead>
+      <tr>
+        <th>Player</th>
+        <th>Score</th>
+        <th>Position</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for player in players %}
+        <tr>
+          <td>{{ player.person.first_name }} {{ player.person.last_name }}</td>
+          <td>
+            <input type="number"
+                   class="score-input form-control"
+                   data-player-id="{{ player.id }}"
+                   value="{{ existing_results[player.id].score if player.id in existing_results else '' }}">
+          </td>
+          <td>
+            <input type="number"
+                   class="position-input form-control"
+                   data-player-id="{{ player.id }}"
+                   value="{{ existing_results[player.id].position if player.id in existing_results else '' }}"
+                   min="1">
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
 
-        <!-- Submit Button -->
-        <div style="text-align: center;">
-            <button type="submit" id="submitResults" style="
-                background-color: #4CAF50;
-                color: white;
-                border: none;
-                padding: 10px 20px;
-                font-size: 16px;
-                cursor: pointer;
-                border-radius: 5px;
-                transition: background-color 0.3s;">
-                Submit Results
-            </button>
-        </div>
-    </form>
+  <div class="form-actions">
+    <button type="submit" id="submitResults" class="btn btn--success">Submit Results</button>
+    <a href="{{ url_for('game_night.view_game_night', game_night_id=game_night_id) }}" class="btn btn--primary">
+      &larr; Back to Game Night
+    </a>
+  </div>
+</form>
 
-    <!-- Back Link -->
-    <div style="text-align: center; margin-top: 20px;">
-        <a href="{{ url_for('game_night.view_game_night', game_night_id=game_night_id) }}" style="
-            color: #007BFF;
-            text-decoration: none;
-            font-weight: bold;">
-            &larr; Back to Game Night
-        </a>
-    </div>
+<script>
+  document.getElementById("resultsForm").addEventListener("submit", function(event) {
+    event.preventDefault();
 
-    <script>
-        document.getElementById("resultsForm").addEventListener("submit", function(event) {
-            event.preventDefault(); // Prevent traditional form submission
+    let formData = {};
 
-            let formData = {};  // Store player data in structured format
+    document.querySelectorAll(".score-input, .position-input").forEach(input => {
+      let playerId = input.dataset.playerId;
+      if (!formData[playerId]) {
+        formData[playerId] = { "user_id": playerId, "score": null, "position": null };
+      }
+      if (input.classList.contains("score-input")) {
+        formData[playerId].score = input.value ? parseInt(input.value) : null;
+      } else if (input.classList.contains("position-input")) {
+        formData[playerId].position = input.value ? parseInt(input.value) : null;
+      }
+    });
 
-            document.querySelectorAll(".score-input, .position-input").forEach(input => {
-                let playerId = input.dataset.playerId;
-                if (!formData[playerId]) {
-                    formData[playerId] = { "user_id": playerId, "score": null, "position": null };
-                }
-                if (input.classList.contains("score-input")) {
-                    formData[playerId].score = input.value ? parseInt(input.value) : null;
-                } else if (input.classList.contains("position-input")) {
-                    formData[playerId].position = input.value ? parseInt(input.value) : null;
-                }
-            });
-
-            // Send JSON data to Flask
-            fetch("{{ url_for('game_night.log_results', game_night_id=game_night_id, game_night_game_id=game_night_game.id) }}", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(formData)
-            })
-            .then(response => {
-                // If the response is a redirect, manually follow it
-                if (response.redirected) {
-                    window.location.href = response.url;
-                    return;
-                }
-                return response.text(); // If not redirected, log response for debugging
-            })
-            .then(data => console.log("Response:", data))
-            .catch(error => console.error("Error:", error));
-        });
-    </script>
+    fetch("{{ url_for('game_night.log_results', game_night_id=game_night_id, game_night_game_id=game_night_game.id) }}", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(formData)
+    })
+    .then(response => {
+      if (response.redirected) {
+        window.location.href = response.url;
+        return;
+      }
+      return response.text();
+    })
+    .then(data => console.log("Response:", data))
+    .catch(error => console.error("Error:", error));
+  });
+</script>
 {% endblock %}

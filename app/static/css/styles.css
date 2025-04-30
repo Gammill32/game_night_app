@@ -1267,6 +1267,43 @@ input[type="checkbox"] {
   box-sizing: border-box;
 }
 
+.form-actions {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+/* Styled Table with banded rows */
+.styled-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 20px;
+}
+
+.styled-table th,
+.styled-table td {
+  border: 1px solid var(--border-color);
+  padding: 10px;
+  text-align: center;
+}
+
+.styled-table thead {
+  background-color: var(--tertiary-color);
+}
+
+.styled-table tbody tr:nth-child(even) {
+  background-color: #f9f9f9;
+}
+
+.styled-table tbody tr:nth-child(odd) {
+  background-color: var(--light-color);
+}
+
+.styled-table tbody tr:hover {
+  background-color: var(--tertiary-color);
+}
+
 /* ==================================================
    9. Sticky Footer Controls
 ================================================== */
