@@ -84,13 +84,6 @@
       <div class="votes-container">
         {% for nomination in nominations %}
         <div class="vote-option">
-          <label for="votes[{{ nomination.game_id }}]">Your Rank:</label>
-          <select name="votes[{{ nomination.game_id }}]" class="vote-option__dropdown">
-            <option value="">No Vote</option>
-            {% for i in range(1, 4) %}
-            <option value="{{ i }}" {% if user_votes.get(nomination.game_id) == i %}selected{% endif %}>{{ i }}</option>
-            {% endfor %}
-          </select>
           <a href="{{ url_for('games.view_game', game_id=nomination.game_id) }}">
             <img src="{{ nomination.image_url }}" alt="{{ nomination.game_name }}" class="vote-option__thumbnail">
           </a>
@@ -100,6 +93,13 @@
             <p>Avg Rating: {{ nomination.avg_rating or 'No ratings yet' }}</p>
             <p>Votes: {{ nomination.vote_score or 0 }}</p>
           </div>
+          <label for="votes[{{ nomination.game_id }}]">Your Rank:</label>
+          <select name="votes[{{ nomination.game_id }}]" class="vote-option__dropdown">
+            <option value="">No Vote</option>
+            {% for i in range(1, 4) %}
+            <option value="{{ i }}" {% if user_votes.get(nomination.game_id) == i %}selected{% endif %}>{{ i }}</option>
+            {% endfor %}
+          </select>
         </div>
         {% endfor %}
       </div>
