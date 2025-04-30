@@ -780,7 +780,6 @@ input[type="checkbox"] {
 
 .filters button,
 .filters a.btn {
-  width: 100%;
   padding: 10px;
   background-color: var(--primary-color);
   color: white;
@@ -789,6 +788,7 @@ input[type="checkbox"] {
   font-size: 16px;
   cursor: pointer;
   transition: background-color 0.3s ease;
+  margin: 5px;
 }
 
 .filters button:hover {
