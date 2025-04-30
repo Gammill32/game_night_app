@@ -1,37 +1,23 @@
-{% extends "base.html" %} {% block title %}Start Game Night{% endblock %} {%
-block content %}
+{% extends "base.html" %}
+
+{% block title %}Start Game Night{% endblock %}
+
+{% block content %}
 <h1>Start a New Game Night</h1>
 
-<form
-  action="{{ url_for('game_night.start_game_night') }}"
-  method="POST"
-  id="startGameNightForm"
->
+<form action="{{ url_for('game_night.start_game_night') }}" method="POST" id="startGameNightForm">
   <div class="form-group">
     <label for="dateInput">Date:</label>
-    <input
-      type="date"
-      name="date"
-      id="dateInput"
-      class="form-control"
-      required
-    />
+    <input type="date" name="date" id="dateInput" class="form-control" required />
   </div>
 
   <div class="form-group">
-    <label for="notesInput">Notes:</label><br />
-    <textarea
-      name="notes"
-      id="notesInput"
-      rows="4"
-      cols="50"
-      class="form-control"
-    ></textarea>
+    <label for="notesInput">Notes:</label>
+    <textarea name="notes" id="notesInput" rows="4" class="form-control"></textarea>
   </div>
 
   <div class="form-group">
     <h3>Attendees:</h3>
-
     <input
       type="text"
       id="searchBox"
@@ -39,40 +25,31 @@ block content %}
       placeholder="Search for a name..."
       autocomplete="off"
     />
-    <br />
 
     <div id="attendeesContainer" class="attendees-container">
-      <!-- People checkboxes will be inserted here by JavaScript -->
+      <!-- JavaScript will inject attendee checkboxes -->
     </div>
 
     <div id="pagination" class="pagination-controls">
-      <button type="button" id="prevPage" class="pagination-button">
-        Previous
-      </button>
+      <button type="button" id="prevPage" class="pagination-button">Previous</button>
       <span id="pageInfo" class="pagination-info"></span>
-      <button type="button" id="nextPage" class="pagination-button">
-        Next
-      </button>
+      <button type="button" id="nextPage" class="pagination-button">Next</button>
     </div>
 
     <div id="selectedCount" class="selected-count">0 Attendees Selected</div>
   </div>
 
-  <div class="form-group">
-    <button type="submit" id="submitButton" class="submit-button">
-      Start Game Night
-    </button>
+  <div class="form-actions">
+    <button type="submit" class="btn btn--success">Start Game Night</button>
+    <a href="{{ url_for('main.index') }}" class="btn btn--primary">Back to Home</a>
   </div>
 </form>
 
-<br />
-<a href="{{ url_for('main.index') }}" class="back-link">Back to Home</a>
-
 <script>
   const people = [
-      {% for person in people %}
-          { id: {{ person.id }}, name: "{{ person.first_name }} {{ person.last_name }}" },
-      {% endfor %}
+    {% for person in people %}
+      { id: {{ person.id }}, name: "{{ person.first_name }} {{ person.last_name }}" },
+    {% endfor %}
   ];
 
   let filteredPeople = [...people];
@@ -88,142 +65,126 @@ block content %}
   const nextPage = document.getElementById('nextPage');
 
   function updateSelectedCount() {
-      const count = selectedPeople.size;
-      const text = `${count} Attendee${count !== 1 ? 's' : ''} Selected`;
-      document.getElementById('selectedCount').textContent = text;
+    const count = selectedPeople.size;
+    document.getElementById('selectedCount').textContent = `${count} Attendee${count !== 1 ? 's' : ''} Selected`;
   }
 
   function renderAttendees() {
-      attendeesContainer.innerHTML = '';
-      const start = (currentPage - 1) * pageSize;
-      const end = start + pageSize;
-      const pagePeople = filteredPeople.slice(start, end);
+    attendeesContainer.innerHTML = '';
+    const start = (currentPage - 1) * pageSize;
+    const pagePeople = filteredPeople.slice(start, start + pageSize);
 
-      if (pagePeople.length === 0 && currentPage > 1) {
-          currentPage--;
-          renderAttendees();
-          return;
+    if (pagePeople.length === 0 && currentPage > 1) {
+      currentPage--;
+      renderAttendees();
+      return;
+    }
+
+    pagePeople.forEach((person, index) => {
+      const label = document.createElement('label');
+      label.className = 'attendee__label';
+      label.dataset.index = index;
+
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.name = 'attendees';
+      checkbox.value = person.id;
+      checkbox.className = 'attendee__checkbox';
+
+      if (selectedPeople.has(person.id)) {
+        checkbox.checked = true;
+        label.classList.add('attendee__label--selected');
       }
 
-      pagePeople.forEach((person, index) => {
-          const label = document.createElement('label');
-          label.className = 'attendee-label';
-          label.dataset.index = index;
-          const checkbox = document.createElement('input');
-          checkbox.type = 'checkbox';
-          checkbox.name = 'attendees';
-          checkbox.value = person.id;
-          checkbox.className = 'attendee-checkbox';
-
-          if (selectedPeople.has(person.id)) {
-              checkbox.checked = true;
-              label.classList.add('attendee-selected');
-          }
-
-          checkbox.addEventListener('change', () => {
-              if (checkbox.checked) {
-                  selectedPeople.add(person.id);
-              } else {
-                  selectedPeople.delete(person.id);
-              }
-              updateSelectedCount();
-              renderAttendees();
-          });
-
-          label.appendChild(checkbox);
-          label.appendChild(document.createTextNode(' ' + person.name));
-          attendeesContainer.appendChild(label);
+      checkbox.addEventListener('change', () => {
+        if (checkbox.checked) selectedPeople.add(person.id);
+        else selectedPeople.delete(person.id);
+        updateSelectedCount();
+        renderAttendees();
       });
 
-      pageInfo.textContent = `Page ${currentPage} of ${Math.ceil(filteredPeople.length / pageSize)}`;
-      highlightTopMatch();
-      updateSelectedCount();
+      label.appendChild(checkbox);
+      label.appendChild(document.createTextNode(' ' + person.name));
+      attendeesContainer.appendChild(label);
+    });
+
+    pageInfo.textContent = `Page ${currentPage} of ${Math.ceil(filteredPeople.length / pageSize)}`;
+    highlightTopMatch();
+    updateSelectedCount();
   }
 
   function updateFilter() {
-      const searchTerm = searchBox.value.toLowerCase();
-      filteredPeople = people.filter(person => person.name.toLowerCase().includes(searchTerm));
-      currentPage = 1;
-      highlightedIndex = 0;
-      renderAttendees();
+    const searchTerm = searchBox.value.toLowerCase();
+    filteredPeople = people.filter(person => person.name.toLowerCase().includes(searchTerm));
+    currentPage = 1;
+    highlightedIndex = 0;
+    renderAttendees();
   }
 
   function highlightTopMatch() {
-      const labels = attendeesContainer.querySelectorAll('label');
-      labels.forEach(label => {
-          label.classList.toggle('attendee-selected', selectedPeople.has(Number(label.querySelector('input').value)));
-          label.classList.remove('attendee-highlighted');
-      });
-
-      if (labels.length > 0) {
-          labels[highlightedIndex]?.scrollIntoView({ block: "nearest" });
-          labels[highlightedIndex].classList.add('attendee-highlighted');
-      }
+    const labels = attendeesContainer.querySelectorAll('.attendee__label');
+    labels.forEach(label => {
+      label.classList.toggle('attendee__label--selected', selectedPeople.has(+label.querySelector('input').value));
+      label.classList.remove('attendee__label--highlighted');
+    });
+    if (labels[highlightedIndex]) {
+      labels[highlightedIndex].scrollIntoView({ block: "nearest" });
+      labels[highlightedIndex].classList.add('attendee__label--highlighted');
+    }
   }
 
   searchBox.addEventListener('input', updateFilter);
 
   prevPage.addEventListener('click', () => {
-      if (currentPage > 1) {
-          currentPage--;
-          highlightedIndex = 0;
-          renderAttendees();
-      }
+    if (currentPage > 1) {
+      currentPage--;
+      highlightedIndex = 0;
+      renderAttendees();
+    }
   });
 
   nextPage.addEventListener('click', () => {
-      if (currentPage * pageSize < filteredPeople.length) {
-          currentPage++;
-          highlightedIndex = 0;
-          renderAttendees();
-      }
+    if (currentPage * pageSize < filteredPeople.length) {
+      currentPage++;
+      highlightedIndex = 0;
+      renderAttendees();
+    }
   });
 
   searchBox.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
-          e.preventDefault();
-          if (filteredPeople.length > 0) {
-              const person = filteredPeople[(currentPage - 1) * pageSize + highlightedIndex];
-              if (person) {
-                  if (e.shiftKey) {
-                      selectedPeople.delete(person.id);
-                  } else {
-                      selectedPeople.add(person.id);
-                  }
-              }
-              searchBox.value = '';
-              highlightedIndex = 0;
-              updateFilter();
-              searchBox.focus();
-          }
-      } else if (e.key === 'ArrowDown') {
-          e.preventDefault();
-          if (highlightedIndex < Math.min(pageSize, filteredPeople.length - (currentPage - 1) * pageSize) - 1) {
-              highlightedIndex++;
-              highlightTopMatch();
-          }
-      } else if (e.key === 'ArrowUp') {
-          e.preventDefault();
-          if (highlightedIndex > 0) {
-              highlightedIndex--;
-              highlightTopMatch();
-          }
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const person = filteredPeople[(currentPage - 1) * pageSize + highlightedIndex];
+      if (person) {
+        if (e.shiftKey) selectedPeople.delete(person.id);
+        else selectedPeople.add(person.id);
       }
+      searchBox.value = '';
+      highlightedIndex = 0;
+      updateFilter();
+      searchBox.focus();
+    } else if (e.key === 'ArrowDown' && highlightedIndex < Math.min(pageSize, filteredPeople.length - (currentPage - 1) * pageSize) - 1) {
+      e.preventDefault();
+      highlightedIndex++;
+      highlightTopMatch();
+    } else if (e.key === 'ArrowUp' && highlightedIndex > 0) {
+      e.preventDefault();
+      highlightedIndex--;
+      highlightTopMatch();
+    }
   });
 
   document.getElementById('startGameNightForm').addEventListener('submit', (e) => {
-      document.querySelectorAll('input[name="attendees"][type="hidden"]').forEach(el => el.remove());
-      selectedPeople.forEach(id => {
-          const hiddenInput = document.createElement('input');
-          hiddenInput.type = 'hidden';
-          hiddenInput.name = 'attendees';
-          hiddenInput.value = id;
-          document.getElementById('startGameNightForm').appendChild(hiddenInput);
-      });
+    document.querySelectorAll('input[name="attendees"][type="hidden"]').forEach(el => el.remove());
+    selectedPeople.forEach(id => {
+      const hiddenInput = document.createElement('input');
+      hiddenInput.type = 'hidden';
+      hiddenInput.name = 'attendees';
+      hiddenInput.value = id;
+      document.getElementById('startGameNightForm').appendChild(hiddenInput);
+    });
   });
 
-  // Initial render
   renderAttendees();
 </script>
-
 {% endblock %}
