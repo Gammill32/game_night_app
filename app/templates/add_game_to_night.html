@@ -1,6 +1,6 @@
 {% extends "base.html" %} {% block title %}Add Game to Game Night{% endblock %}
 {% block content %}
-<h1>Add a Game to Game Night on {{ game_night.date.strftime('%B %d, %Y') }}</h1>
+<h1>Add a Game to {{ game_night.date.strftime('%B %d, %Y') }}</h1>
 
 <!-- Filters -->
 <button id="filter-toggle" class="btn">Filters</button>
@@ -89,7 +89,7 @@
       href="{{ url_for('game_night.view_game_night', game_night_id=game_night.id) }}"
       class="btn"
     >
-      Back to Game Night
+      Back
     </a>
   </div>
 </form>
