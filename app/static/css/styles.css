@@ -162,8 +162,7 @@ ul {
   line-height: 1.2;
   font-size: 16px;
   font-weight: bold;
-  margin-top: 10px;
-  margin-bottom: 10px;
+  margin-block: 10px;
   transition: background-color 0.3s ease;
 }
 
@@ -173,8 +172,6 @@ ul {
 
 .btn--success {
   background-color: var(--success-color);
-  margin-top: 10px;
-  margin-bottom: 10px;
 }
 
 .btn--success:hover {
@@ -183,8 +180,6 @@ ul {
 
 .btn--danger {
   background-color: var(--danger-color);
-  margin-top: 10px;
-  margin-bottom: 10px;
 }
 
 .btn--danger:hover {
@@ -666,13 +661,6 @@ ul {
 }
 
 .btn--back-home {
-  display: inline-block;
-  padding: 10px 15px;
-  background-color: var(--primary-color);
-  color: var(--light-color);
-  border-radius: 5px;
-  text-decoration: none;
-  font-size: 16px;
   margin-top: 20px;
   text-align: center;
 }
@@ -850,7 +838,7 @@ input[type="checkbox"] {
   transition: background-color 0.2s ease;
 }
 
-.attendee__checkbox {
+.attendee__label .attendee__checkbox {
   margin-right: 10px;
 }
 
@@ -1186,7 +1174,6 @@ input[type="checkbox"] {
   }
 
   .calendar-navigation {
-    justify-content: center;
     padding: 20px 40px;
   }
 
