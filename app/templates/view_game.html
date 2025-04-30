@@ -41,29 +41,19 @@
 <table class="styled-table table--narrow">
   <thead>
     <tr>
-      <th>Place</th>
       <th>Player</th>
       <th>Wins</th>
     </tr>
   </thead>
   <tbody>
     {% for player, wins in leaderboard %}
-      {% set row_style = "" %}
-      {% if loop.index == 1 %}
-        {% set row_style = "background-color: gold; font-weight: bold;" %}
-      {% elif loop.index == 2 %}
-        {% set row_style = "background-color: silver;" %}
-      {% elif loop.index == 3 %}
-        {% set row_style = "background-color: var(--bronze-color);" %}
-      {% endif %}
-      <tr class="podium__place" style="{{ row_style }}">
-        <td>{{ loop.index }}</td>
+      <tr>
         <td>{{ player.person.first_name }} {{ player.person.last_name }}</td>
         <td>{{ wins }}</td>
       </tr>
     {% else %}
       <tr>
-        <td colspan="3">No leaderboard data available.</td>
+        <td colspan="2">No leaderboard data available.</td>
       </tr>
     {% endfor %}
   </tbody>
