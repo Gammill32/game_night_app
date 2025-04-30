@@ -39,10 +39,9 @@
       <input type="text" id="name" name="name" class="form-control" placeholder="Enter Game Name">
     </div>
   
-    <button type="submit" class="btn btn--success">Add Game</button>
+    <div class="form-actions">
+      <button type="submit" class="btn btn--success">Add Game</button>
+      <a href="{{ url_for('games.games_index') }}" class="btn btn--primary">Back to Games List</a>
+    </div>
   </form>
-  
-  <div class="admin-panel__back-home">
-    <a href="{{ url_for('games.games_index') }}" class="btn btn--primary">Back to Games List</a>
-  </div>
 {% endblock %}
