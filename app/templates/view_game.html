@@ -48,13 +48,23 @@
   </thead>
   <tbody>
     {% for player, wins in leaderboard %}
-      <tr class="podium__place--{{ loop.index }}">
+      {% set row_style = "" %}
+      {% if loop.index == 1 %}
+        {% set row_style = "background-color: gold; font-weight: bold;" %}
+      {% elif loop.index == 2 %}
+        {% set row_style = "background-color: silver;" %}
+      {% elif loop.index == 3 %}
+        {% set row_style = "background-color: var(--bronze-color);" %}
+      {% endif %}
+      <tr class="podium__place" style="{{ row_style }}">
         <td>{{ loop.index }}</td>
         <td>{{ player.person.first_name }} {{ player.person.last_name }}</td>
         <td>{{ wins }}</td>
       </tr>
     {% else %}
-      <tr><td colspan="3">No leaderboard data available.</td></tr>
+      <tr>
+        <td colspan="3">No leaderboard data available.</td>
+      </tr>
     {% endfor %}
   </tbody>
 </table>
