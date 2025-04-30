@@ -6,15 +6,15 @@
 
 <!-- Overall Stats -->
 <div class="form-actions" style="flex-wrap: wrap; gap: 20px;">
-  <div class="info-box text-center" style="flex: 1; background-color: var(--light-color);">
+  <div class="info-box text-center" style="flex: 1; background-color: var(--neutral-color);">
     <h2>{{ stats.games_played }}</h2>
     <p>Games Played</p>
   </div>
-  <div class="info-box text-center" style="flex: 1; background-color: var(--success-color); color: var(--light-color);">
+  <div class="info-box text-center" style="flex: 1; background-color: var(--success-soft-color);">
     <h2>{{ stats.wins }}</h2>
     <p>Total Wins</p>
   </div>
-  <div class="info-box text-center" style="flex: 1; background-color: var(--danger-color); color: var(--light-color);">
+  <div class="info-box text-center" style="flex: 1; background-color: var(--danger-soft-color);">
     <h2>{{ stats.win_percentage }}%</h2>
     <p>Win Percentage</p>
   </div>
@@ -34,7 +34,7 @@
 
 <!-- Most Wins Game -->
 {% if stats.most_wins_game %}
-<div class="info-box text-center" style="background-color: var(--warning-color);">
+<div class="info-box text-center" style="background-color: var(--warning-soft-color);">
   <h2>Game With Most Wins</h2>
   <img src="{{ stats.most_wins_game.image_url }}" alt="{{ stats.most_wins_game.name }}" class="game-list__thumbnail" style="width: 150px; height: 150px; border-radius: 10px;" />
   <h3>{{ stats.most_wins_game.name }}</h3>
