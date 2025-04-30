@@ -1225,7 +1225,18 @@ ul {
 }
 
 .add-game-to-night-footer input[type="number"] {
-  width: 70px;
-  padding: 5px;
-  font-size: 16px;
+  width: 50px;
+  padding: 4px;
+  font-size: 14px;
+}
+
+.footer-round {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-size: 14px;
+}
+
+.footer-round label {
+  margin-bottom: 4px;
 }
