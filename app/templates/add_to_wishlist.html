@@ -3,62 +3,45 @@
 {% block title %}Add to Wishlist{% endblock %}
 
 {% block content %}
-    <h1>Add a Game to Your Wishlist</h1>
+<h1>Add a Game to Your Wishlist</h1>
 
-    <!-- Explanation Section -->
-    <div style="
-        background-color: #f9f9f9; 
-        border: 1px solid #ddd; 
-        border-radius: 8px; 
-        padding: 15px; 
-        margin-bottom: 20px;
-        font-size: 14px;
-    ">
-        <h3 style="margin-top: 0; color: #333;">How to Find the BGG ID</h3>
-        <p>
-            To add a game to your wishlist, you can use the BoardGameGeek ID (BGG ID). Follow these steps:
-        </p>
-        <ol style="padding-left: 20px;">
-            <li>
-                Go to <a href="https://boardgamegeek.com" target="_blank" style="color: #007bff; text-decoration: none;">
-                    BoardGameGeek</a> and search for your game.
-            </li>
-            <li>
-                Open the game's page and check the URL. The BGG ID is the number that appears in the URL.
-                <br>
-                For example, in this URL:
-                <br>
-                <code style="background-color: #eee; padding: 2px 5px; border-radius: 4px;">
-                    https://boardgamegeek.com/boardgame/342942/ark-nova
-                </code>
-                <br>
-                The BGG ID is <strong style="color: #007bff;">342942</strong>.
-            </li>
-        </ol>
-        <p>
-            If you cannot obtain the BGG ID, you can enter the game name instead. Providing the BGG ID is preferred for accurate game data.
-        </p>
-    </div>
+<!-- Explanation Section -->
+<div class="info-box">
+  <h3>How to Find the BGG ID</h3>
+  <p>
+    To add a game to your wishlist, you can use the BoardGameGeek ID (BGG ID). Follow these steps:
+  </p>
+  <ol>
+    <li>
+      Go to <a href="https://boardgamegeek.com" target="_blank">BoardGameGeek</a> and search for your game.
+    </li>
+    <li>
+      Open the game's page and check the URL. The BGG ID is the number that appears in the URL.
+      <p>For example, in this URL:</p>
+      <code>https:&#8203;//boardgamegeek.com&#8203;/boardgame&#8203;/342942&#8203;/ark-nova</code>
+      <p>The BGG ID is <strong>342942</strong>.</p>
+    </li>
+  </ol>
+  <p>
+    If you cannot obtain the BGG ID, you can enter the game name instead. Providing the BGG ID is preferred for accurate game data.
+  </p>
+</div>
 
-    <!-- Form Section -->
-    <form action="{{ url_for('games.add_to_wishlist') }}" method="POST" style="max-width: 400px;">
-        <label for="bgg_id" style="font-weight: bold;">BGG ID (Preferred):</label><br>
-        <input type="number" name="bgg_id" placeholder="Enter BGG ID" 
-               style="width: 100%; padding: 8px; margin-bottom: 15px; border: 1px solid #ccc; border-radius: 4px;"><br>
+<!-- Form Section -->
+<form action="{{ url_for('games.add_to_wishlist') }}" method="POST" class="standard-form">
+  <div class="form-group">
+    <label for="bgg_id">BGG ID (Preferred):</label>
+    <input type="number" id="bgg_id" name="bgg_id" class="form-control" placeholder="Enter BGG ID">
+  </div>
 
-        <label for="name" style="font-weight: bold;">Game Name (Optional):</label><br>
-        <input type="text" name="name" placeholder="Enter Game Name" 
-               style="width: 100%; padding: 8px; margin-bottom: 20px; border: 1px solid #ccc; border-radius: 4px;"><br>
+  <div class="form-group">
+    <label for="name">Game Name (Optional):</label>
+    <input type="text" id="name" name="name" class="form-control" placeholder="Enter Game Name">
+  </div>
 
-        <button type="submit" style="
-            background-color: #28a745; 
-            color: white; 
-            border: none; 
-            padding: 10px 15px; 
-            border-radius: 5px; 
-            cursor: pointer;
-        ">Add to Wishlist</button>
-    </form>
-    <br>
-    <a href="{{ url_for('games.wishlist') }}" style="color: #007bff; text-decoration: none;">Back to Wishlist</a>
+  <div class="form-actions">
+    <button type="submit" class="btn btn--success">Add to Wishlist</button>
+    <a href="{{ url_for('games.wishlist') }}" class="btn btn--primary">Back to Wishlist</a>
+  </div>
+</form>
 {% endblock %}
