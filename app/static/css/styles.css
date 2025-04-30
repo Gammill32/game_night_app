@@ -1218,6 +1218,11 @@ ul {
   border-radius: 4px;
   cursor: pointer;
   text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  vertical-align: middle;
 }
 
 .add-game-to-night-footer a.btn:hover,
