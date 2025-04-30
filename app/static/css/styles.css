@@ -397,8 +397,11 @@ ul {
 
 /* Voting */
 .votes-container {
+  display: flex;
   flex-direction: column;
   align-items: center;
+  gap: 20px;
+  margin-bottom: 20px;
 }
 
 .vote-option {
@@ -411,6 +414,7 @@ ul {
   padding: 10px;
   border: 1px solid var(--border-color);
   border-radius: 10px;
+  margin: 0 auto;
   background-color: var(--light-color);
   transition: box-shadow 0.3s ease, transform 0.3s ease;
 }
@@ -498,6 +502,12 @@ ul {
 }
 
 /* Admin Controls */
+.admin-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
 .admin-controls .btn {
   display: block;
   width: 100%;
