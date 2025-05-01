@@ -838,6 +838,34 @@ input[type="checkbox"] {
   background-color: var(--primary-hover-color);
 }
 
+.filters-panel {
+  display: block;
+  padding: 20px;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  background-color: var(--light-color);
+  margin-bottom: 20px;
+}
+
+.filters-panel .form-group {
+  margin-bottom: 15px;
+}
+
+.filters-panel label {
+  font-weight: bold;
+  display: block;
+  margin-bottom: 5px;
+}
+
+.filters-panel input,
+.filters-panel select {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid var(--border-color);
+  border-radius: 5px;
+  box-sizing: border-box;
+}
+
 /* ----------------------
    Attendee Search
 ----------------------- */
@@ -1320,6 +1348,16 @@ input[type="checkbox"] {
   border: 1px solid var(--border-color);
   padding: 10px;
   text-align: center;
+}
+
+.styled-table th a {
+  color: var(--light-color);
+  text-decoration: none;
+  font-weight: inherit;
+}
+
+.styled-table th a:hover {
+  text-decoration: underline;
 }
 
 .styled-table thead {
