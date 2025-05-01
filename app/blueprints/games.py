@@ -3,6 +3,7 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash
 from flask_login import login_required, current_user
 from app.services import games_services
+from app.utils import admin_required
 
 games_bp = Blueprint("games", __name__)
 
@@ -133,4 +134,15 @@ def update_rating(game_id):
     success, message = games_services.update_game_rating(game_id, current_user.id, ranking)
 
     flash(message, "success" if success else "error")
+    return redirect(url_for("games.view_game", game_id=game_id))
+
+@games_bp.route("/games/<int:game_id>/update_tutorial", methods=["POST"])
+@login_required
+@admin_required
+def update_tutorial_url(game_id):
+    tutorial_url = request.form.get("tutorial_url", "").strip()
+
+    games_services.update_tutorial_url(game_id, tutorial_url)
+    flash("Tutorial URL updated.", "success")
+
     return redirect(url_for("games.view_game", game_id=game_id))

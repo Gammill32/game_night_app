@@ -227,3 +227,11 @@ def update_game_rating(game_id, user_id, ranking):
     db.session.commit()
 
     return True, "Rating saved successfully."
+
+def update_tutorial_url(game_id, tutorial_url):
+    game = Game.query.get_or_404(game_id)
+
+    game.tutorial_url = tutorial_url.strip() or None
+    db.session.commit()
+    return game
+
