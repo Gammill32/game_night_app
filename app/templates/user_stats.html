@@ -6,16 +6,24 @@
 <form method="get" class="filters-panel">
   <div class="form-group">
     <label for="game-search">Games:</label>
-    <input type="text" id="game-search" placeholder="Search games..." />
-    <div id="game-tags" class="selected-tags"></div>
-    <input type="hidden" name="game_ids" id="game_ids" />
+    <div class="autocomplete-wrapper">
+      <input type="text" id="game-search" placeholder="Search games..." />
+      <div id="game-tags" class="selected-tags"></div>
+      <input type="hidden" name="game_ids" id="game_ids" />
+    </div>
   </div>
 
   <div class="form-group">
     <label for="opponent-search">Opponents:</label>
-    <input type="text" id="opponent-search" placeholder="Search opponents..." />
-    <div id="opponent-tags" class="selected-tags"></div>
-    <input type="hidden" name="opponent_ids" id="opponent_ids" />
+    <div class="autocomplete-wrapper">
+      <input
+        type="text"
+        id="opponent-search"
+        placeholder="Search opponents..."
+      />
+      <div id="opponent-tags" class="selected-tags"></div>
+      <input type="hidden" name="opponent_ids" id="opponent_ids" />
+    </div>
   </div>
 
   <div class="form-group">
