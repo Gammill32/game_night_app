@@ -25,7 +25,7 @@
       id="start_date"
       name="start_date"
       class="form-control"
-      value="{{ request.args.get('start_date', '') }}"
+      value="{{ start_date }}"
     />
   </div>
 
@@ -36,7 +36,7 @@
       id="end_date"
       name="end_date"
       class="form-control"
-      value="{{ request.args.get('end_date', '') }}"
+      value="{{ end_date }}"
     />
   </div>
 
@@ -174,13 +174,13 @@
       "game-search",
       "game-tags",
       "game_ids",
-      "/api/games/autocomplete"
+      "/games/autocomplete"
     );
     setupAutocomplete(
       "opponent-search",
       "opponent-tags",
       "opponent_ids",
-      "/api/people/autocomplete"
+      "/people/autocomplete"
     );
   });
 </script>
