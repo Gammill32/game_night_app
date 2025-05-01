@@ -1,6 +1,7 @@
 from app.models import db, Game, OwnedBy, Wishlist, Player, Result, GameNight, GameNightGame, GamesIndex, Person, GameRatings
-from sqlalchemy import func
+from sqlalchemy import func, distinct
 from app.utils import fetch_and_parse_bgg_data
+from datetime import datetime
 
 
 def get_or_create_game(game_name, bgg_id=None):
@@ -235,3 +236,64 @@ def update_tutorial_url(game_id, tutorial_url):
     db.session.commit()
     return game
 
+def get_user_stats(user_id, game_ids=None, opponent_ids=None, start_date=None, end_date=None, sort_by="wins", sort_order="desc"):
+    # Base query to fetch user's game results
+    query = db.session.query(
+        GameNightGame.game_id,
+        Game.name.label("game_name"),
+        func.count(Result.id).label("games_played"),
+        func.sum(func.case([(Result.position == 1, 1)], else_=0)).label("wins"),
+        func.avg(Result.position).label("average_position"),
+        func.max(GameNightGame.created_at).label("last_played")
+    ).join(Result, GameNightGame.id == Result.game_night_game_id
+    ).join(Player, Result.player_id == Player.id
+    ).join(Game, GameNightGame.game_id == Game.id
+    ).filter(Player.people_id == user_id)
+
+    # Apply game filter
+    if game_ids:
+        query = query.filter(GameNightGame.game_id.in_(game_ids))
+
+    # Apply date filters
+    if start_date:
+        try:
+            start = datetime.strptime(start_date, "%Y-%m-%d")
+            query = query.filter(GameNightGame.created_at >= start)
+        except ValueError:
+            pass  # Invalid date format; ignore filter
+
+    if end_date:
+        try:
+            end = datetime.strptime(end_date, "%Y-%m-%d")
+            query = query.filter(GameNightGame.created_at <= end)
+        except ValueError:
+            pass  # Invalid date format; ignore filter
+
+    # Apply opponent filter
+    if opponent_ids:
+        subquery = db.session.query(Result.game_night_game_id
+        ).join(Player, Result.player_id == Player.id
+        ).filter(Player.people_id.in_(opponent_ids)
+        ).group_by(Result.game_night_game_id
+        ).having(func.count(distinct(Player.people_id)) == len(opponent_ids)
+        ).subquery()
+
+        query = query.filter(GameNightGame.id.in_(subquery))
+
+    # Group by game
+    query = query.group_by(GameNightGame.game_id, Game.name)
+
+    # Apply sorting
+    sort_column = {
+        "wins": func.sum(func.case([(Result.position == 1, 1)], else_=0)),
+        "games_played": func.count(Result.id),
+        "average_position": func.avg(Result.position),
+        "last_played": func.max(GameNightGame.created_at)
+    }.get(sort_by, func.sum(func.case([(Result.position == 1, 1)], else_=0)))
+
+    if sort_order == "asc":
+        query = query.order_by(sort_column.asc())
+    else:
+        query = query.order_by(sort_column.desc())
+
+    return query.all()

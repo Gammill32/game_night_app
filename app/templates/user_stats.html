@@ -1,0 +1,75 @@
+<!-- templates/user_stats.html -->
+
+{% extends "base.html" %} {% block content %}
+<h1>User Statistics</h1>
+
+<form method="get" action="{{ url_for('games.user_stats') }}">
+  <!-- Game Filter -->
+  <label for="game_ids">Games:</label>
+  <input
+    type="text"
+    id="game_ids"
+    name="game_ids"
+    placeholder="Enter game IDs separated by commas"
+  />
+
+  <!-- Opponent Filter -->
+  <label for="opponent_ids">Opponents:</label>
+  <input
+    type="text"
+    id="opponent_ids"
+    name="opponent_ids"
+    placeholder="Enter opponent IDs separated by commas"
+  />
+
+  <!-- Date Filters -->
+  <label for="start_date">Start Date:</label>
+  <input type="date" id="start_date" name="start_date" />
+
+  <label for="end_date">End Date:</label>
+  <input type="date" id="end_date" name="end_date" />
+
+  <!-- Sorting Options -->
+  <label for="sort_by">Sort By:</label>
+  <select id="sort_by" name="sort_by">
+    <option value="wins">Wins</option>
+    <option value="games_played">Games Played</option>
+    <option value="average_position">Average Position</option>
+    <option value="last_played">Last Played</option>
+  </select>
+
+  <label for="sort_order">Order:</label>
+  <select id="sort_order" name="sort_order">
+    <option value="desc">Descending</option>
+    <option value="asc">Ascending</option>
+  </select>
+
+  <button type="submit">Apply Filters</button>
+</form>
+
+<table>
+  <thead>
+    <tr>
+      <th>Game</th>
+      <th>Games Played</th>
+      <th>Wins</th>
+      <th>Average Position</th>
+      <th>Last Played</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for stat in stats %}
+    <tr>
+      <td>{{ stat.game_name }}</td>
+      <td>{{ stat.games_played }}</td>
+      <td>{{ stat.wins }}</td>
+      <td>{{ "%.2f"|format(stat.average_position) }}</td>
+      <td>
+        {{ stat.last_played.strftime('%Y-%m-%d') if stat.last_played else 'N/A'
+        }}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

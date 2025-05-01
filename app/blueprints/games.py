@@ -146,3 +146,28 @@ def update_tutorial_url(game_id):
     flash("Tutorial URL updated.", "success")
 
     return redirect(url_for("games.view_game", game_id=game_id))
+
+@games_bp.route("/user_stats", methods=["GET"])
+@login_required
+def user_stats():
+    # Retrieve filter parameters from the request
+    game_ids = request.args.getlist("game_ids", type=int)
+    opponent_ids = request.args.getlist("opponent_ids", type=int)
+    start_date = request.args.get("start_date")
+    end_date = request.args.get("end_date")
+    sort_by = request.args.get("sort_by", "wins")
+    sort_order = request.args.get("sort_order", "desc")
+
+    # Fetch user statistics based on filters
+    stats = games_services.get_user_stats(
+        user_id=current_user.id,
+        game_ids=game_ids,
+        opponent_ids=opponent_ids,
+        start_date=start_date,
+        end_date=end_date,
+        sort_by=sort_by,
+        sort_order=sort_order
+    )
+
+    return render_template("user_stats.html", stats=stats)
+
