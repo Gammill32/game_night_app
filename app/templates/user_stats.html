@@ -47,26 +47,40 @@
   <button type="submit">Apply Filters</button>
 </form>
 
-<table>
+<table class="stats-table">
   <thead>
     <tr>
-      <th>Game</th>
-      <th>Games Played</th>
-      <th>Wins</th>
-      <th>Average Position</th>
-      <th>Last Played</th>
+      {% for col, label in [ ('game_name', 'Game'), ('games_played', 'Plays'),
+      ('wins', 'Wins'), ('win_pct', 'Win %'), ('win_pct_last_5', 'Win % (Last
+      5)'), ('average_position', 'Avg Pos'), ('last_played', 'Last Played') ] %}
+      <th>
+        <a
+          href="{{ url_for('games.user_stats', 
+                                game_ids=request.args.getlist('game_ids'),
+                                opponent_ids=request.args.getlist('opponent_ids'),
+                                start_date=request.args.get('start_date'),
+                                end_date=request.args.get('end_date'),
+                                sort_by=col,
+                                sort_order='asc' if sort_by != col or sort_order == 'desc' else 'desc') }}"
+        >
+          {{ label }} {% if sort_by == col %} {{ '▲' if sort_order == 'asc' else
+          '▼' }} {% endif %}
+        </a>
+      </th>
+      {% endfor %}
     </tr>
   </thead>
   <tbody>
-    {% for stat in stats %}
+    {% for row in stats %}
     <tr>
-      <td>{{ stat.game_name }}</td>
-      <td>{{ stat.games_played }}</td>
-      <td>{{ stat.wins }}</td>
-      <td>{{ "%.2f"|format(stat.average_position) }}</td>
+      <td>{{ row.game_name }}</td>
+      <td>{{ row.games_played }}</td>
+      <td>{{ row.wins }}</td>
+      <td>{{ "%.1f"|format(row.win_pct or 0) }}%</td>
+      <td>{{ "%.1f"|format(row.win_pct_last_5 or 0) }}%</td>
+      <td>{{ "%.2f"|format(row.average_position or 0) }}</td>
       <td>
-        {{ stat.last_played.strftime('%Y-%m-%d') if stat.last_played else 'N/A'
-        }}
+        {{ row.last_played.strftime('%Y-%m-%d') if row.last_played else '' }}
       </td>
     </tr>
     {% endfor %}
