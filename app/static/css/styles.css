@@ -1326,7 +1326,7 @@ input[type="checkbox"] {
 }
 
 .table--narrow.styled-table th {
-  background-color: var(--neutral-color);
+  background-color: var(--secondary-color);
   color: var(--text-color);
   font-size: 14px;
   padding: 6px 8px;
