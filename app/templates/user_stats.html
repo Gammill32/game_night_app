@@ -5,27 +5,17 @@
 
 <form method="get" class="filters-panel">
   <div class="form-group">
-    <label for="game_ids">Games:</label>
-    <input
-      type="text"
-      id="game_ids"
-      name="game_ids"
-      class="form-control"
-      placeholder="Enter game IDs separated by commas"
-      value="{{ request.args.get('game_ids', '') }}"
-    />
+    <label for="game-search">Games:</label>
+    <input type="text" id="game-search" placeholder="Search games..." />
+    <div id="game-tags" class="selected-tags"></div>
+    <input type="hidden" name="game_ids" id="game_ids" />
   </div>
 
   <div class="form-group">
-    <label for="opponent_ids">Opponents:</label>
-    <input
-      type="text"
-      id="opponent_ids"
-      name="opponent_ids"
-      class="form-control"
-      placeholder="Enter opponent IDs separated by commas"
-      value="{{ request.args.get('opponent_ids', '') }}"
-    />
+    <label for="opponent-search">Opponents:</label>
+    <input type="text" id="opponent-search" placeholder="Search opponents..." />
+    <div id="opponent-tags" class="selected-tags"></div>
+    <input type="hidden" name="opponent_ids" id="opponent_ids" />
   </div>
 
   <div class="form-group">
@@ -89,7 +79,7 @@
       <td>{{ "%.1f"|format(row.win_pct_last_5 or 0) }}%</td>
       <td>{{ "%.2f"|format(row.average_position or 0) }}</td>
       <td>
-        {{ row.last_played.strftime('%Y-%m-%d') if row.last_played else '' }}
+        {{ row.last_played.strftime('%b %e, %Y') if row.last_played else '' }}
       </td>
     </tr>
     {% endfor %}
