@@ -414,7 +414,6 @@ ul {
 .game-list__title {
   font-size: 18px;
   font-weight: bold;
-  color: var(--primary-color);
   text-decoration: none;
 }
 

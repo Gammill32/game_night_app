@@ -33,7 +33,6 @@ services:
       - "traefik.http.routers.game_night.rule=Host(`gamenight.sgammill.com`)"
       - "traefik.http.routers.game_night.entrypoints=websecure"
       - "traefik.http.routers.game_night.tls.certresolver=cloudflare"
-      - "traefik.http.routers.game_night.middlewares=authelia-forward-auth@file"
 
       # Service config
       - "traefik.http.services.game_night.loadbalancer.server.port=8000"

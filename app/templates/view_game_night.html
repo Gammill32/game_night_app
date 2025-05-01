@@ -58,18 +58,28 @@
             </div>
             {% endif %}
   
-            <ul class="results-list">
-              {% for result in gng.results %}
-                <li>
-                  {{ result.first_name }} {{ result.last_name }}:
-                  {% if result.position is not none %}Place {{ result.position }}{% endif %}
-                  {% if result.position is not none and result.score is not none %}, {% endif %}
-                  {% if result.score is not none %}Score {{ result.score }}{% endif %}
-                </li>
-              {% else %}
-                <li>No results logged.</li>
-              {% endfor %}
-            </ul>
+            <table class="styled-table table--narrow">
+              <thead>
+                <tr>
+                  <th>Player</th>
+                  <th>Place</th>
+                  <th>Score</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for result in gng.results %}
+                <tr>
+                  <td>{{ result.first_name }} {{ result.last_name }}</td>
+                  <td>{% if result.position is not none %}{{ result.position }}{% else %}-{% endif %}</td>
+                  <td>{% if result.score is not none %}{{ result.score }}{% else %}-{% endif %}</td>
+                </tr>
+                {% else %}
+                <tr>
+                  <td colspan="3">No results logged.</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
           </div>
         </div>
       </li>
