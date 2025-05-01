@@ -11,6 +11,7 @@ block content %}
       class="form-control"
       placeholder="Search for a game..."
       autocomplete="off"
+      data-selected="{{ selected_game_ids | tojson }}"
     />
     <div id="gameTags" class="selected-tags"></div>
   </div>
@@ -24,6 +25,7 @@ block content %}
       class="form-control"
       placeholder="Search for an opponent..."
       autocomplete="off"
+      data-selected="{{ selected_opponent_ids | tojson }}"
     />
     <div id="opponentTags" class="selected-tags"></div>
   </div>
@@ -62,16 +64,16 @@ block content %}
     <tr>
       {% for col, label in [ ('game_name', 'Game'), ('games_played', 'Plays'),
       ('wins', 'Wins'), ('win_pct', 'Win %'), ('win_pct_last_5', 'Win % (Last
-      5)'), ('average_position', 'Avg Pos'), ('last_played', 'Last Played') ] %}
+      5)'), ('average_position', 'Avg Pos'), ('last_played', 'Last Played')] %}
       <th>
         <a
           href="{{ url_for('games.user_stats',
-            game_ids=request.args.getlist('game_ids'),
-            opponent_ids=request.args.getlist('opponent_ids'),
-            start_date=request.args.get('start_date'),
-            end_date=request.args.get('end_date'),
-            sort_by=col,
-            sort_order='desc' if sort_by == col and sort_order == 'asc' else 'asc') }}"
+                            game_ids=request.args.getlist('game_ids'),
+                            opponent_ids=request.args.getlist('opponent_ids'),
+                            start_date=request.args.get('start_date'),
+                            end_date=request.args.get('end_date'),
+                            sort_by=col,
+                            sort_order='desc' if sort_by == col and sort_order == 'asc' else 'asc') }}"
         >
           {{ label }} {% if sort_by == col %}{{ '▲' if sort_order == 'asc' else
           '▼' }}{% endif %}
@@ -144,7 +146,7 @@ block content %}
         remove.onclick = () => {
           selected.delete(item.id);
           renderTags();
-          form.submit(); // auto-submit when removing
+          form.submit();
         };
 
         tag.appendChild(remove);
@@ -174,7 +176,7 @@ block content %}
       }
     });
 
-    // Rehydrate existing tags
+    // Rehydrate from initial dataset
     (async () => {
       const selectedIds = JSON.parse(searchBox.dataset.selected || "[]");
       if (selectedIds.length > 0) {
