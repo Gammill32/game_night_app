@@ -111,7 +111,26 @@ block content %}
   ) {
     const searchBox = document.getElementById(searchBoxId);
     const tagsContainer = document.getElementById(tagsContainerId);
+    const form = document.getElementById("userStatsForm");
     const selected = new Map();
+
+    let previewItem = null;
+    const previewBox = document.createElement("div");
+    previewBox.className = "autocomplete-preview";
+    previewBox.style.fontSize = "0.9rem";
+    previewBox.style.color = "#666";
+    previewBox.style.marginTop = "4px";
+    searchBox.insertAdjacentElement("afterend", previewBox);
+
+    async function updatePreview() {
+      const query = searchBox.value.trim();
+      previewItem = await fetchTopMatch(apiUrl, query);
+      if (previewItem) {
+        previewBox.textContent = `Will add: ${previewItem.name}`;
+      } else {
+        previewBox.textContent = "";
+      }
+    }
 
     function renderTags() {
       tagsContainer.innerHTML = "";
@@ -139,15 +158,21 @@ block content %}
       });
     }
 
+    searchBox.addEventListener("input", updatePreview);
+
     searchBox.addEventListener("keydown", async (e) => {
       if (e.key === "Enter") {
         e.preventDefault();
         const query = searchBox.value.trim();
-        const topMatch = await fetchTopMatch(apiUrl, query);
-        if (topMatch && !selected.has(topMatch.id)) {
-          selected.set(topMatch.id, topMatch);
+        if (!previewItem) {
+          previewItem = await fetchTopMatch(apiUrl, query);
+        }
+        if (previewItem && !selected.has(previewItem.id)) {
+          selected.set(previewItem.id, previewItem);
           renderTags();
           searchBox.value = "";
+          previewBox.textContent = "";
+          form.submit(); // ✅ Immediately apply filters
         }
       }
     });
