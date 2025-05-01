@@ -978,20 +978,42 @@ input[type="checkbox"] {
 }
 
 .flash-messages {
-  margin: 15px 0;
-  padding: 10px;
-  border-radius: 4px;
-  font-size: 14px;
+  margin: 20px auto;
+  max-width: 800px;
+  padding: 0 20px;
 }
 
-.flash-messages .error {
-  background-color: var(--danger-color);
-  color: var(--light-color);
+.flash-message {
+  padding: 12px 16px;
+  border-radius: 6px;
+  margin-bottom: 12px;
+  font-size: 15px;
+  font-weight: 500;
+  border-left: 6px solid transparent;
 }
 
-.flash-messages .success {
-  background-color: var(--success-color);
-  color: var(--light-color);
+.flash-success {
+  background-color: var(--success-soft-color);
+  border-left-color: var(--success-color);
+  color: var(--dark-color);
+}
+
+.flash-error {
+  background-color: var(--danger-soft-color);
+  border-left-color: var(--danger-color);
+  color: var(--dark-color);
+}
+
+.flash-warning {
+  background-color: var(--warning-soft-color);
+  border-left-color: var(--warning-color);
+  color: var(--dark-color);
+}
+
+.flash-info {
+  background-color: var(--tertiary-color);
+  border-left-color: var(--info-color);
+  color: var(--dark-color);
 }
 
 /* ==================================================
