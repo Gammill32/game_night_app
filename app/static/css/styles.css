@@ -1325,6 +1325,18 @@ input[type="checkbox"] {
   margin: 0 auto;
 }
 
+.table--narrow.styled-table th {
+  background-color: var(--neutral-color);
+  color: var(--text-color);
+  font-size: 14px;
+  padding: 6px 8px;
+}
+
+.table--narrow.styled-table td {
+  font-size: 14px;
+  padding: 6px 8px;
+}
+
 /* ==================================================
    9. Sticky Footer Controls
 ================================================== */
