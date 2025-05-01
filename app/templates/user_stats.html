@@ -61,7 +61,7 @@
                                 start_date=request.args.get('start_date'),
                                 end_date=request.args.get('end_date'),
                                 sort_by=col,
-                                sort_order='asc' if sort_by != col or sort_order == 'desc' else 'desc') }}"
+                                sort_order='desc' if sort_by == col and sort_order == 'asc' else 'asc') }}"
         >
           {{ label }} {% if sort_by == col %} {{ '▲' if sort_order == 'asc' else
           '▼' }} {% endif %}
