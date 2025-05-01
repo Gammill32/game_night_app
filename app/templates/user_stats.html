@@ -63,16 +63,16 @@ block content %}
       5)'), ('average_position', 'Avg Pos'), ('last_played', 'Last Played') ] %}
       <th>
         <a
-          href="{{ url_for('games.user_stats', 
-                                game_ids=request.args.getlist('game_ids'),
-                                opponent_ids=request.args.getlist('opponent_ids'),
-                                start_date=request.args.get('start_date'),
-                                end_date=request.args.get('end_date'),
-                                sort_by=col,
-                                sort_order='desc' if sort_by == col and sort_order == 'asc' else 'asc') }}"
+          href="{{ url_for('games.user_stats',
+            game_ids=request.args.getlist('game_ids'),
+            opponent_ids=request.args.getlist('opponent_ids'),
+            start_date=request.args.get('start_date'),
+            end_date=request.args.get('end_date'),
+            sort_by=col,
+            sort_order='desc' if sort_by == col and sort_order == 'asc' else 'asc') }}"
         >
-          {{ label }} {% if sort_by == col %} {{ '▲' if sort_order == 'asc' else
-          '▼' }} {% endif %}
+          {{ label }} {% if sort_by == col %}{{ '▲' if sort_order == 'asc' else
+          '▼' }}{% endif %}
         </a>
       </th>
       {% endfor %}
@@ -94,7 +94,6 @@ block content %}
     {% endfor %}
   </tbody>
 </table>
-{% endblock %}
 
 <script>
   async function fetchTopMatch(apiUrl, query) {
