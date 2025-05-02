@@ -86,8 +86,8 @@ block content %}
   <thead>
     <tr>
       {% for col, label in [ ('game_name', 'Game'), ('games_played', 'Plays'),
-      ('wins', 'Wins'), ('win_pct', 'Win %'), ('win_pct_last_5', 'Win % (Last
-      5)'), ('average_position', 'Avg Pos'), ('last_played', 'Last Played')] %}
+      ('wins', 'Wins'), ('win_pct', 'Win %'), ('average_position', 'Avg Pos'),
+      ('last_played', 'Last Played')] %}
       <th>
         <a
           href="{{ url_for('games.user_stats',
@@ -112,7 +112,6 @@ block content %}
       <td>{{ row.games_played }}</td>
       <td>{{ row.wins }}</td>
       <td>{{ "%.1f"|format(row.win_pct or 0) }}%</td>
-      <td>{{ "%.1f"|format(row.win_pct_last_5 or 0) }}%</td>
       <td>{{ "%.2f"|format(row.average_position or 0) }}</td>
       <td>
         {{ row.last_played.strftime('%b %e, %Y') if row.last_played else '' }}

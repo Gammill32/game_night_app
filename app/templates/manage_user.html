@@ -1,20 +1,28 @@
-{% extends "base.html" %}
-{% block title %}Manage Account{% endblock %}
-{% block content %}
+{% extends "base.html" %} {% block title %}Manage Account{% endblock %} {% block
+content %}
 
 <h1>Manage Your Account</h1>
 
 <!-- Overall Stats -->
-<div class="form-actions" style="flex-wrap: wrap; gap: 20px;">
-  <div class="info-box text-center" style="flex: 1; background-color: var(--neutral-color);">
+<div class="form-actions" style="flex-wrap: wrap; gap: 20px">
+  <div
+    class="info-box text-center"
+    style="flex: 1; background-color: var(--neutral-color)"
+  >
     <h2>{{ stats.games_played }}</h2>
     <p>Games Played</p>
   </div>
-  <div class="info-box text-center" style="flex: 1; background-color: var(--success-soft-color);">
+  <div
+    class="info-box text-center"
+    style="flex: 1; background-color: var(--success-soft-color)"
+  >
     <h2>{{ stats.wins }}</h2>
     <p>Total Wins</p>
   </div>
-  <div class="info-box text-center" style="flex: 1; background-color: var(--danger-soft-color);">
+  <div
+    class="info-box text-center"
+    style="flex: 1; background-color: var(--danger-soft-color)"
+  >
     <h2>{{ stats.win_percentage }}%</h2>
     <p>Win Percentage</p>
   </div>
@@ -22,9 +30,17 @@
 
 <!-- Most Played Game -->
 {% if stats.most_played_game %}
-<div class="info-box text-center" style="background-color: var(--tertiary-color);">
+<div
+  class="info-box text-center"
+  style="background-color: var(--tertiary-color)"
+>
   <h2>Most Played Game</h2>
-  <img src="{{ stats.most_played_game.image_url }}" alt="{{ stats.most_played_game.name }}" class="game-list__thumbnail" style="width: 150px; height: 150px; border-radius: 10px;" />
+  <img
+    src="{{ stats.most_played_game.image_url }}"
+    alt="{{ stats.most_played_game.name }}"
+    class="game-list__thumbnail"
+    style="width: 150px; height: 150px; border-radius: 10px"
+  />
   <h3>{{ stats.most_played_game.name }}</h3>
   <p>Wins: <strong>{{ stats.most_played_stats[0] }}</strong></p>
   <p>Win Percentage: <strong>{{ stats.most_played_stats[1] }}%</strong></p>
@@ -34,9 +50,17 @@
 
 <!-- Most Wins Game -->
 {% if stats.most_wins_game %}
-<div class="info-box text-center" style="background-color: var(--warning-soft-color);">
+<div
+  class="info-box text-center"
+  style="background-color: var(--warning-soft-color)"
+>
   <h2>Game With Most Wins</h2>
-  <img src="{{ stats.most_wins_game.image_url }}" alt="{{ stats.most_wins_game.name }}" class="game-list__thumbnail" style="width: 150px; height: 150px; border-radius: 10px;" />
+  <img
+    src="{{ stats.most_wins_game.image_url }}"
+    alt="{{ stats.most_wins_game.name }}"
+    class="game-list__thumbnail"
+    style="width: 150px; height: 150px; border-radius: 10px"
+  />
   <h3>{{ stats.most_wins_game.name }}</h3>
   <p>Wins: <strong>{{ stats.most_wins_stats[0] }}</strong></p>
   <p>Win Percentage: <strong>{{ stats.most_wins_stats[1] }}%</strong></p>
@@ -45,25 +69,51 @@
 {% endif %}
 
 <!-- User Details Form -->
-<form action="{{ url_for('auth.manage_user') }}" method="POST" class="standard-form">
+<form
+  action="{{ url_for('auth.manage_user') }}"
+  method="POST"
+  class="standard-form"
+>
   <div class="form-group">
     <label for="email">Email:</label>
-    <input type="email" name="email" id="email" class="form-control" value="{{ person.email }}" required />
+    <input
+      type="email"
+      name="email"
+      id="email"
+      class="form-control"
+      value="{{ person.email }}"
+      required
+    />
   </div>
 
   <div class="form-group">
     <label for="new_password">New Password:</label>
-    <input type="password" name="new_password" id="new_password" class="form-control" />
+    <input
+      type="password"
+      name="new_password"
+      id="new_password"
+      class="form-control"
+    />
   </div>
 
   <div class="form-group">
     <label for="confirm_password">Confirm New Password:</label>
-    <input type="password" name="confirm_password" id="confirm_password" class="form-control" />
+    <input
+      type="password"
+      name="confirm_password"
+      id="confirm_password"
+      class="form-control"
+    />
   </div>
 
   <div class="form-actions">
     <button type="submit" class="btn btn--primary">Update</button>
-    <a href="{{ url_for('main.index') }}" class="btn btn--secondary">Back to Home</a>
+    <a href="{{ url_for('games.user_stats') }}" class="btn btn--secondary"
+      >Full Stats</a
+    >
+    <a href="{{ url_for('main.index') }}" class="btn btn--secondary"
+      >Back to Home</a
+    >
   </div>
 </form>
 
