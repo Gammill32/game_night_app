@@ -71,6 +71,10 @@ block content %}
     />
   </div>
 
+  <!-- Preserve sort_by and sort_order -->
+  <input type="hidden" name="sort_by" value="{{ sort_by }}" />
+  <input type="hidden" name="sort_order" value="{{ sort_order }}" />
+
   <div class="filter-actions">
     <button type="submit" class="btn">Apply Filters</button>
     <a href="{{ url_for('games.user_stats') }}" class="btn">Clear Filters</a>
