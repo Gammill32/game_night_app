@@ -4,6 +4,44 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>{% block title %}Game Night{% endblock %}</title>
+    <!-- Favicons -->
+    <link
+      rel="icon"
+      href="{{ url_for('static', filename='images/favicon.svg') }}"
+      type="image/svg+xml"
+    />
+    <link
+      rel="icon"
+      href="{{ url_for('static', filename='images/favicon.ico') }}"
+      sizes="any"
+    />
+    <link
+      rel="apple-touch-icon"
+      sizes="180x180"
+      href="{{ url_for('static', filename='images/apple-touch-icon.png') }}"
+    />
+    <link
+      rel="icon"
+      type="image/png"
+      sizes="96x96"
+      href="{{ url_for('static', filename='images/favicon-96x96.png') }}"
+    />
+    <link
+      rel="icon"
+      type="image/png"
+      sizes="192x192"
+      href="{{ url_for('static', filename='images/web-app-manifest-192x192.png') }}"
+    />
+    <link
+      rel="icon"
+      type="image/png"
+      sizes="512x512"
+      href="{{ url_for('static', filename='images/web-app-manifest-512x512.png') }}"
+    />
+    <link
+      rel="manifest"
+      href="{{ url_for('static', filename='images/site.webmanifest') }}"
+    />
     <link
       rel="stylesheet"
       href="{{ url_for('static', filename='css/styles.css') }}"

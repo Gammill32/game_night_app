@@ -85,6 +85,13 @@ ul {
    3. Components
 ================================================== */
 
+.logo {
+  display: block;
+  margin: 0 auto 20px;
+  max-width: 200px;
+  height: auto;
+}
+
 /* Navigation Bar */
 .navbar__button,
 .navbar__links a,
