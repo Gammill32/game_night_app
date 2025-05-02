@@ -15,7 +15,7 @@ block content %}
       autocomplete="off"
     />
     <div id="gameTags" class="selected-tags">
-      {% for game in selected_games %}
+      {% for game in selected_game_names %}
       <span class="tag">
         {{ game.name }}
         <button type="button" onclick="removeTag(this)">×</button>
@@ -37,7 +37,7 @@ block content %}
       autocomplete="off"
     />
     <div id="opponentTags" class="selected-tags">
-      {% for person in selected_opponents %}
+      {% for person in selected_opponent_namess %}
       <span class="tag">
         {{ person.first_name }} {{ person.last_name }}
         <button type="button" onclick="removeTag(this)">×</button>
