@@ -16,10 +16,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 RUN apt-get update && apt-get install -y cron && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Add cron job for updating BGG data
-RUN echo "0 3 * * * cd /app && /usr/local/bin/python3 app/scripts/fetch_bgg_data.py >> /app/logs/cron.log 2>&1" > /etc/cron.d/bgg-cron
+RUN echo "0 3 * * * cd /app && /app/scripts/run_with_env.sh /usr/local/bin/python3 app/scripts/fetch_bgg_data.py >> /app/logs/cron.log 2>&1" > /etc/cron.d/bgg-cron
 
 # Add cron job for sending game night reminders
-RUN echo "21 19 * * * cd /app && /usr/local/bin/python3 app/scripts/run_check_reminders.py >> /app/logs/cron.log 2>&1" > /etc/cron.d/reminders-cron
+RUN echo "21 19 * * * cd /app && /app/scripts/run_with_env.sh /usr/local/bin/python3 app/scripts/run_check_reminders.py >> /app/logs/cron.log 2>&1" > /etc/cron.d/reminders-cron
 
 # Set permissions for cron jobs
 RUN chmod 0644 /etc/cron.d/bgg-cron /etc/cron.d/reminders-cron
