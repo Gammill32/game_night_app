@@ -9,6 +9,9 @@ WORKDIR /app
 # Copy the current directory contents into the container
 COPY . /app
 
+#Executable cron job
+RUN chmod +x /app/scripts/run_with_env.sh
+
 # Install required Python packages
 RUN pip install --no-cache-dir -r requirements.txt
 
