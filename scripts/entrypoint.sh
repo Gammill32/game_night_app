@@ -2,6 +2,7 @@
 
 # Export selected environment vars for cron
 cat <<EOF > /app/scripts/cron_env.sh
+export PYTHONPATH=/app
 export SQLALCHEMY_DATABASE_URI="$DATABASE_URL"
 export FLASK_APP="$FLASK_APP"
 export MAIL_SERVER="$MAIL_SERVER"

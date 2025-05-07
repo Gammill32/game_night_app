@@ -23,7 +23,7 @@ RUN mkdir -p /app/logs && touch /app/logs/cron.log
 
 # Add cron jobs
 RUN echo "0 8 * * * /app/scripts/run_with_env.sh /usr/local/bin/python3 /app/scripts/fetch_bgg_data.py >> /app/logs/cron.log 2>&1" > /etc/cron.d/bgg-cron
-RUN echo "20 19 * * * /app/scripts/run_with_env.sh /usr/local/bin/python3 /app/scripts/run_check_reminders.py >> /app/logs/cron.log 2>&1" > /etc/cron.d/reminders-cron
+RUN echo "32 19 * * * /app/scripts/run_with_env.sh /usr/local/bin/python3 /app/scripts/run_check_reminders.py >> /app/logs/cron.log 2>&1" > /etc/cron.d/reminders-cron
 RUN chmod 0644 /etc/cron.d/bgg-cron /etc/cron.d/reminders-cron && \
     crontab /etc/cron.d/bgg-cron && crontab -l | cat - /etc/cron.d/reminders-cron | crontab -
 
