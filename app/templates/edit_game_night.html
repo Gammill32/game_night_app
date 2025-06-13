@@ -51,31 +51,24 @@ block content %}
     <div id="selectedCount" class="selected-count">0 Attendees Selected</div>
   </div>
 
-  <form
-    action="{{ url_for('game_night.edit_game_night', game_night_id=game_night.id) }}"
-    method="POST"
-  >
-    <!-- ... your other form fields ... -->
+  <div class="form-actions">
+    <button type="submit" class="btn btn--success">Save Changes</button>
 
-    <div class="form-actions">
-      <button type="submit" class="btn btn--success">Save Changes</button>
-    </div>
-  </form>
+    <form
+      action="{{ url_for('game_night.delete_game_night', game_night_id=game_night.id) }}"
+      method="POST"
+      onsubmit="return confirm('Are you sure you want to delete this game night? This cannot be undone.');"
+      style="display: inline;"
+    >
+      <button type="submit" class="btn btn--danger">Delete Game Night</button>
+    </form>
 
-  <form
-    action="{{ url_for('game_night.delete_game_night', game_night_id=game_night.id) }}"
-    method="POST"
-    onsubmit="return confirm('Are you sure you want to delete this game night? This cannot be undone.');"
-    class="inline-form"
-  >
-    <button type="submit" class="btn btn--danger">Delete Game Night</button>
-  </form>
-
-  <a
-    href="{{ url_for('game_night.view_game_night', game_night_id=game_night.id) }}"
-    class="btn btn--primary"
-    >Back to Game Night</a
-  >
+    <a
+      href="{{ url_for('game_night.view_game_night', game_night_id=game_night.id) }}"
+      class="btn btn--primary"
+    >Back to Game Night</a>
+  </div>
+</form>
 
   <script>
     const people = [
