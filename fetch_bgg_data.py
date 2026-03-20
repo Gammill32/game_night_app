@@ -7,7 +7,8 @@ from flask import current_app
 def fetch_game_details(bgg_id):
     """Fetch game details from BoardGameGeek API."""
     url = f"https://boardgamegeek.com/xmlapi2/thing?id={bgg_id}"
-    response = requests.get(url)
+    headers = {"User-Agent": "GameNightApp/1.0"}
+    response = requests.get(url, headers=headers)
     if response.status_code == 200:
         return response.content
     return None
