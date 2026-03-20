@@ -6,41 +6,49 @@ from datetime import datetime
 def get_or_create_game(game_name, bgg_id=None):
     """Retrieve a game from the database by name or BGG ID, or create it if not found."""
 
-    # Check if game already exists by BGG ID first
+    bgg_details = {}
+
     if bgg_id:
+        try:
+            bgg_id = int(bgg_id)
+        except ValueError:
+            return None, "Invalid BGG ID format."
+
+        # Check if game already exists by BGG ID first
         existing_by_bgg = Game.query.filter_by(bgg_id=bgg_id).first()
         if existing_by_bgg:
+            # If the existing record is missing data, update it now
+            if not existing_by_bgg.name or not existing_by_bgg.description:
+                bgg_details = fetch_and_parse_bgg_data(bgg_id)
+                if bgg_details:
+                    existing_by_bgg.name = bgg_details.get("name") or existing_by_bgg.name
+                    existing_by_bgg.description = bgg_details.get("description") or existing_by_bgg.description
+                    existing_by_bgg.min_players = bgg_details.get("min_players") or existing_by_bgg.min_players
+                    existing_by_bgg.max_players = bgg_details.get("max_players") or existing_by_bgg.max_players
+                    existing_by_bgg.playtime = bgg_details.get("playtime") or existing_by_bgg.playtime
+                    existing_by_bgg.image_url = bgg_details.get("image_url") or existing_by_bgg.image_url
+                    db.session.commit()
             return existing_by_bgg, None
 
-    # Otherwise check by name (case insensitive)
-    game = Game.query.filter(func.lower(Game.name) == func.lower(game_name)).first()
+        bgg_details = fetch_and_parse_bgg_data(bgg_id)
+
+    # Use BGG name if no name was provided
+    effective_name = game_name or bgg_details.get("name", "")
+    if not effective_name:
+        return None, "A game name is required."
+
+    # Check by name (case insensitive)
+    game = Game.query.filter(func.lower(Game.name) == func.lower(effective_name)).first()
 
     if not game:
-        # If still no match, create it
-        game_details = {
-            "name": game_name,
-            "description": None,
-            "min_players": None,
-            "max_players": None,
-            "playtime": None,
-            "image_url": None
-        }
-
-        if bgg_id:
-            try:
-                bgg_id = int(bgg_id)
-                game_details.update(fetch_and_parse_bgg_data(bgg_id))
-            except ValueError:
-                return None, "Invalid BGG ID format."
-
         game = Game(
-            name=game_details["name"],
+            name=effective_name,
             bgg_id=bgg_id if bgg_id else None,
-            description=game_details.get("description"),
-            min_players=game_details.get("min_players"),
-            max_players=game_details.get("max_players"),
-            playtime=game_details.get("playtime"),
-            image_url=game_details.get("image_url"),
+            description=bgg_details.get("description"),
+            min_players=bgg_details.get("min_players"),
+            max_players=bgg_details.get("max_players"),
+            playtime=bgg_details.get("playtime"),
+            image_url=bgg_details.get("image_url"),
         )
         db.session.add(game)
         db.session.commit()
