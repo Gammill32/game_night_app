@@ -31,14 +31,17 @@
 - **Tailwind CSS** (via CDN) replaces `app/static/css/styles.css`. No Node.js build step required at this scale.
 - **HTMX** (via CDN) added to base template. Used for live BGG search, vote submission, and poll responses — no full page reloads for these interactions.
 - `pytest` + `pytest-flask` added for the test suite. Tests live in `tests/`.
-- A `BGGService` class introduced in `app/services/bgg_service.py`, wrapping the existing `fetch_and_parse_bgg_data` utility and adding search support.
-- `Poll` and `PollOption` and `PollResponse` models added in Phase 3 (new tables, migration required).
+- **Flask-Migrate (Alembic)** added in Phase 1 alongside the test suite. Required for Phase 3 schema additions; set up early so all phases can be tracked via migrations from the start.
+- **BGGService** (`app/services/bgg_service.py`) — new service class containing all BGG HTTP and XML parsing logic. The existing fragile import chain (`games_services.py` → `utils.py` → top-level `fetch_bgg_data.py`) is deleted and replaced. `fetch_bgg_data.py` (both the root-level copy and `scripts/` copy) are removed.
+- **Polls blueprint** — new `app/blueprints/polls.py` handles all poll routes (admin-gated management routes and the public `/poll/<token>` endpoint). Poll logic is not added to `admin.py`.
+- `Poll`, `PollOption`, and `PollResponse` models added in Phase 3 (new tables, Alembic migration required).
+- **Gunicorn worker count** fixed to 1 (`-w 1`) in the production Docker Compose command. The in-memory BGGService cache and APScheduler are per-process; multiple workers would cause cache thrashing and duplicate scheduled job execution. Single worker is appropriate for homelab scale.
+- **Docker housekeeping** done alongside Phase 1: add `.dockerignore`, fix Dockerfile layer order (copy requirements before app code), remove host-bind volume mounts for templates/static from production compose (app must use files baked into the image), add compose healthcheck.
 
 ### What does not change
 
 - Auth flow and session handling
-- All existing service logic
-- Deployment infrastructure
+- Deployment infrastructure (Docker Compose, Traefik, homelab setup)
 - Database schema (until Phase 3 poll tables)
 
 ---
@@ -73,9 +76,18 @@ All templates inherit from `base.html`. Updating `base.html` (nav structure, Tai
 - `login.html`, `signup.html`, `forgot_password.html`, `update_password.html` — auth pages
 - Email templates updated to match new style
 
+### Phase 1 infrastructure tasks (alongside UI work)
+
+These have no user-visible effect but must be done in Phase 1 so subsequent phases build on solid ground:
+
+- **Set up Flask-Migrate** — initialise Alembic, create an initial migration from the current schema (`flask db init`, `flask db migrate`, `flask db upgrade`). All future schema changes use `flask db migrate` rather than `db.create_all()`.
+- **Remove `test_bp`** — the debug blueprint registered unconditionally in `app/__init__.py` should be deleted or gated behind `app.debug`.
+- **Dockerfile housekeeping** — fix layer order, add `.dockerignore`, pin Python to `3.11-slim`, remove host-bind volume mounts for templates/static from production compose, add healthcheck, set `gunicorn -w 1`.
+- **Set up test infrastructure** — `tests/` directory, `conftest.py`, pytest + pytest-flask configured against a test PostgreSQL database via `TEST_DATABASE_URL`.
+
 ### Testing for Phase 1
 
-No new business logic — no new unit tests required. Smoke tests are sufficient: parameterized route checks via the Flask test client verifying each page returns 200 (or expected redirect) without a 500 error.
+No new business logic — no new unit tests required. Smoke tests are sufficient: parameterized route checks via the Flask test client verifying each page returns 200 (or expected redirect) without a 500 error. **These smoke tests must be committed and green before Phase 2 begins** — they serve as the regression harness for template changes made during Phase 2.
 
 ---
 
@@ -89,15 +101,18 @@ The existing `add_game.html` form currently takes a name and optional BGG ID. Th
 
 1. User types a game name into a search field
 2. HTMX fires a request to a new endpoint `GET /games/bgg-search?q=<query>` on each keystroke (debounced ~400ms)
-3. Flask calls the BGG XML search API, returns a partial HTML template (`_bgg_results.html`) listing matching games with thumbnail, name, year
-4. User clicks a result — this populates a hidden `bgg_id` field and confirms their selection
+3. Flask calls the BGG XML search API, returns a partial HTML template (`_bgg_results.html`) listing matching games with thumbnail, name, year. If BGG is unavailable or times out, the fragment renders a single error line ("Could not reach BoardGameGeek — please try again").
+4. User clicks a result — HTMX swaps the entire search widget with a "selected game" confirmation div. The confirmation div contains the game name, thumbnail, and a hidden `<input name="bgg_id">` with the selected BGG ID baked in. A "change" link re-renders the search widget.
 5. User submits — existing `add_game` logic handles the rest (already calls `get_or_create_game` with `bgg_id`)
 
 **BGGService** (`app/services/bgg_service.py`):
-- `search(query: str) -> list[dict]` — calls BGG XML API search endpoint, parses results
-- `fetch_details(bgg_id: int) -> dict` — existing `fetch_and_parse_bgg_data` wrapped here
+- `search(query: str) -> list[dict]` — calls BGG XML API search endpoint, parses results. Returns empty list if `len(query) < 3` (server-side guard, no API call made).
+- `fetch_details(bgg_id: int) -> dict` — all BGG HTTP and XML parsing logic lives here. The existing `fetch_bgg_data.py` is deleted; no wrapper chain.
 - BGG XML API is public (no auth key required for search and item lookup)
-- Responses cached in-memory (simple dict cache with TTL) to avoid hammering BGG on repeated searches
+- **All `requests.get()` calls use an explicit timeout of 5 seconds.** A BGG outage must not hang a gunicorn worker.
+- **BGG 202 handling:** BGG's XML API2 sometimes returns `HTTP 202` with an empty body on first lookup (it is still generating the response). `fetch_details` must retry once after a 1-second delay on 202. If the retry also returns 202, return an empty dict gracefully.
+- Responses cached using `cachetools.TTLCache` (max 200 entries, 10-minute TTL) — thread-safe, bounded memory, correct eviction. `cachetools` added to `requirements.txt`.
+- Cache is per-process (intentional given single gunicorn worker — see Architecture).
 
 ### Richer game detail pages
 
@@ -109,7 +124,7 @@ The existing `add_game.html` form currently takes a name and optional BGG ID. Th
 - "How to play" link (already stored as `tutorial_url`)
 - Min/max players and playtime (already in model, just better displayed)
 
-BGG data that doesn't already exist in the model (rating, complexity, categories) is display-only and not stored in the database — no new model fields required. On `view_game` page load, the `BGGService` is called and the result is served from the in-memory cache if available (same cache used by search, 10-minute TTL). On a cache miss the BGG API is called and the result is cached. This means the first load after cache expiry makes a live call; subsequent loads within the TTL window are instant. This is consistent with the in-memory cache described in the search flow above.
+BGG data that doesn't already exist in the model (rating, complexity, categories) is display-only and not stored in the database — no new model fields required. BGG enrichment data loads via a **secondary HTMX request** after the core page renders. The `view_game.html` page loads instantly from the database; an `hx-get="/games/<id>/bgg-details"` fires immediately on page load to fill in the BGG metadata panel. This prevents a cold-cache BGG API call from blocking the entire page render. The BGG details endpoint returns a small HTML fragment; on error or timeout it returns a graceful "BGG data unavailable" fragment.
 
 ### Testing for Phase 2
 
@@ -169,8 +184,11 @@ PollResponse
 - `/poll/<token>` renders the poll publicly
 - Respondent selects options (single or multiple depending on poll type) and enters their name if not logged in
 - HTMX submits response, page updates to show "thanks" state and current results
-- Duplicate prevention: enforced at the application layer (not a DB UNIQUE constraint). For single-select polls, submitting checks whether any `PollResponse` rows already exist for `(poll_id, person_id)` / `(poll_id, respondent_name)` and rejects re-submission. For multi-select polls, the entire previous response set for the respondent is deleted and replaced on re-submission (last write wins). This is intentionally lightweight — suitable for a trust-based friend group.
-- Results visibility: a respondent must submit a response before they can see results. Anyone who has responded (logged-in or anonymous) can then see live results at any time by revisiting the poll URL. The admin can always see full results from the admin panel regardless of whether they've responded.
+- `respondent_name` is normalised before storage and lookup: `respondent_name.strip().lower()`. This prevents "Alice" and " alice " being treated as different people.
+- Duplicate prevention: enforced at the application layer. `respondent_name` matching uses the normalised value. For single-select polls, submitting checks whether any `PollResponse` rows already exist for `(poll_id, person_id)` / `(poll_id, respondent_name)` and rejects re-submission. For multi-select polls, the entire previous response set for the respondent is deleted and replaced on re-submission (last write wins). Known limitation: two different people with the same name cannot both respond anonymously — acceptable for a friend group.
+- **Anonymous results visibility:** On successful submission, a session cookie (`poll_<token>_responded = true`) is set. On revisiting `/poll/<token>`, the app checks this cookie to decide whether to show the results view or the response form. Logged-in users are checked via `PollResponse` query against their `person_id`. The admin always sees results regardless.
+- **Poll token collision:** On the (astronomically unlikely) event of a `UNIQUE` constraint violation during poll creation, the service retries token generation up to 3 times before raising an error.
+- **`poll_is_active(poll)` helper:** A single service-layer function checks both closure mechanisms: `return not poll.closed and (poll.closes_at is None or poll.closes_at > datetime.utcnow())`. All routes and templates use this helper — never check `closed` or `closes_at` directly.
 
 **Results view:**
 - Logged-in users and anyone with the link can see live results after responding
@@ -194,7 +212,7 @@ PollResponse
 - **Framework:** `pytest` + `pytest-flask`
 - **Test location:** `tests/` at repo root, mirroring app structure (`tests/services/`, `tests/blueprints/`)
 - **Scope:** Unit tests for service functions; integration tests for Flask routes using the test client; no browser/E2E tests (overkill for this project)
-- **Database:** Tests use a separate in-memory SQLite database or a test PostgreSQL database (configured via `TEST_DATABASE_URL` env var)
+- **Database:** Tests require a PostgreSQL database (configured via `TEST_DATABASE_URL` env var). SQLite is not supported — existing models use `db.ARRAY` (PostgreSQL-only) and several SQL views that require PostgreSQL DDL. In CI this is a service container; locally developers run a PostgreSQL instance (documented in README).
 - **Mocking:** BGG API calls are always mocked in tests — no real network calls
 - **CI:** GitHub Actions runs on every push and pull request — see CI/CD section below
 
@@ -216,24 +234,28 @@ PollResponse
 A `.github/workflows/ci.yml` workflow runs on every push and pull request to `main`:
 
 1. **Lint & format check** — `ruff check` and `ruff format --check`. Ruff replaces flake8, black, and isort in a single fast tool. Config lives in `pyproject.toml`.
-2. **Type checking** — `mypy` on `app/` and `tests/`. Catches type errors statically. Config in `pyproject.toml`.
-3. **Security scan** — `bandit -r app/` flags common Python security issues (SQLi, hardcoded secrets, etc.).
-4. **Tests** — `pytest` with coverage report. Uses a test PostgreSQL service container in the Actions environment (matches production DB engine).
+2. **Type checking** — `mypy` on `app/` and `tests/`. Config in `pyproject.toml` with `ignore_missing_imports = true` — several Flask extensions (`flask-login`, `flask-mail`, `flask-bcrypt`, `apscheduler`) do not ship type stubs; this prevents mypy from failing on day one due to unresolvable imports rather than real type errors.
+3. **Security scan** — `bandit -r app/ -ll -ii` (medium+ severity, medium+ confidence). The threshold flags are required to suppress low-signal noise; without them bandit becomes something developers learn to ignore.
+4. **Docker build check** — `docker build .` verifies the image builds cleanly. Cheap, catches dependency installation failures and Dockerfile errors before they reach the homelab.
+5. **Tests** — `pytest --cov=app --cov-fail-under=60` with a PostgreSQL service container. The 60% threshold is a floor to prevent coverage from drifting to zero; it can be raised as the test suite grows.
 
-All four steps must pass for a push to be considered clean. The workflow uses Python 3.11 and caches pip dependencies.
+All five steps must pass for a push to be considered clean. The workflow uses **Python 3.11** and caches pip dependencies (cache key hashes both `requirements.txt` and `requirements-dev.txt`). **The Dockerfile is updated to use `python:3.11-slim`** to match.
 
-**New dev dependencies added to `requirements-dev.txt`:** `ruff`, `mypy`, `bandit`, `pytest`, `pytest-flask`, `pytest-cov`, `pytest-mock`
+**New dev dependencies added to `requirements-dev.txt`:** `ruff`, `mypy`, `bandit`, `pytest`, `pytest-flask`, `pytest-cov`, `pytest-mock`, `pre-commit`
 
-A `.pre-commit-config.yaml` is also added so the same ruff and mypy checks can run locally before push (opt-in via `pre-commit install`).
+**New runtime dependency added to `requirements.txt`:** `cachetools`
+
+A `.pre-commit-config.yaml` is also added so the same ruff and mypy checks can run locally before push (opt-in via `pre-commit install`). The `.pre-commit-config.yaml` pins the same ruff version as `requirements-dev.txt` to prevent silent divergence.
 
 ### CD (auto-deploy to homelab — TBD)
 
 > **Pending:** Waiting to confirm how the homelab receives updates (SSH access, self-hosted Actions runner, Watchtower, etc.) before specifying the deployment pipeline. This section will be completed before implementation planning begins.
 >
-> Options under consideration:
-> - **Self-hosted GitHub Actions runner** on the homelab — runner pulls the repo and runs `docker compose up --build -d` on successful CI. No inbound port exposure needed.
-> - **Watchtower** — watches Docker Hub for a new image pushed by CI, auto-redeploys. Requires a Docker Hub push step in CI.
-> - **Scripted manual deploy** — CI passes, developer SSHs in and runs `./scripts/deploy.sh`. Simpler, still documented and reproducible.
+> **Recommendation (pending confirmation):** Self-hosted GitHub Actions runner on the homelab. Runner connects to GitHub over outbound HTTPS (no inbound port exposure). On successful CI, the deploy job runs: `git pull`, `docker compose build`, `flask db upgrade`, `docker compose up -d`. This is the only option that handles database migrations automatically as part of deploy — critical for Phase 3.
+>
+> Watchtower is not recommended — it has no migration awareness and complicates rollback.
+>
+> Scripted manual deploy (`./scripts/deploy.sh`) is a valid fallback if a self-hosted runner is not feasible. The script would do the same steps as above; CI just doesn't trigger it automatically.
 
 ---
 
