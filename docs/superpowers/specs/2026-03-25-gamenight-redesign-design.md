@@ -111,7 +111,8 @@ The existing `add_game.html` form currently takes a name and optional BGG ID. Th
 - BGG XML API is public (no auth key required for search and item lookup)
 - **All `requests.get()` calls use an explicit timeout of 5 seconds.** A BGG outage must not hang a gunicorn worker.
 - **BGG 202 handling:** BGG's XML API2 sometimes returns `HTTP 202` with an empty body on first lookup (it is still generating the response). `fetch_details` must retry once after a 1-second delay on 202. If the retry also returns 202, return an empty dict gracefully.
-- Responses cached using `cachetools.TTLCache` (max 200 entries, 10-minute TTL) — thread-safe, bounded memory, correct eviction. `cachetools` added to `requirements.txt`.
+- Responses cached using `cachetools.TTLCache` (max 200 entries, 10-minute TTL) — bounded memory, correct eviction. `cachetools` added to `requirements.txt`.
+- `TTLCache` requires an explicit lock for thread safety: `cachetools.cached(cache=TTLCache(...), lock=threading.RLock())`. APScheduler runs in a background thread even with a single gunicorn worker, so the cache can be accessed concurrently.
 - Cache is per-process (intentional given single gunicorn worker — see Architecture).
 
 ### Richer game detail pages
@@ -184,7 +185,7 @@ PollResponse
 - `/poll/<token>` renders the poll publicly
 - Respondent selects options (single or multiple depending on poll type) and enters their name if not logged in
 - HTMX submits response, page updates to show "thanks" state and current results
-- `respondent_name` is normalised before storage and lookup: `respondent_name.strip().lower()`. This prevents "Alice" and " alice " being treated as different people.
+- `respondent_name` is stored as entered (preserving original casing for display in results), but normalised (`strip().lower()`) for duplicate-prevention lookups only. The `PollResponse` table stores the original value; all duplicate checks normalise before comparing.
 - Duplicate prevention: enforced at the application layer. `respondent_name` matching uses the normalised value. For single-select polls, submitting checks whether any `PollResponse` rows already exist for `(poll_id, person_id)` / `(poll_id, respondent_name)` and rejects re-submission. For multi-select polls, the entire previous response set for the respondent is deleted and replaced on re-submission (last write wins). Known limitation: two different people with the same name cannot both respond anonymously — acceptable for a friend group.
 - **Anonymous results visibility:** On successful submission, a session cookie (`poll_<token>_responded = true`) is set. On revisiting `/poll/<token>`, the app checks this cookie to decide whether to show the results view or the response form. Logged-in users are checked via `PollResponse` query against their `person_id`. The admin always sees results regardless.
 - **Poll token collision:** On the (astronomically unlikely) event of a `UNIQUE` constraint violation during poll creation, the service retries token generation up to 3 times before raising an error.
