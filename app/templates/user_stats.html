@@ -1,125 +1,133 @@
-{% extends "base.html" %} {% block title %}Player Statistics{% endblock %} {%
-block content %}
+{% extends "base.html" %}
+{% block title %}Player Statistics{% endblock %}
+{% block content %}
 
-<h1>Player Statistics</h1>
+<h1 class="text-2xl font-bold text-stone-800 mb-6">Player Statistics</h1>
 
-<form method="get" class="filters-panel" id="userStatsForm">
-  <!-- Game filter -->
-  <div class="form-group form-group--block">
-    <label for="gameSearch">Games:</label>
-    <input
-      type="text"
-      id="gameSearch"
-      class="form-control"
-      placeholder="Search for a game..."
-      autocomplete="off"
-    />
-    <div id="gameSuggestion" class="autocomplete-suggestion"></div>
-    <div id="gameTags" class="selected-tags">
-      {% for game in selected_game_names %}
-      <span class="tag">
-        {{ game.name }}
-        <button type="button" onclick="removeTag(this)">×</button>
-        <input type="hidden" name="game_ids" value="{{ game.id }}" />
-      </span>
-      {% endfor %}
+<form method="get" class="bg-white rounded-xl border border-stone-200 shadow-sm p-5 mb-6" id="userStatsForm">
+  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+
+    <!-- Game filter -->
+    <div>
+      <label for="gameSearch" class="block text-sm font-medium text-stone-700 mb-1">Games</label>
+      <input
+        type="text"
+        id="gameSearch"
+        class="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+        placeholder="Search for a game..."
+        autocomplete="off"
+      />
+      <div id="gameSuggestion" class="mt-1 text-xs text-stone-400 italic"></div>
+      <div id="gameTags" class="flex flex-wrap gap-2 mt-2">
+        {% for game in selected_game_names %}
+        <span class="inline-flex items-center gap-1 rounded-full bg-stone-100 px-3 py-1 text-xs font-medium text-stone-700">
+          {{ game.name }}
+          <button type="button" onclick="removeTag(this)" class="text-stone-400 hover:text-stone-600">×</button>
+          <input type="hidden" name="game_ids" value="{{ game.id }}" />
+        </span>
+        {% endfor %}
+      </div>
     </div>
-  </div>
 
-  <!-- Opponent filter -->
-  <div class="form-group form-group--block">
-    <label for="opponentSearch">Opponents:</label>
-    <input
-      type="text"
-      id="opponentSearch"
-      class="form-control"
-      placeholder="Search for an opponent..."
-      autocomplete="off"
-    />
-    <div id="opponentSuggestion" class="autocomplete-suggestion"></div>
-    <div id="opponentTags" class="selected-tags">
-      {% for person in selected_opponent_names %}
-      <span class="tag">
-        {{ person.name }}
-        <button type="button" onclick="removeTag(this)">×</button>
-        <input type="hidden" name="opponent_ids" value="{{ person.id }}" />
-      </span>
-      {% endfor %}
+    <!-- Opponent filter -->
+    <div>
+      <label for="opponentSearch" class="block text-sm font-medium text-stone-700 mb-1">Opponents</label>
+      <input
+        type="text"
+        id="opponentSearch"
+        class="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+        placeholder="Search for an opponent..."
+        autocomplete="off"
+      />
+      <div id="opponentSuggestion" class="mt-1 text-xs text-stone-400 italic"></div>
+      <div id="opponentTags" class="flex flex-wrap gap-2 mt-2">
+        {% for person in selected_opponent_names %}
+        <span class="inline-flex items-center gap-1 rounded-full bg-stone-100 px-3 py-1 text-xs font-medium text-stone-700">
+          {{ person.name }}
+          <button type="button" onclick="removeTag(this)" class="text-stone-400 hover:text-stone-600">×</button>
+          <input type="hidden" name="opponent_ids" value="{{ person.id }}" />
+        </span>
+        {% endfor %}
+      </div>
     </div>
-  </div>
 
-  <!-- Date filters -->
-  <div class="form-group form-group--block">
-    <label for="start_date">Start Date:</label>
-    <input
-      type="date"
-      id="start_date"
-      name="start_date"
-      class="form-control"
-      value="{{ start_date }}"
-    />
-  </div>
+    <!-- Date filters -->
+    <div>
+      <label for="start_date" class="block text-sm font-medium text-stone-700 mb-1">Start Date</label>
+      <input
+        type="date"
+        id="start_date"
+        name="start_date"
+        class="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+        value="{{ start_date }}"
+      />
+    </div>
 
-  <div class="form-group form-group--block">
-    <label for="end_date">End Date:</label>
-    <input
-      type="date"
-      id="end_date"
-      name="end_date"
-      class="form-control"
-      value="{{ end_date }}"
-    />
+    <div>
+      <label for="end_date" class="block text-sm font-medium text-stone-700 mb-1">End Date</label>
+      <input
+        type="date"
+        id="end_date"
+        name="end_date"
+        class="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+        value="{{ end_date }}"
+      />
+    </div>
   </div>
 
   <!-- Preserve sort_by and sort_order -->
   <input type="hidden" name="sort_by" value="{{ sort_by }}" />
   <input type="hidden" name="sort_order" value="{{ sort_order }}" />
 
-  <div class="filter-actions">
-    <button type="submit" class="btn">Apply Filters</button>
-    <a href="{{ url_for('games.user_stats') }}" class="btn">Clear Filters</a>
+  <div class="flex gap-3">
+    <button type="submit" class="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 transition-colors">Apply Filters</button>
+    <a href="{{ url_for('games.user_stats') }}" class="inline-flex items-center rounded-lg border border-stone-300 px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50 transition-colors">Clear Filters</a>
   </div>
 </form>
 
 <!-- Results Table -->
-<table class="styled-table stats-table">
-  <thead>
-    <tr>
-      {% for col, label in [ ('game_name', 'Game'), ('games_played', 'Plays'),
-      ('wins', 'Wins'), ('win_pct', 'Win %'), ('average_position', 'Avg Pos'),
-      ('last_played', 'Last Played')] %}
-      <th>
-        <a
-          href="{{ url_for('games.user_stats',
-          game_ids=request.args.getlist('game_ids'),
-          opponent_ids=request.args.getlist('opponent_ids'),
-          start_date=request.args.get('start_date'),
-          end_date=request.args.get('end_date'),
-          sort_by=col,
-          sort_order='desc' if sort_by == col and sort_order == 'asc' else 'asc') }}"
-        >
-          {{ label }}{% if sort_by == col %} {{ '▲' if sort_order == 'asc' else
-          '▼' }}{% endif %}
-        </a>
-      </th>
-      {% endfor %}
-    </tr>
-  </thead>
-  <tbody>
-    {% for row in stats %}
-    <tr>
-      <td>{{ row.game_name }}</td>
-      <td>{{ row.games_played }}</td>
-      <td>{{ row.wins }}</td>
-      <td>{{ "%.1f"|format(row.win_pct or 0) }}%</td>
-      <td>{{ "%.2f"|format(row.average_position or 0) }}</td>
-      <td>
-        {{ row.last_played.strftime('%b %e, %Y') if row.last_played else '' }}
-      </td>
-    </tr>
-    {% endfor %}
-  </tbody>
-</table>
+<div class="bg-white rounded-xl border border-stone-200 shadow-sm overflow-hidden">
+  <div class="overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead class="bg-stone-50 border-b border-stone-200">
+        <tr>
+          {% for col, label in [ ('game_name', 'Game'), ('games_played', 'Plays'),
+          ('wins', 'Wins'), ('win_pct', 'Win %'), ('average_position', 'Avg Pos'),
+          ('last_played', 'Last Played')] %}
+          <th class="text-left text-xs font-semibold text-stone-500 uppercase tracking-wide pb-2 px-2 py-3">
+            <a
+              href="{{ url_for('games.user_stats',
+              game_ids=request.args.getlist('game_ids'),
+              opponent_ids=request.args.getlist('opponent_ids'),
+              start_date=request.args.get('start_date'),
+              end_date=request.args.get('end_date'),
+              sort_by=col,
+              sort_order='desc' if sort_by == col and sort_order == 'asc' else 'asc') }}"
+              class="hover:text-stone-700 transition-colors"
+            >
+              {{ label }}{% if sort_by == col %} {{ '▲' if sort_order == 'asc' else '▼' }}{% endif %}
+            </a>
+          </th>
+          {% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in stats %}
+        <tr class="border-t border-stone-100 hover:bg-stone-50 transition-colors">
+          <td class="py-2 px-2 text-stone-700">{{ row.game_name }}</td>
+          <td class="py-2 px-2 text-stone-700">{{ row.games_played }}</td>
+          <td class="py-2 px-2 text-stone-700">{{ row.wins }}</td>
+          <td class="py-2 px-2 text-stone-700">{{ "%.1f"|format(row.win_pct or 0) }}%</td>
+          <td class="py-2 px-2 text-stone-700">{{ "%.2f"|format(row.average_position or 0) }}</td>
+          <td class="py-2 px-2 text-stone-700">
+            {{ row.last_played.strftime('%b %e, %Y') if row.last_played else '' }}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
 
 <!-- Script: Autocomplete logic -->
 <script>

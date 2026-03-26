@@ -2,102 +2,102 @@
 {% block title %}My Wishlist{% endblock %}
 
 {% block content %}
-<h1>My Wishlist</h1>
-
-<!-- Add to Wishlist Link -->
-<a href="{{ url_for('games.add_to_wishlist') }}" class="btn btn--success">Add a Game to Wishlist</a>
-
-<!-- Filters -->
-<button id="filter-toggle" class="btn">Filters</button>
-<div id="filter-section" class="filters">
-  <form method="GET" action="{{ url_for('games.wishlist') }}">
-    <div class="form-group">
-      <label for="name">Game Name:</label>
-      <input type="text" id="name" name="name" class="form-control" value="{{ request.args.get('name', '') }}" />
-    </div>
-
-    <div class="form-group">
-      <input type="checkbox" id="players-filter-toggle" name="players_enabled" {% if request.args.get('players_enabled') %}checked{% endif %}>
-      <label for="players-slider">Players</label>
-      <div id="players-slider-wrapper" class="{% if not request.args.get('players_enabled') %}is-hidden{% endif %}">
-        <input id="players-slider" type="range" name="players" min="1" max="20" step="1" value="{{ request.args.get('players', 4) }}" />
-        <span id="players-value">{{ request.args.get('players', 4) }}</span>
-      </div>
-    </div>
-
-    <div class="form-group">
-      <input type="checkbox" id="playtime-filter-toggle" name="playtime_enabled" {% if request.args.get('playtime_enabled') %}checked{% endif %}>
-      <label for="playtime-slider">Playtime (Minutes)</label>
-      <div id="playtime-slider-wrapper" class="{% if not request.args.get('playtime_enabled') %}is-hidden{% endif %}">
-        <input id="playtime-slider" type="range" name="playtime" min="15" max="300" step="15" value="{{ request.args.get('playtime', 30) }}" />
-        <span id="playtime-value">{{ request.args.get('playtime', 30) }}</span>
-      </div>
-    </div>
-
-    <div class="filter-actions">
-      <button type="submit" class="btn">Apply Filters</button>
-      <a href="{{ url_for('games.wishlist') }}" class="btn">Reset Filters</a>
-    </div>
-  </form>
+<div class="flex items-center justify-between mb-6">
+  <h1 class="text-2xl font-bold text-stone-800">My Wishlist</h1>
+  <a href="{{ url_for('games.add_to_wishlist') }}" class="inline-flex items-center rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 transition-colors">Add a Game</a>
 </div>
 
-<hr />
+<!-- Filters -->
+<details class="mb-6 bg-white rounded-xl border border-stone-200 shadow-sm" {% if request.args.get('name') or request.args.get('players_enabled') or request.args.get('playtime_enabled') %}open{% endif %}>
+  <summary class="px-5 py-3 text-sm font-medium text-stone-700 cursor-pointer select-none">Filters</summary>
+  <div class="px-5 pb-5">
+    <form method="GET" action="{{ url_for('games.wishlist') }}">
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+        <div>
+          <label for="name" class="block text-sm font-medium text-stone-700 mb-1">Game Name</label>
+          <input type="text" id="name" name="name" class="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent" value="{{ request.args.get('name', '') }}" />
+        </div>
 
-<!-- Wishlist Games List -->
-<ul class="game-list">
+        <div>
+          <div class="flex items-center gap-2 mb-1">
+            <input type="checkbox" id="players-filter-toggle" name="players_enabled" {% if request.args.get('players_enabled') %}checked{% endif %} class="rounded border-stone-300">
+            <label for="players-filter-toggle" class="text-sm font-medium text-stone-700">Players</label>
+          </div>
+          <div id="players-slider-wrapper" class="{% if not request.args.get('players_enabled') %}hidden{% endif %}">
+            <div class="flex items-center gap-3">
+              <input id="players-slider" type="range" name="players" min="1" max="20" step="1" value="{{ request.args.get('players', 4) }}" class="w-full accent-red-600" />
+              <span id="players-value" class="text-sm text-stone-700 w-6 text-right">{{ request.args.get('players', 4) }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <div class="flex items-center gap-2 mb-1">
+            <input type="checkbox" id="playtime-filter-toggle" name="playtime_enabled" {% if request.args.get('playtime_enabled') %}checked{% endif %} class="rounded border-stone-300">
+            <label for="playtime-filter-toggle" class="text-sm font-medium text-stone-700">Playtime (Minutes)</label>
+          </div>
+          <div id="playtime-slider-wrapper" class="{% if not request.args.get('playtime_enabled') %}hidden{% endif %}">
+            <div class="flex items-center gap-3">
+              <input id="playtime-slider" type="range" name="playtime" min="15" max="300" step="15" value="{{ request.args.get('playtime', 30) }}" class="w-full accent-red-600" />
+              <span id="playtime-value" class="text-sm text-stone-700 w-8 text-right">{{ request.args.get('playtime', 30) }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex gap-3">
+        <button type="submit" class="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 transition-colors">Apply Filters</button>
+        <a href="{{ url_for('games.wishlist') }}" class="inline-flex items-center rounded-lg border border-stone-300 px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50 transition-colors">Reset Filters</a>
+      </div>
+    </form>
+  </div>
+</details>
+
+<!-- Wishlist Grid -->
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
   {% for game in games %}
-  <li class="game-list__item">
-    <div class="game-list__info">
-      <a href="{{ url_for('games.view_game', game_id=game.id) }}">
-        <img src="{{ game.image_url }}" alt="{{ game.name }}" class="game-list__thumbnail" />
-      </a>
-      <div class="game-list__info-content">
-        <strong class="game-list__title">{{ game.name }}</strong>
-        <p class="game-list__description">Min Players: {{ game.min_players or 'N/A' }}</p>
-        <p class="game-list__description">Max Players: {{ game.max_players or 'N/A' }}</p>
-        <p class="game-list__description">Playtime: {{ game.playtime or 'N/A' }} minutes</p>
-
-        <form action="{{ url_for('games.remove_from_wishlist', game_id=game.id) }}" method="POST">
-          <button class="btn btn--danger" type="submit">Remove from Wishlist</button>
-        </form>
-
-        <form action="{{ url_for('games.claim_game', game_id=game.id) }}" method="POST">
-          <button class="btn btn--success" type="submit">I Own This Game</button>
-        </form>
+  <div class="bg-white rounded-xl border border-stone-200 shadow-sm p-5 flex flex-col gap-3">
+    <a href="{{ url_for('games.view_game', game_id=game.id) }}" class="block">
+      <img src="{{ game.image_url }}" alt="{{ game.name }}" class="w-full h-36 object-contain rounded-lg mb-2" />
+    </a>
+    <div class="flex-1">
+      <a href="{{ url_for('games.view_game', game_id=game.id) }}" class="text-base font-semibold text-stone-800 hover:text-red-600 transition-colors">{{ game.name }}</a>
+      <div class="mt-2 space-y-0.5 text-sm text-stone-500">
+        <p>Players: {{ game.min_players or 'N/A' }}–{{ game.max_players or 'N/A' }}</p>
+        <p>Playtime: {{ game.playtime or 'N/A' }} min</p>
       </div>
     </div>
-  </li>
+    <div class="flex flex-wrap gap-2 pt-1">
+      <form action="{{ url_for('games.remove_from_wishlist', game_id=game.id) }}" method="POST">
+        <button class="inline-flex items-center rounded-lg border border-stone-300 px-3 py-1.5 text-xs font-medium text-stone-700 hover:bg-stone-50 transition-colors" type="submit">Remove from Wishlist</button>
+      </form>
+      <form action="{{ url_for('games.claim_game', game_id=game.id) }}" method="POST">
+        <button class="inline-flex items-center rounded-lg bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700 transition-colors" type="submit">I Own This Game</button>
+      </form>
+    </div>
+  </div>
   {% else %}
-  <li class="empty-state">No games found in your wishlist.</li>
+  <div class="col-span-full text-center py-12 text-stone-500 text-sm">No games found in your wishlist.</div>
   {% endfor %}
-</ul>
-
-<!-- Back to Home Button -->
-<div class="text-center mt-1">
-  <a href="{{ url_for('main.index') }}" class="btn btn--primary">Back to Home</a>
 </div>
 
 <script>
-  document.addEventListener("DOMContentLoaded", () => {
-    document.getElementById("filter-toggle").addEventListener("click", () => {
-      document.getElementById("filter-section").classList.toggle("active");
+  const setupSliderToggle = (checkboxId, wrapperId, sliderId, valueId) => {
+    const toggle = document.getElementById(checkboxId);
+    const wrapper = document.getElementById(wrapperId);
+    const slider = document.getElementById(sliderId);
+    const value = document.getElementById(valueId);
+
+    toggle.addEventListener("change", () => {
+      wrapper.classList.toggle("hidden", !toggle.checked);
     });
 
-    const setupSliderToggle = (checkboxId, wrapperId, sliderId, valueId) => {
-      const toggle = document.getElementById(checkboxId);
-      const wrapper = document.getElementById(wrapperId);
-      const slider = document.getElementById(sliderId);
-      const value = document.getElementById(valueId);
+    slider.addEventListener("input", () => {
+      value.textContent = slider.value;
+    });
+  };
 
-      toggle.addEventListener("change", () => {
-        wrapper.classList.toggle("is-hidden", !toggle.checked);
-      });
-
-      slider.addEventListener("input", () => {
-        value.textContent = slider.value;
-      });
-    };
-
+  document.addEventListener("DOMContentLoaded", () => {
     setupSliderToggle("players-filter-toggle", "players-slider-wrapper", "players-slider", "players-value");
     setupSliderToggle("playtime-filter-toggle", "playtime-slider-wrapper", "playtime-slider", "playtime-value");
   });

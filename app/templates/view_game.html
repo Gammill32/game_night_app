@@ -1,135 +1,163 @@
-{% extends "base.html" %} {% block title %}{{ game.name }}{% endblock %} {%
-block content %}
-<h1>{{ game.name }}</h1>
+{% extends "base.html" %}
+{% block title %}{{ game.name }}{% endblock %}
+{% block content %}
 
-<img
-  src="{{ game.image_url }}"
-  alt="{{ game.name }}"
-  class="vote-option__thumbnail"
-/>
-
-<div class="game-list__meta">
-  <p><strong>Min Players:</strong> {{ game.min_players or 'N/A' }}</p>
-  <p><strong>Max Players:</strong> {{ game.max_players or 'N/A' }}</p>
-  <p><strong>Playtime:</strong> {{ game.playtime or 'N/A' }} minutes</p>
+<div class="mb-6">
+  <a href="javascript:history.back()" class="inline-flex items-center rounded-lg border border-stone-300 px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50 transition-colors">Back</a>
 </div>
 
-<div class="info-box">
-  <h3>Description</h3>
-  <p style="white-space: pre-wrap">{{ game.description | safe }}</p>
-</div>
-
-{% if current_user.is_admin_or_owner %}
-<h2>Owners</h2>
-<ul class="players-list">
-  {% for owner in game.owners %}
-  <li>{{ owner.person.first_name }} {{ owner.person.last_name }}</li>
-  {% else %}
-  <li>No owners listed.</li>
-  {% endfor %}
-</ul>
-{% endif %}
-
-<h2>Your Rating</h2>
-<form
-  action="{{ url_for('games.update_rating', game_id=game.id) }}"
-  method="POST"
-  class="standard-form"
->
-  <div class="form-group">
-    <label for="ranking">Rating (0-10):</label>
-    <input
-      type="number"
-      id="ranking"
-      name="ranking"
-      min="0"
-      max="10"
-      value="{{ user_rating or '' }}"
-      class="form-control"
-      required
+<!-- Game header -->
+<div class="flex flex-col sm:flex-row gap-6 mb-8">
+  <div class="flex-shrink-0">
+    <img
+      src="{{ game.image_url }}"
+      alt="{{ game.name }}"
+      class="w-40 h-40 object-contain rounded-xl border border-stone-200 bg-stone-50"
     />
   </div>
-  <button type="submit" class="btn btn--success">Save Rating</button>
-</form>
-
-<h2>Leaderboard (Top 3 Players)</h2>
-<table class="styled-table table--narrow">
-  <thead>
-    <tr>
-      <th>Player</th>
-      <th>Wins</th>
-    </tr>
-  </thead>
-  <tbody>
-    {% for player, wins in leaderboard %}
-    <tr>
-      <td>{{ player.person.first_name }} {{ player.person.last_name }}</td>
-      <td>{{ wins }}</td>
-    </tr>
-    {% else %}
-    <tr>
-      <td colspan="2">No leaderboard data available.</td>
-    </tr>
-    {% endfor %}
-  </tbody>
-</table>
-
-{% if current_user.is_admin_or_owner %}
-<section class="module">
-  <h2 class="module__title">Tutorial URL</h2>
-  <form
-    action="{{ url_for('games.update_tutorial_url', game_id=game.id) }}"
-    method="POST"
-    class="standard-form"
-  >
-    <div class="form-group">
-      <label for="tutorial_url">YouTube URL:</label>
-      <input
-        type="url"
-        id="tutorial_url"
-        name="tutorial_url"
-        value="{{ game.tutorial_url or '' }}"
-        class="form-control"
-      />
+  <div class="flex-1">
+    <h1 class="text-2xl font-bold text-stone-800 mb-3">{{ game.name }}</h1>
+    <div class="space-y-1 text-sm text-stone-600">
+      <p><span class="font-medium text-stone-700">Min Players:</span> {{ game.min_players or 'N/A' }}</p>
+      <p><span class="font-medium text-stone-700">Max Players:</span> {{ game.max_players or 'N/A' }}</p>
+      <p><span class="font-medium text-stone-700">Playtime:</span> {{ game.playtime or 'N/A' }} minutes</p>
     </div>
-    <button type="submit" class="btn btn--secondary">Save Tutorial URL</button>
-  </form>
-</section>
-{% endif %} {% if game.tutorial_url %}
-<section class="module">
-  <h2 class="module__title">Watch Tutorial</h2>
-  <div class="video-container">
-    <iframe
-      src="https://www.youtube.com/embed/{{ game.tutorial_url | replace('https://www.youtube.com/watch?v=', '') | replace('https://youtu.be/', '') }}"
-      frameborder="0"
-      allow="clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-      allowfullscreen
-    >
-    </iframe>
   </div>
-</section>
-{% endif %}
+</div>
 
-<!-- <h2>Previous Results</h2>
+<!-- Two-column layout -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+
+  <!-- Left column: Description + Rating + Tutorial admin -->
+  <div class="space-y-6">
+
+    <!-- Description -->
+    <div class="bg-white rounded-xl border border-stone-200 shadow-sm p-5">
+      <h2 class="text-base font-semibold text-stone-800 mb-3">Description</h2>
+      <p class="text-sm text-stone-600 whitespace-pre-wrap">{{ game.description | safe }}</p>
+    </div>
+
+    <!-- Owners (admin only) -->
+    {% if current_user.is_admin_or_owner %}
+    <div class="bg-white rounded-xl border border-stone-200 shadow-sm p-5">
+      <h2 class="text-base font-semibold text-stone-800 mb-3">Owners</h2>
+      <ul class="space-y-1 text-sm text-stone-700">
+        {% for owner in game.owners %}
+        <li>{{ owner.person.first_name }} {{ owner.person.last_name }}</li>
+        {% else %}
+        <li class="text-stone-400">No owners listed.</li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+
+    <!-- Rating form -->
+    <div class="bg-white rounded-xl border border-stone-200 shadow-sm p-5">
+      <h2 class="text-base font-semibold text-stone-800 mb-3">Your Rating</h2>
+      <form action="{{ url_for('games.update_rating', game_id=game.id) }}" method="POST">
+        <div class="mb-3">
+          <label for="ranking" class="block text-sm font-medium text-stone-700 mb-1">Rating (0–10)</label>
+          <input
+            type="number"
+            id="ranking"
+            name="ranking"
+            min="0"
+            max="10"
+            value="{{ user_rating or '' }}"
+            class="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+            required
+          />
+        </div>
+        <button type="submit" class="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 transition-colors">Save Rating</button>
+      </form>
+    </div>
+
+    <!-- Tutorial URL (admin only) -->
+    {% if current_user.is_admin_or_owner %}
+    <div class="bg-white rounded-xl border border-stone-200 shadow-sm p-5">
+      <h2 class="text-base font-semibold text-stone-800 mb-3">Tutorial URL</h2>
+      <form action="{{ url_for('games.update_tutorial_url', game_id=game.id) }}" method="POST">
+        <div class="mb-3">
+          <label for="tutorial_url" class="block text-sm font-medium text-stone-700 mb-1">YouTube URL</label>
+          <input
+            type="url"
+            id="tutorial_url"
+            name="tutorial_url"
+            value="{{ game.tutorial_url or '' }}"
+            class="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+          />
+        </div>
+        <button type="submit" class="inline-flex items-center rounded-lg border border-stone-300 px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50 transition-colors">Save Tutorial URL</button>
+      </form>
+    </div>
+    {% endif %}
+
+    <!-- Watch Tutorial -->
+    {% if game.tutorial_url %}
+    <div class="bg-white rounded-xl border border-stone-200 shadow-sm p-5">
+      <h2 class="text-base font-semibold text-stone-800 mb-3">Watch Tutorial</h2>
+      <div class="relative w-full" style="padding-bottom: 56.25%;">
+        <iframe
+          class="absolute inset-0 w-full h-full rounded-lg"
+          src="https://www.youtube.com/embed/{{ game.tutorial_url | replace('https://www.youtube.com/watch?v=', '') | replace('https://youtu.be/', '') }}"
+          frameborder="0"
+          allow="clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          allowfullscreen
+        >
+        </iframe>
+      </div>
+    </div>
+    {% endif %}
+
+  </div>
+
+  <!-- Right column: Leaderboard -->
+  <div class="space-y-6">
+    <div class="bg-white rounded-xl border border-stone-200 shadow-sm p-5">
+      <h2 class="text-base font-semibold text-stone-800 mb-3">Leaderboard (Top 3 Players)</h2>
+      <table class="w-full text-sm">
+        <thead>
+          <tr>
+            <th class="text-left text-xs font-semibold text-stone-500 uppercase tracking-wide pb-2 px-2">Player</th>
+            <th class="text-left text-xs font-semibold text-stone-500 uppercase tracking-wide pb-2 px-2">Wins</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for player, wins in leaderboard %}
+          <tr class="border-t border-stone-100">
+            <td class="py-2 px-2 text-stone-700">{{ player.person.first_name }} {{ player.person.last_name }}</td>
+            <td class="py-2 px-2 text-stone-700">{{ wins }}</td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="2" class="py-4 px-2 text-stone-400 text-center">No leaderboard data available.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<!-- Previous Results (commented out, preserved as-is) -->
+<!--
+<h2>Previous Results</h2>
 <ul>
   {% for game_night in game_nights %}
   <li>
-    <a
-      href="{{ url_for('game_night.view_game_night', game_night_id=game_night.id) }}"
-    >
+    <a href="{{ url_for('game_night.view_game_night', game_night_id=game_night.id) }}">
       {{ game_night.date.strftime('%Y-%m-%d') }}
     </a>
     <ul>
-      {% for game_night_game in game_night.game_night_games %} {% if
-      game_night_game.game_id == game.id %}
+      {% for game_night_game in game_night.game_night_games %} {% if game_night_game.game_id == game.id %}
       <li>
         Round: {{ game_night_game.round }}<br />
         Results:
         <ul>
           {% for result in game_night_game.results %}
           <li>
-            {{ result.player.person.first_name }} {{
-            result.player.person.last_name }} - Score: {{ result.score }},
+            {{ result.player.person.first_name }} {{ result.player.person.last_name }} - Score: {{ result.score }},
             Position: {{ result.position }}
           </li>
           {% else %}
@@ -143,9 +171,7 @@ block content %}
   {% else %}
   <li>No game nights found for this game.</li>
   {% endfor %}
-</ul> -->
+</ul>
+-->
 
-<div class="admin-panel__back-home">
-  <a href="javascript:history.back()" class="btn btn--primary">Back</a>
-</div>
 {% endblock %}
