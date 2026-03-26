@@ -55,15 +55,15 @@ jobs:
       - name: Security scan (bandit)
         run: bandit -r app/ -ll -ii
 
-      - name: Docker build check
-        run: docker build -t gamenight:ci .
-
       - name: Run tests
         env:
           TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/gamenight_test
           SECRET_KEY: ci-secret-key
           FLASK_DEBUG: "1"
         run: pytest --cov=app --cov-report=term-missing --cov-fail-under=60 -v
+
+      - name: Docker build check
+        run: docker build -t gamenight:ci .
 
   publish:
     name: Publish image to GHCR
@@ -89,4 +89,6 @@ jobs:
         with:
           context: .
           push: true
-          tags: ghcr.io/${{ github.repository }}:latest
+          tags: |
+            ghcr.io/${{ github.repository }}:latest
+            ghcr.io/${{ github.repository }}:${{ github.sha }}
