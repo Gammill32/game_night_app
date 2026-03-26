@@ -46,6 +46,8 @@
 - Create: `tests/services/__init__.py`
 - Create: `tests/services/test_bgg_service.py`
 
+**Prerequisite check:** Phase 1 Task 1 Step 3 adds `cachetools` to `requirements.txt`. Verify it's there before continuing — `BGGService` imports it at module level and the app will fail to start without it.
+
 - [ ] **Step 1: Write failing tests for `BGGService.search()`**
 
 ```python
@@ -60,14 +62,15 @@ SEARCH_XML = b"""<?xml version="1.0" encoding="utf-8"?>
   <item type="boardgame" id="13">
     <name type="primary" value="Catan" />
     <yearpublished value="1995" />
-    <thumbnail>https://example.com/catan.jpg</thumbnail>
   </item>
   <item type="boardgame" id="822">
     <name type="primary" value="Carcassonne" />
     <yearpublished value="2000" />
-    <thumbnail>https://example.com/carc.jpg</thumbnail>
   </item>
 </items>"""
+# Note: BGG's /xmlapi2/search response does NOT include <thumbnail>.
+# Thumbnails are only available via /xmlapi2/thing. The _parse_search
+# return dict should NOT include a thumbnail key (or set it to empty string).
 
 DETAILS_XML = b"""<?xml version="1.0" encoding="utf-8"?>
 <items>
@@ -163,7 +166,9 @@ def test_fetch_details_retries_on_202(requests_mock):
             {"status_code": 200, "content": DETAILS_XML},
         ],
     )
-    details = BGGService.fetch_details(13)
+    # Patch _RETRY_DELAY to 0 so the test doesn't wait 1 second in CI
+    with patch("app.services.bgg_service._RETRY_DELAY", 0):
+        details = BGGService.fetch_details(13)
     assert details["name"] == "Catan"
     assert requests_mock.call_count == 2
 
@@ -197,6 +202,47 @@ def test_fetch_details_returns_empty_on_timeout(requests_mock):
     )
     details = BGGService.fetch_details(13)
     assert details == {}
+
+
+def test_fetch_details_returns_empty_on_connection_error(requests_mock):
+    import requests
+    requests_mock.get(
+        "https://boardgamegeek.com/xmlapi2/thing",
+        exc=requests.exceptions.ConnectionError,
+    )
+    details = BGGService.fetch_details(13)
+    assert details == {}
+
+
+def test_fetch_details_returns_empty_on_500(requests_mock):
+    requests_mock.get(
+        "https://boardgamegeek.com/xmlapi2/thing",
+        status_code=500,
+        content=b"",
+    )
+    details = BGGService.fetch_details(13)
+    assert details == {}
+
+
+def test_search_returns_empty_on_connection_error(requests_mock):
+    import requests
+    requests_mock.get(
+        "https://boardgamegeek.com/xmlapi2/search",
+        exc=requests.exceptions.ConnectionError,
+    )
+    results = BGGService.search("Catan")
+    assert results == []
+
+
+def test_empty_result_not_cached(requests_mock):
+    """A {} error result must not be stored in cache — BGG timeouts should not poison cache."""
+    import requests
+    requests_mock.get(
+        "https://boardgamegeek.com/xmlapi2/thing",
+        exc=requests.exceptions.Timeout,
+    )
+    BGGService.fetch_details(13)
+    assert 13 not in _bgg_module._cache
 ```
 
 - [ ] **Step 2: Run tests to confirm they fail**
@@ -226,10 +272,15 @@ logger = logging.getLogger(__name__)
 
 _BGG_BASE = "https://boardgamegeek.com/xmlapi2"
 _TIMEOUT = 5  # seconds
+_RETRY_DELAY = 1  # seconds to wait before retrying after a 202 response
 
 # Module-level cache and lock. TTLCache is not thread-safe on its own;
 # the RLock is required because APScheduler runs in a background thread
 # even with a single gunicorn worker.
+#
+# IMPORTANT: Do NOT switch to the @cachetools.cached decorator pattern.
+# The decorator wraps the method and makes _cache inaccessible, which
+# breaks the `_bgg_module._cache.clear()` call in the test clear_cache fixture.
 _cache: cachetools.TTLCache = cachetools.TTLCache(maxsize=200, ttl=600)
 _lock = threading.RLock()
 
@@ -265,8 +316,9 @@ class BGGService:
             if bgg_id in _cache:
                 return _cache[bgg_id]
         result = cls._fetch_with_retry(bgg_id)
-        with _lock:
-            _cache[bgg_id] = result
+        if result:  # Do NOT cache {} — a BGG timeout would poison the cache for 10 min
+            with _lock:
+                _cache[bgg_id] = result
         return result
 
     # ------------------------------------------------------------------ #
@@ -286,7 +338,7 @@ class BGGService:
             return {}
 
         if resp.status_code == 202:
-            time.sleep(1)
+            time.sleep(_RETRY_DELAY)
             try:
                 resp = requests.get(
                     f"{_BGG_BASE}/thing",
@@ -315,14 +367,14 @@ class BGGService:
         for item in root.findall("item"):
             name_el = item.find("name[@type='primary']")
             year_el = item.find("yearpublished")
-            thumb_el = item.find("thumbnail")
             if name_el is None:
                 continue
             results.append({
                 "bgg_id": int(item.get("id", 0)),
                 "name": name_el.get("value", ""),
                 "year": year_el.get("value", "") if year_el is not None else "",
-                "thumbnail": thumb_el.text if thumb_el is not None else "",
+                # BGG search results do not include thumbnails — only /thing does.
+                "thumbnail": "",
             })
         return results
 
@@ -402,11 +454,13 @@ git commit -m "feat: implement BGGService with TTLCache, 202 retry, and timeout 
 - Modify: `app/utils/utils.py`
 - Modify: `app/services/games_services.py`
 
-- [ ] **Step 1: Read `app/utils/utils.py` and `app/services/games_services.py`** to understand all references to `fetch_and_parse_bgg_data` and `fetch_bgg_data`.
+- [ ] **Step 1: Read `app/utils/utils.py`, `app/utils/__init__.py`, and `app/services/games_services.py`** to understand all references to `fetch_and_parse_bgg_data` and `fetch_bgg_data`.
 
-- [ ] **Step 2: Update `app/utils/utils.py`**
+- [ ] **Step 2: Update `app/utils/utils.py` and `app/utils/__init__.py`**
 
-Remove the `fetch_and_parse_bgg_data` function (and its import of `fetch_bgg_data`). If there are other utilities in the file unrelated to BGG, keep them.
+Remove the `fetch_and_parse_bgg_data` function from `utils.py` (and its import of `fetch_bgg_data`). If there are other utilities in the file unrelated to BGG, keep them.
+
+**Also update `app/utils/__init__.py`:** Remove `fetch_and_parse_bgg_data` from the import/re-export list. If this is not done, `from app.utils import fetch_and_parse_bgg_data` in any remaining file will still resolve (to a deleted function), causing `ImportError` at runtime instead of a clean `NameError` at the call site.
 
 - [ ] **Step 3: Update `app/services/games_services.py`**
 
@@ -434,12 +488,12 @@ git rm fetch_bgg_data.py scripts/fetch_bgg_data.py
 ```bash
 pytest -v
 ```
-Expected: All pass. Fix any import errors.
+Expected: All pass. If you see `ImportError: cannot import name 'fetch_and_parse_bgg_data'`, the function is still being re-exported from `app/utils/__init__.py` — remove it there too. If you see `NameError: name 'fetch_and_parse_bgg_data' is not defined`, a call site in `games_services.py` was missed — grep for it with `grep -r fetch_and_parse_bgg_data app/`.
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add app/utils/utils.py app/services/games_services.py
+git add app/utils/utils.py app/utils/__init__.py app/services/games_services.py
 git commit -m "refactor: consolidate BGG logic into BGGService, remove fetch_bgg_data.py"
 ```
 
@@ -484,7 +538,21 @@ def test_bgg_search_requires_login(client):
     assert resp.status_code in (302, 401)
 
 
-def test_bgg_details_fragment_returns_html(auth_client):
+@pytest.fixture()
+def bgg_game(app):
+    """A minimal Game row for BGG details tests."""
+    from app.models import Game
+    from app.extensions import db as _db
+    with app.app_context():
+        game = Game(name="Catan", bgg_id=13)
+        _db.session.add(game)
+        _db.session.commit()
+        yield game
+        _db.session.delete(game)
+        _db.session.commit()
+
+
+def test_bgg_details_fragment_returns_html(auth_client, bgg_game):
     with patch("app.blueprints.games.BGGService.fetch_details") as mock_fetch:
         mock_fetch.return_value = {
             "bgg_rating": 7.2,
@@ -493,15 +561,7 @@ def test_bgg_details_fragment_returns_html(auth_client):
             "categories": ["Strategy"],
             "mechanics": ["Trading"],
         }
-        # Need a game in DB — create one first
-        from app.models import Game
-        from app.extensions import db
-        game = Game(name="Catan", bgg_id=13)
-        db.session.add(game)
-        db.session.commit()
-        resp = auth_client.get(f"/games/{game.id}/bgg-details")
-        db.session.delete(game)
-        db.session.commit()
+        resp = auth_client.get(f"/games/{bgg_game.id}/bgg-details")
     assert resp.status_code == 200
     assert b"7.2" in resp.data
 ```
@@ -515,11 +575,14 @@ Expected: 404 errors (routes don't exist yet).
 
 - [ ] **Step 3: Add routes to `app/blueprints/games.py`**
 
-Add two new routes at the bottom of the file:
+**Before editing:** Read `app/blueprints/games.py` first to see the existing imports. Add the two new imports at the TOP of the imports section (not mid-file — ruff E402 will fail CI). Also verify `from app.models import Game` is already imported; if not, add it.
 
 ```python
+# Add to the TOP of the imports in games.py (not mid-file):
+from app.models import Game  # add if not already present
 from app.services.bgg_service import BGGService
 
+# Then add these two routes at the bottom of the file:
 @games_bp.route("/bgg-search")
 @login_required
 def bgg_search():
@@ -553,7 +616,7 @@ def bgg_details(game_id: int):
   <li>
     <button type="button"
             class="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-stone-50 transition-colors"
-            hx-get="{{ url_for('games.bgg_search') }}?select={{ game.bgg_id }}&name={{ game.name | urlencode }}&year={{ game.year | urlencode }}&thumbnail={{ game.thumbnail | urlencode }}"
+            hx-get="{{ url_for('games.bgg_search', select=game.bgg_id, name=game.name, year=game.year, thumbnail=game.thumbnail) }}"
             hx-target="#bgg-search-widget"
             hx-swap="outerHTML">
       {% if game.thumbnail %}
@@ -610,12 +673,53 @@ def bgg_search():
   </div>
   <button type="button"
           class="text-xs text-stone-500 hover:text-red-600 underline"
-          hx-get="{{ url_for('games.bgg_search') }}?q="
+          hx-get="{{ url_for('games.bgg_search', reset='1') }}"
           hx-target="#bgg-search-widget"
           hx-swap="outerHTML">
     Change
   </button>
   <input type="hidden" name="bgg_id" value="{{ bgg_id }}" />
+</div>
+```
+
+Also update the `bgg_search` route to handle `?reset=1` by returning a blank widget (NOT an empty string — an empty response would destroy the `#bgg-search-widget` target with nothing, breaking the page):
+
+```python
+@games_bp.route("/bgg-search")
+@login_required
+def bgg_search():
+    query = request.args.get("q", "").strip()
+    if request.args.get("select"):
+        return render_template("_bgg_selected.html",
+            bgg_id=request.args.get("select"),
+            name=request.args.get("name"),
+            year=request.args.get("year"),
+            thumbnail=request.args.get("thumbnail"),
+        )
+    if request.args.get("reset"):
+        return render_template("_bgg_widget_blank.html")
+    if len(query) < 3:
+        return ""
+    results = BGGService.search(query)
+    return render_template("_bgg_results.html", results=results, query=query)
+```
+
+Create `_bgg_widget_blank.html` — the empty widget state that preserves the target `id`:
+
+```html
+<div id="bgg-search-widget">
+  <label class="block text-sm font-medium text-stone-700 mb-2">Search BoardGameGeek</label>
+  <input type="text"
+         id="bgg-query"
+         placeholder="Start typing a game name…"
+         autocomplete="off"
+         class="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+         hx-get="{{ url_for('games.bgg_search') }}"
+         hx-trigger="keyup changed delay:300ms"
+         hx-target="#bgg-results"
+         name="q"
+         hx-include="[name='q']" />
+  <div id="bgg-results" class="mt-2"></div>
 </div>
 ```
 
