@@ -2,9 +2,8 @@ import logging
 from flask import Flask
 from flask_session import Session
 
-# Import Config & Extensions
 from app.config import Config
-from app.extensions import db, bcrypt, mail, login_manager
+from app.extensions import db, bcrypt, mail, login_manager, migrate
 
 
 def init_extensions(app):
@@ -14,6 +13,7 @@ def init_extensions(app):
     bcrypt.init_app(app)
     mail.init_app(app)
     login_manager.init_app(app)
+    migrate.init_app(app, db)
 
 
 def register_blueprints(app):
@@ -26,8 +26,8 @@ def register_blueprints(app):
     app.register_blueprint(blueprints.voting_bp)
     app.register_blueprint(blueprints.reminders_bp)
     app.register_blueprint(blueprints.main_bp)
-    app.register_blueprint(blueprints.test_bp)
     app.register_blueprint(blueprints.api_bp)
+    # test_bp removed — was a debug artifact registered unconditionally
 
 
 def setup_logging():
@@ -36,11 +36,8 @@ def setup_logging():
 
 
 def setup_database(app):
-    """Set up the database and create tables if necessary."""
-    from app.models import Person  # Lazy import
-
-    with app.app_context():
-        db.create_all()  # Avoid in production; use migrations instead
+    """Register the user_loader callback for Flask-Login."""
+    from app.models import Person
 
     @login_manager.user_loader
     def load_user(user_id):
