@@ -3,46 +3,58 @@
 {% block title %}Log Results{% endblock %}
 
 {% block content %}
-<h1>Log Results for {{ game_night_game.game.name }} (Round {{ game_night_game.round }})</h1>
+<div class="max-w-2xl mx-auto">
+  <h1 class="text-2xl font-bold text-stone-800 mb-6">
+    Log Results for {{ game_night_game.game.name }} (Round {{ game_night_game.round }})
+  </h1>
 
-<form id="resultsForm">
-  <table class="styled-table">
-    <thead>
-      <tr>
-        <th>Player</th>
-        <th>Score</th>
-        <th>Position</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for player in players %}
-        <tr>
-          <td>{{ player.person.first_name }} {{ player.person.last_name }}</td>
-          <td>
-            <input type="number"
-                   class="score-input form-control"
-                   data-player-id="{{ player.id }}"
-                   value="{{ existing_results[player.id].score if player.id in existing_results else '' }}">
-          </td>
-          <td>
-            <input type="number"
-                   class="position-input form-control"
-                   data-player-id="{{ player.id }}"
-                   value="{{ existing_results[player.id].position if player.id in existing_results else '' }}"
-                   min="1">
-          </td>
-        </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+  <form id="resultsForm">
+    <div class="bg-white rounded-xl border border-stone-200 shadow-sm p-5 mb-5 overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="border-b border-stone-200">
+            <th class="text-left py-2 pr-4 text-xs font-medium text-stone-500">Player</th>
+            <th class="text-left py-2 pr-4 text-xs font-medium text-stone-500">Score</th>
+            <th class="text-left py-2 text-xs font-medium text-stone-500">Position</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for player in players %}
+            <tr class="border-b border-stone-100 last:border-0">
+              <td class="py-2 pr-4 text-sm text-stone-700">
+                {{ player.person.first_name }} {{ player.person.last_name }}
+              </td>
+              <td class="py-2 pr-4">
+                <input type="number"
+                       class="score-input w-full rounded-lg border border-stone-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                       data-player-id="{{ player.id }}"
+                       value="{{ existing_results[player.id].score if player.id in existing_results else '' }}">
+              </td>
+              <td class="py-2">
+                <input type="number"
+                       class="position-input w-full rounded-lg border border-stone-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                       data-player-id="{{ player.id }}"
+                       value="{{ existing_results[player.id].position if player.id in existing_results else '' }}"
+                       min="1">
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
 
-  <div class="form-actions">
-    <button type="submit" id="submitResults" class="btn btn--success">Submit Results</button>
-    <a href="{{ url_for('game_night.view_game_night', game_night_id=game_night_id) }}" class="btn btn--primary">
-      Back to Game Night
-    </a>
-  </div>
-</form>
+    <div class="flex flex-wrap gap-3">
+      <button type="submit" id="submitResults"
+              class="inline-flex items-center rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 transition-colors">
+        Submit Results
+      </button>
+      <a href="{{ url_for('game_night.view_game_night', game_night_id=game_night_id) }}"
+         class="inline-flex items-center rounded-lg border border-stone-300 px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50 transition-colors">
+        Back to Game Night
+      </a>
+    </div>
+  </form>
+</div>
 
 <script>
   document.getElementById("resultsForm").addEventListener("submit", function(event) {

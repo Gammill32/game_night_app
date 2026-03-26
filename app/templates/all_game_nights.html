@@ -3,23 +3,34 @@
 {% block title %}All Game Nights{% endblock %}
 
 {% block content %}
-<div class="game-night-container">
-    <h1>All Game Nights</h1>
+<div class="max-w-2xl mx-auto">
+  <h1 class="text-2xl font-bold text-stone-800 mb-6">All Game Nights</h1>
 
-    <ul class="game-nights">
-        {% for gn in game_nights %}
-            <li>
-                <a href="{{ url_for('game_night.view_game_night', game_night_id=gn.game_night_id) }}" class="game-night-card">
-                    {{ gn.date.strftime('%B %d, %Y') }}
-                </a>
-            </li>
-        {% else %}
-            <li class="empty-state">No game nights found.</li>
-        {% endfor %}
-    </ul>
+  {% if game_nights %}
+  <ul class="space-y-2 mb-6">
+    {% for gn in game_nights %}
+    <li>
+      <a href="{{ url_for('game_night.view_game_night', game_night_id=gn.game_night_id) }}"
+         class="flex items-center justify-between bg-white rounded-xl border border-stone-200 shadow-sm px-5 py-3 hover:border-red-300 hover:shadow transition-all">
+        <span class="text-sm font-medium text-stone-800">{{ gn.date.strftime('%B %d, %Y') }}</span>
+        <span class="text-stone-400 text-xs">&rarr;</span>
+      </a>
+    </li>
+    {% else %}
+    <li class="bg-white rounded-xl border border-stone-200 shadow-sm p-5">
+      <p class="text-sm text-stone-500">No game nights found.</p>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <div class="bg-white rounded-xl border border-stone-200 shadow-sm p-5 mb-6">
+    <p class="text-sm text-stone-500">No game nights found.</p>
+  </div>
+  {% endif %}
 
-    <div class="admin-panel__back-home">
-        <a href="{{ url_for('main.index') }}" class="btn btn--primary">Back to Home</a>
-    </div>
+  <a href="{{ url_for('main.index') }}"
+     class="inline-flex items-center rounded-lg border border-stone-300 px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50 transition-colors">
+    &larr; Back to Home
+  </a>
 </div>
 {% endblock %}

@@ -3,98 +3,102 @@
 {% block title %}Home{% endblock %}
 
 {% block content %}
-<img src="{{ url_for('static', filename='images/logo.png') }}" alt="Game Night Logo" class="logo" />
-<h1 class="text-center">Welcome to Game Night!</h1>
+<div class="max-w-3xl mx-auto">
+  <div class="flex items-center gap-4 mb-6">
+    <img src="{{ url_for('static', filename='images/logo.png') }}" alt="Game Night Logo" class="h-12 w-auto" />
+    <h1 class="text-2xl font-bold text-stone-800">Welcome to Game Night!</h1>
+  </div>
 
-<!-- Calendar Navigation -->
-<div class="calendar-navigation">
-    <form action="{{ url_for('main.index') }}" method="GET" class="calendar__form">
-      <div class="calendar__nav-controls">
-        <a href="{{ url_for('main.index', month=prev_month.month, year=prev_month.year) }}" class="calendar__arrow">&larr;</a>
-  
-        <select name="month" onchange="this.form.submit()" class="calendar__select">
+  <!-- Month Navigation -->
+  <div class="bg-white rounded-xl border border-stone-200 shadow-sm p-5 mb-6">
+    <form action="{{ url_for('main.index') }}" method="GET">
+      <div class="flex items-center gap-3 flex-wrap">
+        <a href="{{ url_for('main.index', month=prev_month.month, year=prev_month.year) }}"
+           class="inline-flex items-center rounded-lg border border-stone-300 px-3 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50 transition-colors">
+          &larr;
+        </a>
+
+        <select name="month" onchange="this.form.submit()"
+                class="rounded-lg border border-stone-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent">
           {% for month_num, month_name in months %}
           <option value="{{ month_num }}" {% if current_month.month == month_num %}selected{% endif %}>
             {{ month_name }}
           </option>
           {% endfor %}
         </select>
-  
-        <select name="year" onchange="this.form.submit()" class="calendar__select">
+
+        <select name="year" onchange="this.form.submit()"
+                class="rounded-lg border border-stone-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent">
           {% for year in years %}
           <option value="{{ year }}" {% if current_month.year == year %}selected{% endif %}>
             {{ year }}
           </option>
           {% endfor %}
         </select>
-  
-        <a href="{{ url_for('main.index', month=next_month.month, year=next_month.year) }}" class="calendar__arrow">&rarr;</a>
+
+        <a href="{{ url_for('main.index', month=next_month.month, year=next_month.year) }}"
+           class="inline-flex items-center rounded-lg border border-stone-300 px-3 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50 transition-colors">
+          &rarr;
+        </a>
       </div>
     </form>
+
+    <!-- Game nights this month as a list -->
+    {% if game_nights %}
+    <ul class="mt-4 divide-y divide-stone-100">
+      {% for gn in game_nights %}
+      <li class="py-2 flex items-center justify-between">
+        <a href="{{ url_for('game_night.view_game_night', game_night_id=gn.game_night_id) }}"
+           class="text-sm font-medium text-red-600 hover:text-red-700 hover:underline">
+          {{ gn.date.strftime('%A, %B %d') }}
+        </a>
+        {% if gn.final %}
+        <span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-stone-100 text-stone-600">Finalized</span>
+        {% elif gn.closed %}
+        <span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700">Voting Closed</span>
+        {% else %}
+        <span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">Open</span>
+        {% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="mt-4 text-sm text-stone-500">No game nights this month.</p>
+    {% endif %}
   </div>
 
-  <div class="calendar">
-    <table>
-      <thead>
-        <tr>
-          <th>Sun</th>
-          <th>Mon</th>
-          <th>Tue</th>
-          <th>Wed</th>
-          <th>Thu</th>
-          <th>Fri</th>
-          <th>Sat</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for week in calendar %}
-        <tr>
-          {% for day in week %}
-            {% if day %}
-              {% set is_today = (day == today.day and current_month.month == today.month and current_month.year == today.year) %}
-              {% set game_days = game_nights | selectattr("date", "equalto", current_month.replace(day=day)) | list %}
-              <td class="calendar__cell {% if is_today %}calendar__cell--today{% endif %} {% if game_days %}calendar__cell--clickable{% endif %}">
-                {% if game_days %}
-                  <a href="{{ url_for('game_night.view_game_night', game_night_id=game_days[0].game_night_id) }}" class="calendar__cell-link">
-                    <div class="calendar__cell-content">
-                      <strong>{{ day }}</strong>
-                      <div class="dice-icon">🎲</div>
-                    </div>
-                  </a>
-                {% else %}
-                  <div class="calendar__cell-content">
-                    <strong>{{ day }}</strong>
-                  </div>
-                {% endif %}
-              </td>
-            {% else %}
-              <td class="calendar__cell"></td>
-            {% endif %}
-          {% endfor %}
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
+  <!-- Recent & Upcoming -->
+  <h2 class="text-lg font-semibold text-stone-800 mb-3">Recent &amp; Upcoming</h2>
 
-<h2 class="text-center">Recent & Upcoming</h2>
-
-<ul class="game-nights">
-  {% for gn in game_nights_list %}
-  <li>
-    <a class="game-night-card" href="{{ url_for('game_night.view_game_night', game_night_id=gn.game_night_id) }}">
-      {{ gn.date.strftime('%B %d, %Y') }}
-    </a>
-  </li>
+  {% if game_nights_list %}
+  <ul class="space-y-2 mb-6">
+    {% for gn in game_nights_list %}
+    <li>
+      <a href="{{ url_for('game_night.view_game_night', game_night_id=gn.game_night_id) }}"
+         class="flex items-center justify-between bg-white rounded-xl border border-stone-200 shadow-sm px-5 py-3 hover:border-red-300 hover:shadow transition-all">
+        <span class="text-sm font-medium text-stone-800">{{ gn.date.strftime('%B %d, %Y') }}</span>
+        <span class="text-stone-400 text-xs">&rarr;</span>
+      </a>
+    </li>
+    {% endfor %}
+  </ul>
   {% else %}
-  <li class="empty-state">No game nights found.</li>
-  {% endfor %}
-</ul>
-
-<div class="text-center mt-1">
-  <a href="{{ url_for('main.all_game_nights') }}" class="btn">See All Game Nights</a>
-  {% if current_user.admin or current_user.owner %}
-  <a href="{{ url_for('game_night.start_game_night') }}" class="btn btn--success">Start a New Game Night</a>
+  <div class="bg-white rounded-xl border border-stone-200 shadow-sm p-5 mb-6">
+    <p class="text-sm text-stone-500">No game nights found.</p>
+  </div>
   {% endif %}
+
+  <div class="flex flex-wrap gap-3">
+    <a href="{{ url_for('main.all_game_nights') }}"
+       class="inline-flex items-center rounded-lg border border-stone-300 px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50 transition-colors">
+      See All Game Nights
+    </a>
+    {% if current_user.admin or current_user.owner %}
+    <a href="{{ url_for('game_night.start_game_night') }}"
+       class="inline-flex items-center rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 transition-colors">
+      Start a New Game Night
+    </a>
+    {% endif %}
+  </div>
 </div>
 {% endblock %}
