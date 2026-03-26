@@ -43,6 +43,8 @@
 
 ## Task 1: Project tooling setup (pyproject.toml + requirements-dev.txt)
 
+**Prerequisite:** A Python 3.11 virtualenv must be active before running any pip or flask commands. If one doesn't exist yet: `python3.11 -m venv .venv && source .venv/bin/activate`.
+
 **Files:**
 - Create: `pyproject.toml`
 - Create: `requirements-dev.txt`
@@ -126,7 +128,9 @@ migrate = Migrate()
 
 - [ ] **Step 2: Update `app/__init__.py`**
 
-Import `migrate` from extensions and initialize it. Replace `setup_database` and update `init_extensions` and `register_blueprints`:
+Import `migrate` from extensions and initialize it. Replace `setup_database` and update `init_extensions` and `register_blueprints`.
+
+Also remove the `test_bp` import from `app/blueprints/__init__.py` — the registration is removed below but the import line remains and will cause a ruff `F401` error:
 
 ```python
 import logging
@@ -167,12 +171,8 @@ def setup_logging():
 
 
 def setup_database(app):
-    """Set up the database. In development only, create tables directly."""
+    """Register the user_loader callback for Flask-Login."""
     from app.models import Person
-
-    with app.app_context():
-        if app.debug:
-            db.create_all()  # Dev convenience only; production uses flask db upgrade
 
     @login_manager.user_loader
     def load_user(user_id):
@@ -201,12 +201,22 @@ def create_app():
 
 - [ ] **Step 3: Initialize migrations**
 
+**Prerequisite:** `export FLASK_APP=app` (required for all `flask` CLI commands).
+
+**Brownfield check:** If the database already has tables (existing production schema), run `flask db stamp head` immediately after `flask db init` and BEFORE `flask db migrate`. This marks the current schema as the baseline without touching the DB. Skip `flask db upgrade` in that case — the schema is already current.
+
 ```bash
+export FLASK_APP=app
 flask db init
+# For brownfield only (DB already has tables):
+#   flask db stamp head
 flask db migrate -m "initial schema"
 flask db upgrade
 ```
-Expected: `migrations/` directory created, initial migration applied.
+
+**SQL view warning:** After `flask db migrate`, open the generated migration file and inspect it. Models backed by SQL views (`GamesIndex`, `UserRecentFutureGameNight`, etc.) must NOT appear as `CREATE TABLE` statements. If they do, delete those statements from the migration before running `flask db upgrade` — Alembic cannot manage views. Consider adding an `include_object` hook to `migrations/env.py` to permanently exclude view-backed models from autogeneration.
+
+Expected: `migrations/` directory created, initial migration applied (or stamped for brownfield).
 
 - [ ] **Step 4: Commit**
 
@@ -244,6 +254,8 @@ requirements-dev.txt
 
 - [ ] **Step 2: Create `scripts/entrypoint.sh`**
 
+**First, read the existing file:** `scripts/entrypoint.sh` already exists. Read it before overwriting — it likely contains cron job setup and a `gunicorn -w 4` invocation. Determine whether the cron jobs are still needed (APScheduler in `start_schedulers` likely replaces them). If the existing cron entries are dead code, discard them. If not, preserve the logic.
+
 This script runs database migrations automatically on every container start, then hands off to gunicorn. Alembic migrations are idempotent, so running this on restart is safe.
 
 ```bash
@@ -276,6 +288,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 RUN chmod +x scripts/entrypoint.sh
+
+# Required so entrypoint.sh can run `flask db upgrade` without FLASK_APP set at runtime
+ENV FLASK_APP=app
 
 EXPOSE 8000
 
@@ -332,6 +347,7 @@ Empty file.
 
 ```python
 import os
+import unittest.mock
 import pytest
 from app import create_app
 from app.extensions import db as _db
@@ -341,16 +357,20 @@ from app.extensions import db as _db
 def app():
     """Create a test Flask app using the test PostgreSQL database."""
     os.environ["DATABASE_URL"] = os.environ["TEST_DATABASE_URL"]
-    os.environ["FLASK_DEBUG"] = "1"  # Allows db.create_all() in setup_database
+    os.environ["FLASK_DEBUG"] = "1"
     os.environ["SECRET_KEY"] = "test-secret-key"
-    os.environ["SESSION_TYPE"] = "null"  # "null" avoids filesystem dependency in CI
 
-    app = create_app()
-    app.config.update(
-        TESTING=True,
-        WTF_CSRF_ENABLED=False,
-        SERVER_NAME="localhost",
-    )
+    # Patch APScheduler before create_app() — background threads fire during teardown
+    # and hit a closed DB connection, causing noisy errors in CI logs.
+    with unittest.mock.patch("app.start_schedulers"):
+        app = create_app()
+
+    # Set SESSION_TYPE after create_app() so the app config is already initialised.
+    # Setting it via os.environ before create_app() does not work with flask-session.
+    app.config["SESSION_TYPE"] = "null"
+    app.config["TESTING"] = True
+    app.config["WTF_CSRF_ENABLED"] = False
+    # Do NOT set SERVER_NAME — it breaks url_for() resolution in tests.
     return app
 
 
@@ -390,7 +410,8 @@ def auth_client(app, db):
         _db.session.commit()
 
         with app.test_client() as client:
-            client.post("/auth/login", data={"email": "test@example.com", "password": "password"})
+            # auth_bp has no url_prefix — login route is /login, not /auth/login
+            client.post("/login", data={"email": "test@example.com", "password": "password"})
             yield client
 
         _db.session.delete(user)
@@ -416,7 +437,8 @@ def admin_client(app, db):
         _db.session.commit()
 
         with app.test_client() as client:
-            client.post("/auth/login", data={"email": "admin@example.com", "password": "password"})
+            # auth_bp has no url_prefix — login route is /login, not /auth/login
+            client.post("/login", data={"email": "admin@example.com", "password": "password"})
             yield client
 
         _db.session.delete(admin)
@@ -425,17 +447,20 @@ def admin_client(app, db):
 
 - [ ] **Step 3: Write smoke tests**
 
+**Before writing:** Run `flask routes` to get the exact registered route paths. The routes below are derived from reading the blueprint files — verify each one matches `flask routes` output before running.
+
 ```python
 # tests/test_smoke.py
 import pytest
 
 
 # Routes that redirect to login when unauthenticated
+# Verify exact paths with: flask routes
 REDIRECT_ROUTES = [
     "/",
     "/games/",
-    "/games/wishlist",
-    "/games/stats",
+    "/wishlist",      # games.wishlist — no /games/ prefix
+    "/user_stats",    # games.user_stats — no /games/ prefix
 ]
 
 # Routes that require admin
@@ -443,11 +468,11 @@ ADMIN_ROUTES = [
     "/admin/",
 ]
 
-# Auth routes accessible without login
+# Auth routes — auth_bp has no url_prefix, so routes are at root, not /auth/
 AUTH_ROUTES = [
-    "/auth/login",
-    "/auth/signup",
-    "/auth/forgot-password",
+    "/login",
+    "/signup",
+    "/forgot_password",
 ]
 
 
@@ -475,13 +500,55 @@ def test_admin_routes_load_for_admin(admin_client, route):
     assert response.status_code == 200, f"{route} returned {response.status_code}"
 ```
 
+**Add seed fixture to `conftest.py`** (required for parameterized routes with IDs):
+
+```python
+@pytest.fixture(scope="session")
+def seed_data(db, app):
+    """Minimal seed: one Game, one GameNight for routes with path params.
+
+    Read app/models.py first to confirm field names before writing this fixture.
+    Adjust field names to match the actual model definitions.
+    """
+    from app.models import Game, GameNight
+    import datetime
+
+    with app.app_context():
+        game = Game(name="Test Game", bgg_id=1)
+        _db.session.add(game)
+        _db.session.flush()
+
+        game_night = GameNight(date=datetime.date.today())
+        _db.session.add(game_night)
+        _db.session.commit()
+
+        yield {"game_id": game.id, "game_night_id": game_night.id}
+
+        _db.session.delete(game_night)
+        _db.session.delete(game)
+        _db.session.commit()
+```
+
+Then add parameterized tests for routes with IDs (after seed_data is confirmed working):
+
+```python
+def test_view_game_loads(auth_client, seed_data):
+    response = auth_client.get(f"/games/{seed_data['game_id']}")
+    assert response.status_code == 200
+
+def test_view_game_night_loads(auth_client, seed_data):
+    response = auth_client.get(f"/game_nights/{seed_data['game_night_id']}")
+    assert response.status_code == 200
+```
+
 - [ ] **Step 4: Set TEST_DATABASE_URL and run tests**
 
 ```bash
 export TEST_DATABASE_URL="postgresql://postgres:postgres@localhost:5432/gamenight_test"
+flask routes  # Verify route paths match what's in the smoke test lists above
 pytest tests/test_smoke.py -v
 ```
-Expected: All smoke tests pass. Fix any route path mismatches by checking `app/blueprints/` for the actual registered URLs.
+Expected: All smoke tests pass. If a route returns 404, check `flask routes` output and correct the path in the test.
 
 - [ ] **Step 5: Commit**
 
@@ -553,7 +620,7 @@ jobs:
           ruff format --check .
 
       - name: Type check (mypy)
-        run: mypy app/
+        run: mypy app/ tests/
 
       - name: Security scan (bandit)
         run: bandit -r app/ -ll -ii
@@ -596,6 +663,8 @@ jobs:
 ```
 
 The `publish` job only runs after `ci` passes and only on direct pushes to `main` (not PRs). It uses `GITHUB_TOKEN` — no extra secrets required. The homelab webhook continues to work as-is: it restarts the container pulling from GHCR, which now only contains CI-passing builds.
+
+**Homelab action required:** After the first successful publish, verify the homelab's Docker restart webhook pulls from `ghcr.io/cner-smith/game_night_app:latest` (not a local build). If it currently builds locally, update the webhook command to `docker pull ghcr.io/cner-smith/game_night_app:latest && docker compose ... up -d`.
 
 **Note for the repository owner:** The GHCR package visibility defaults to private for new packages. After the first publish, go to the package settings on GitHub and set it to public (or configure the homelab's Docker daemon with a GHCR auth token). Public is simpler for homelab use and appropriate for a personal project.
 
@@ -725,7 +794,7 @@ Replace the content of `app/static/css/styles.css` with a minimal override file:
       </a>
       {% endfor %}
 
-      {% if current_user.admin or current_user.owner %}
+      {% if current_user.is_authenticated and (current_user.admin or current_user.owner) %}
       <a href="{{ url_for('admin.admin_page') }}"
          title="Admin"
          class="group relative flex items-center justify-center w-10 h-10 rounded-lg text-amber-500 hover:bg-amber-50 hover:text-amber-600 transition-colors">
@@ -761,6 +830,7 @@ Replace the content of `app/static/css/styles.css` with a minimal override file:
         </button>
       </form>
     </div>
+    {% endif %}
   </aside>
 
   <!-- ===== MOBILE TOP BAR ===== -->
@@ -825,17 +895,49 @@ Replace the content of `app/static/css/styles.css` with a minimal override file:
 </html>
 ```
 
-- [ ] **Step 3: Run smoke tests to verify base template renders**
+- [ ] **Step 3: Create placeholder static image files**
+
+The base template references `favicon.svg`, `favicon.ico`, `apple-touch-icon.png`, `site.webmanifest`, and `logo.png`. Without them every page load produces 404 errors and the sidebar logo is broken. Create minimal placeholders now; replace with real assets later.
+
+```bash
+mkdir -p app/static/images
+
+# Minimal 1×1 transparent PNG for apple-touch-icon and logo
+python3 -c "
+import base64, pathlib
+# 1x1 transparent PNG (68 bytes)
+png = base64.b64decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==')
+pathlib.Path('app/static/images/apple-touch-icon.png').write_bytes(png)
+pathlib.Path('app/static/images/logo.png').write_bytes(png)
+"
+
+# Minimal SVG favicon
+cat > app/static/images/favicon.svg << 'EOF'
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <text y=".9em" font-size="90">🎲</text>
+</svg>
+EOF
+
+# Copy SVG as ICO placeholder (browsers handle this gracefully)
+cp app/static/images/favicon.svg app/static/images/favicon.ico
+
+# Minimal web manifest
+cat > app/static/images/site.webmanifest << 'EOF'
+{"name":"Game Night","short_name":"GameNight","icons":[],"start_url":"/","display":"standalone"}
+EOF
+```
+
+- [ ] **Step 4: Run smoke tests to verify base template renders**
 
 ```bash
 pytest tests/test_smoke.py -v
 ```
 Expected: All pass. If a template error appears (e.g., `url_for` endpoint not found), check the blueprint URL map with `flask routes`.
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 5: Commit**
 
 ```bash
-git add app/templates/base.html app/static/css/styles.css
+git add app/templates/base.html app/static/css/styles.css app/static/images/
 git commit -m "feat: replace custom CSS with Tailwind CDN, add icon sidebar and mobile bottom nav"
 ```
 
@@ -851,6 +953,14 @@ git commit -m "feat: replace custom CSS with Tailwind CDN, add icon sidebar and 
 - Modify: `app/templates/update_password.html`
 
 Auth pages use `auth_base.html` (not `base.html`) since they don't show the nav. Rewrite `auth_base.html` as a centered card layout, then update each auth form to use Tailwind classes.
+
+- [ ] **Step 0: Read all files in this task before editing**
+
+```bash
+# Read each file to understand current structure, form field names, and any custom logic
+# before overwriting. Template variables come from the route — check app/blueprints/auth.py
+# to confirm what context variables are passed to each template.
+```
 
 - [ ] **Step 1: Rewrite `auth_base.html`**
 
@@ -925,6 +1035,8 @@ git commit -m "feat: redesign auth templates with Tailwind"
 - Modify: `app/templates/wishlist.html`
 - Modify: `app/templates/user_stats.html`
 
+**Before editing any template in this task:** Read the current file and the corresponding route in `app/blueprints/games.py` to understand what context variables are available (e.g., `games`, `game`, `wishlist_items`). Do not assume variable names — read the route first.
+
 Apply Tailwind to each template. The consistent patterns to use throughout:
 
 - **Page headings:** `<h1 class="text-2xl font-bold text-stone-800 mb-6">`
@@ -971,16 +1083,18 @@ git commit -m "feat: redesign game library templates with Tailwind"
 - Modify: `app/templates/nominate_game.html`
 - Modify: `app/templates/log_results.html`
 
+**Before editing any template in this task:** Read the current file and the corresponding route in `app/blueprints/game_night.py` (or `main.py` for `index.html`) to understand what context variables are passed. The dashboard (`index.html`) is particularly complex — read its route carefully before touching the template.
+
 Apply the same Tailwind patterns from Task 8. `index.html` (the dashboard) gets special treatment:
 - Hero section showing the next upcoming game night (date, player count, status)
 - Quick action cards (Start Voting, View Games, etc.)
 - Recent game nights list
 
 - [ ] **Step 1: Update `index.html`** — dashboard with hero + quick actions
-- [ ] **Step 2: Update `start_game_night.html`**, `edit_game_night.html`** — form cards
+- [ ] **Step 2: Update `start_game_night.html`, `edit_game_night.html`** — form cards
 - [ ] **Step 3: Update `view_game_night.html`** — game night detail with nominations/votes/results sections
 - [ ] **Step 4: Update `all_game_nights.html`** — list/grid of past nights
-- [ ] **Step 5: Update `add_game_to_night.html`**, `nominate_game.html`**, `log_results.html`** — action forms
+- [ ] **Step 5: Update `add_game_to_night.html`, `nominate_game.html`, `log_results.html`** — action forms
 
 - [ ] **Step 6: Run smoke tests**
 
@@ -1086,15 +1200,39 @@ docker compose -f docker-compose.game_night.yml up --build -d
 
 The app runs on a home lab via Docker Compose. See `docker-compose.game_night.yml`.
 
-After pulling new code:
+The container runs `flask db upgrade` automatically on startup via `scripts/entrypoint.sh` — no manual migration step is needed when deploying.
+
 ```bash
-docker compose -f docker-compose.game_night.yml build
-flask db upgrade  # Apply any new migrations
+docker compose -f docker-compose.game_night.yml pull
 docker compose -f docker-compose.game_night.yml up -d
 ```
 ```
 
-- [ ] **Step 4: Create `CHANGELOG.md`**
+- [ ] **Step 4: Create `.env.example`**
+
+```bash
+cat > .env.example << 'EOF'
+# Database
+DATABASE_URL=postgresql://user:password@localhost:5432/gamenight
+
+# Flask
+SECRET_KEY=change-me-in-production
+FLASK_APP=app
+FLASK_DEBUG=0
+
+# Email (flask-mail)
+MAIL_SERVER=smtp.example.com
+MAIL_PORT=587
+MAIL_USERNAME=
+MAIL_PASSWORD=
+MAIL_DEFAULT_SENDER=noreply@example.com
+
+# Session
+SESSION_TYPE=filesystem
+EOF
+```
+
+- [ ] **Step 5: Create `CHANGELOG.md`**
 
 ```markdown
 # Changelog
@@ -1115,25 +1253,25 @@ docker compose -f docker-compose.game_night.yml up -d
 - Raw custom CSS (replaced by Tailwind utilities)
 ```
 
-- [ ] **Step 5: Run full test suite**
+- [ ] **Step 6: Run full test suite**
 
 ```bash
 pytest -v
 ```
 Expected: All smoke tests pass.
 
-- [ ] **Step 6: Run linter and type checker**
+- [ ] **Step 7: Run linter and type checker**
 
 ```bash
 ruff check .
-mypy app/
+mypy app/ tests/
 ```
 Fix any issues before committing.
 
-- [ ] **Step 7: Final commit for Phase 1**
+- [ ] **Step 8: Final commit for Phase 1**
 
 ```bash
-git add app/templates/admin_page.html app/templates/add_person.html app/templates/manage_user.html app/templates/email_templates/ README.md CHANGELOG.md
+git add app/templates/admin_page.html app/templates/add_person.html app/templates/manage_user.html app/templates/email_templates/ README.md CHANGELOG.md .env.example
 git commit -m "feat: complete phase 1 — tailwind UI overhaul, infrastructure, CI pipeline"
 ```
 
