@@ -1,6 +1,6 @@
 # blueprints/main.py
 
-from flask import Blueprint, render_template, request
+from flask import Blueprint, render_template, request, current_app
 from flask_login import login_required, current_user
 from datetime import datetime, date
 import calendar
@@ -16,7 +16,7 @@ def index():
     """Homepage with a calendar of game nights using SQL views."""
     
     # Define Central Time Zone
-    central_timezone = pytz.timezone("America/Chicago")
+    central_timezone = pytz.timezone(current_app.config["APP_TIMEZONE"])
     today_central = datetime.now(central_timezone).date()
 
     # Get year and month from query parameters or default to current date

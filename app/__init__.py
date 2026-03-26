@@ -1,14 +1,13 @@
 import logging
 from flask import Flask
-from flask_session import Session
 
 from app.config import Config
-from app.extensions import db, bcrypt, mail, login_manager, migrate
+from app.extensions import db, bcrypt, mail, login_manager, migrate, sess
 
 
 def init_extensions(app):
     """Initialize Flask extensions."""
-    Session(app)
+    sess.init_app(app)
     db.init_app(app)
     bcrypt.init_app(app)
     mail.init_app(app)
@@ -35,13 +34,13 @@ def setup_logging():
     logging.basicConfig(level=logging.DEBUG)
 
 
-def setup_database(app):
+def register_user_loader(app):
     """Register the user_loader callback for Flask-Login."""
     from app.models import Person
 
     @login_manager.user_loader
     def load_user(user_id):
-        return Person.query.get(int(user_id))
+        return db.session.get(Person, int(user_id))
 
 
 def start_schedulers(app):
@@ -50,14 +49,19 @@ def start_schedulers(app):
     start_scheduler(app)
 
 
-def create_app():
+def create_app(config_class=None):
     """Factory function to create a Flask app instance."""
     app = Flask(__name__)
-    app.config.from_object(Config)
+    if config_class is None:
+        config_class = Config
+    app.config.from_object(config_class)
+
+    if not app.debug and app.config.get("SECRET_KEY") == "dev-insecure-default":
+        raise RuntimeError("SECRET_KEY must be set to a secure value in production. Set the SECRET_KEY environment variable.")
 
     setup_logging()
     init_extensions(app)
-    setup_database(app)
+    register_user_loader(app)
     register_blueprints(app)
     start_schedulers(app)
 

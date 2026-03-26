@@ -11,7 +11,7 @@ class GameNight(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     date = db.Column(db.Date, nullable=False)
     notes = db.Column(db.Text)
-    created_at = db.Column(db.DateTime, default=func.current_timestamp())
+    created_at = db.Column(db.DateTime, server_default=func.now())
     final = db.Column(db.Boolean, default=False)
     closed = db.Column(db.Boolean, default=False)
 
@@ -27,7 +27,7 @@ class Person(db.Model, UserMixin):
     last_name = db.Column(db.String, nullable=False)
     email = db.Column(db.String, unique=True, nullable=True)
     password = db.Column(db.String, nullable=True)
-    created_at = db.Column(db.DateTime, default=func.current_timestamp())
+    created_at = db.Column(db.DateTime, server_default=func.now())
     temp_pass = db.Column(db.Boolean, default=False)
     admin = db.Column(db.Boolean, default=False, nullable=False)
     owner = db.Column(db.Boolean, default=False, nullable=False)
@@ -84,7 +84,7 @@ class Player(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     game_night_id = db.Column(db.Integer, ForeignKey('gamenights.id'))
     people_id = db.Column(db.Integer, ForeignKey('people.id'))
-    created_at = db.Column(db.DateTime, default=func.current_timestamp())
+    created_at = db.Column(db.DateTime, server_default=func.now())
 
     game_night = relationship('GameNight', back_populates='players')
     person = relationship('Person', back_populates='players')
@@ -98,7 +98,7 @@ class GameNightGame(db.Model):
     game_night_id = db.Column(db.Integer, ForeignKey('gamenights.id'), nullable=True)
     game_id = db.Column(db.Integer, ForeignKey('games.id'), nullable=True)
     round = db.Column(db.Integer)
-    created_at = db.Column(db.DateTime, default=func.current_timestamp())
+    created_at = db.Column(db.DateTime, server_default=func.now())
 
     game_night = relationship('GameNight', back_populates='game_night_games')
     game = relationship('Game', back_populates='game_night_games')
@@ -111,7 +111,7 @@ class Result(db.Model):
     player_id = db.Column(db.Integer, ForeignKey('players.id'), nullable=True)
     score = db.Column(db.Integer)
     position = db.Column(db.Integer)
-    created_at = db.Column(db.DateTime, default=func.current_timestamp())
+    created_at = db.Column(db.DateTime, server_default=func.now())
 
     game_night_game = relationship('GameNightGame', back_populates='results')
     player = relationship('Player', back_populates='results')

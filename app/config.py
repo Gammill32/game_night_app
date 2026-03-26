@@ -6,7 +6,7 @@ load_dotenv()
 
 class Config:
     """Base configuration."""
-    SECRET_KEY = os.getenv("SECRET_KEY", "default_secret_key")
+    SECRET_KEY = os.getenv("SECRET_KEY", "dev-insecure-default")
     SQLALCHEMY_DATABASE_URI = os.getenv("DATABASE_URL")
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
@@ -31,3 +31,5 @@ class Config:
     ENV = os.getenv("FLASK_ENV", "production")
     DEBUG = os.getenv("FLASK_DEBUG", "0") == "1"
 
+    # Timezone Configuration
+    APP_TIMEZONE = os.getenv("APP_TIMEZONE", "America/Chicago")

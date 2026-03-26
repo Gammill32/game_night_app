@@ -3,6 +3,13 @@ import unittest.mock
 import pytest
 from app import create_app
 from app.extensions import db as _db
+from app.config import Config
+
+
+class TestConfig(Config):
+    TESTING = True
+    SESSION_TYPE = "null"
+    WTF_CSRF_ENABLED = False
 
 
 @pytest.fixture(scope="session")
@@ -15,15 +22,10 @@ def app():
     # Patch APScheduler before create_app() — background threads fire during teardown
     # and hit a closed DB connection, causing noisy errors in CI logs.
     with unittest.mock.patch("app.start_schedulers"):
-        app = create_app()
+        application = create_app(TestConfig)
 
-    # Set SESSION_TYPE after create_app() so the app config is already initialised.
-    # Setting it via os.environ before create_app() does not work with flask-session.
-    app.config["SESSION_TYPE"] = "null"
-    app.config["TESTING"] = True
-    app.config["WTF_CSRF_ENABLED"] = False
     # Do NOT set SERVER_NAME — it breaks url_for() resolution in tests.
-    return app
+    return application
 
 
 @pytest.fixture(scope="session")
