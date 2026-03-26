@@ -151,17 +151,30 @@ from app.services.poll_services import (
 
 # Note: `app` and `db` fixtures come from tests/conftest.py (Phase 1).
 # Before writing these tests, read the Person model in app/models.py to confirm
-# the required fields (at minimum: name and email are typically required).
+# the required NOT NULL fields. Person uses first_name + last_name (NOT a name field).
 
+# This fixture is duplicated in test_polls.py. Move it to tests/conftest.py to avoid
+# unique email collisions across test runs (both files run in the same session).
 
 @pytest.fixture()
-def poll_author(app):
-    """A real Person to satisfy Poll.created_by NOT NULL FK constraint."""
+def poll_author(app, db):
+    """A real Person to satisfy Poll.created_by NOT NULL FK constraint.
+    Uses random email to avoid unique constraint collisions across test runs.
+    No manual teardown — Poll rows reference this Person via NOT NULL FK, so
+    deleting it while polls exist causes a FK violation. Let db fixture teardown handle it.
+    """
+    import uuid
     with app.app_context():
-        person = Person(name="Test Author", email="author@test.com")
+        person = Person(
+            first_name="Test",
+            last_name="Author",
+            email=f"author_{uuid.uuid4().hex[:8]}@test.invalid",
+        )
         _db.session.add(person)
         _db.session.commit()
         yield person
+        # Do NOT manually delete here — Poll.created_by FK constraint will cause
+        # an IntegrityError if polls exist. Rely on db fixture's drop_all() teardown.
 
 
 @pytest.fixture()
@@ -202,6 +215,13 @@ def test_poll_is_active_not_yet_expired(app, sample_poll):
     with app.app_context():
         sample_poll.closes_at = datetime.utcnow() + timedelta(hours=1)
         assert poll_is_active(sample_poll) is True
+
+
+def test_poll_is_active_at_exact_boundary(app, sample_poll):
+    """Poll expires at closes_at exactly (<=), not after."""
+    with app.app_context():
+        sample_poll.closes_at = datetime.utcnow()
+        assert poll_is_active(sample_poll) is False
 
 
 # ── create_poll ─────────────────────────────────────────────────────────
@@ -263,6 +283,30 @@ def test_submit_response_replaces_on_multi_select(app, db, poll_author):
         responses = PollResponse.query.filter_by(poll_id=poll.id).all()
         assert len(responses) == 1
         assert responses[0].option_id == poll.options[2].id
+
+
+def test_submit_response_logged_in_multi_select(app, db, poll_author):
+    """A logged-in user submitting multi-select uses person_id for duplicate detection."""
+    with app.app_context():
+        poll = create_poll("Q", None, ["A", "B", "C"], poll_author.id, True)
+        ids = [poll.options[0].id, poll.options[1].id]
+        submit_response(poll, ids, person_id=poll_author.id, respondent_name=None)
+        new_ids = [poll.options[2].id]
+        success, _ = submit_response(poll, new_ids, person_id=poll_author.id, respondent_name=None)
+        assert success is True
+        responses = PollResponse.query.filter_by(poll_id=poll.id, person_id=poll_author.id).all()
+        assert len(responses) == 1
+
+
+def test_create_poll_token_collision_raises(app, db, poll_author):
+    """If generate_token returns a colliding value 3× in a row, RuntimeError is raised."""
+    from unittest.mock import patch
+    with app.app_context():
+        existing = create_poll("Existing", None, ["A"], poll_author.id, False)
+        # Force token to always collide with the existing poll
+        with patch.object(Poll, "generate_token", return_value=existing.token):
+            with pytest.raises(RuntimeError):
+                create_poll("New", None, ["A"], poll_author.id, False)
 
 
 def test_submit_response_rejected_for_closed_poll(app, db, poll_author):
@@ -478,15 +522,23 @@ from app.services.poll_services import create_poll
 
 
 @pytest.fixture()
-def poll_author(app):
-    """A real Person to satisfy Poll.created_by NOT NULL constraint."""
+def poll_author(app, db):
+    """A real Person to satisfy Poll.created_by NOT NULL FK constraint.
+    IMPORTANT: Move this fixture to tests/conftest.py to share it with
+    test_poll_services.py and avoid unique email collisions across test runs.
+    """
+    import uuid
     with app.app_context():
-        person = Person(name="Poll Author", email="pollauthor@test.com")
+        person = Person(
+            first_name="Poll",
+            last_name="Author",
+            email=f"pollauthor_{uuid.uuid4().hex[:8]}@test.invalid",
+        )
         _db.session.add(person)
         _db.session.commit()
         yield person
-        _db.session.delete(person)
-        _db.session.commit()
+        # Do NOT manually delete — Poll.created_by NOT NULL FK will cause IntegrityError.
+        # Rely on db fixture's drop_all() for cleanup.
 
 
 @pytest.fixture()
@@ -509,6 +561,8 @@ def test_poll_page_loads(client, open_poll):
     resp = client.get(f"/poll/{open_poll.token}")
     assert resp.status_code == 200
     assert b"Best Day?" in resp.data
+    assert b'name="option_ids"' in resp.data
+    assert b'name="respondent_name"' in resp.data
 
 
 def test_poll_page_404_for_bad_token(client):
@@ -564,6 +618,22 @@ def test_admin_can_create_poll(admin_client):
 def test_non_admin_cannot_access_create(auth_client):
     resp = auth_client.get("/polls/create")
     assert resp.status_code in (302, 403)
+
+
+def test_admin_poll_list_shows_polls(admin_client, open_poll):
+    resp = admin_client.get("/polls/")
+    assert resp.status_code == 200
+    assert b"Best Day?" in resp.data
+
+
+def test_submit_response_rejects_missing_name(client, open_poll):
+    """Anonymous submission without respondent_name should fail gracefully."""
+    option_id = open_poll.options[0].id
+    resp = client.post(f"/poll/{open_poll.token}/respond",
+                       data={"option_ids": str(option_id)})  # No respondent_name
+    assert resp.status_code == 200
+    # Should show an error, not a thank-you
+    assert b"name" in resp.data.lower() or b"error" in resp.data.lower()
 ```
 
 - [ ] **Step 2: Run to confirm failures**
@@ -583,7 +653,7 @@ from flask_login import login_required, current_user
 from app.services.poll_services import (
     create_poll, get_poll_by_token, poll_is_active, submit_response, get_results
 )
-from app.utils.decorators import admin_required  # Adjust import to match existing decorator path
+from app.utils import admin_required  # Confirmed path — app/utils/__init__.py re-exports this
 
 # No url_prefix — admin routes use /polls/... and public route uses /poll/<token>
 # This keeps the shareable URL as /poll/<token> per the spec.
@@ -657,6 +727,16 @@ def poll_page(token: str):
                            results=results)
 
 
+@polls_bp.route("/polls/option-row", endpoint="poll_option_row")
+@login_required
+@admin_required
+def poll_option_row():
+    """HTMX fragment: return a new option input row for the create poll form.
+    Must be registered here — poll_create.html calls url_for('polls.poll_option_row').
+    """
+    return render_template("_poll_option_row.html")
+
+
 @polls_bp.route("/poll/<token>/respond", methods=["POST"], endpoint="poll_submit")
 def poll_submit(token: str):
     """HTMX endpoint — submit poll response, return fragment."""
@@ -672,15 +752,15 @@ def poll_submit(token: str):
         option_ids = [int(oid) for oid in option_ids_raw]
     except (ValueError, TypeError):
         return render_template("_poll_thanks.html",
-                               success=False, message="Invalid submission.")
+                               success=False, message="Invalid submission.", results=None)
 
     if not option_ids:
         return render_template("_poll_thanks.html",
-                               success=False, message="Please select at least one option.")
+                               success=False, message="Please select at least one option.", results=None)
 
     if person_id is None and not respondent_name:
         return render_template("_poll_thanks.html",
-                               success=False, message="Please enter your name.")
+                               success=False, message="Please enter your name.", results=None)
 
     success, message = submit_response(poll, option_ids, person_id, respondent_name)
 
@@ -709,7 +789,13 @@ app.register_blueprint(blueprints.polls_bp)
 ```bash
 pytest tests/blueprints/test_polls.py -v
 ```
-Fix any issues (route URL mismatches, missing decorator imports, etc.) then rerun until all pass.
+
+If tests fail, check these specific issues before debugging generically:
+- `ImportError: cannot import name 'admin_required'` → import is `from app.utils import admin_required`
+- `404` on `/polls/create` → blueprint not registered in `app/__init__.py`
+- `302` on admin POST to `/polls/create` → `admin_client` fixture may not have `admin=True` set on the Person
+- `BuildError` for `polls.poll_option_row` → route is missing from `polls.py` (see Step 3 above)
+- `IntegrityError` during fixture teardown → `poll_author` fixture is trying to manually delete a Person while polls still reference it via FK; remove the manual delete from the fixture
 
 - [ ] **Step 6: Commit**
 
@@ -1038,9 +1124,27 @@ Add the polls nav item in `base.html` nav_items (after Stats):
 
 Use a clipboard/checklist icon path. SVG path for a clipboard: `M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2`
 
-Note: `polls.poll_respond` requires a token argument — the nav item should link to the polls list for logged-in users (`polls.poll_list`), not a specific poll. For the mobile bottom nav, only show polls item if `active_polls_count > 0`.
+Nav item behavior: the admin sidebar link goes to `polls.poll_list` and must be guarded with `{% if current_user.is_authenticated and (current_user.admin or current_user.owner) %}`. Regular users clicking an unguarded nav link get silently redirected by `@admin_required`, which is confusing. Do NOT add this to the public nav — the shareable poll URL is sent directly via the context processor on the dashboard, not through navigation.
 
 - [ ] **Step 2: Add active polls section to `index.html`**
+
+First, update the context processor to inject both `active_polls_count` and `active_polls` (the full list for dashboard links):
+
+```python
+@polls_bp.app_context_processor
+def inject_active_polls():
+    """Make active poll count and list available in all templates."""
+    from app.models import Poll
+    from app.services.poll_services import poll_is_active
+    try:
+        all_open = Poll.query.filter_by(closed=False).all()
+        active = [p for p in all_open if poll_is_active(p)]
+        return {"active_polls_count": len(active), "active_polls": active}
+    except Exception:
+        return {"active_polls_count": 0, "active_polls": []}
+```
+
+Then add to `index.html`:
 
 ```html
 {% if active_polls_count > 0 %}
@@ -1059,11 +1163,24 @@ Note: `polls.poll_respond` requires a token argument — the nav item should lin
 {% endif %}
 ```
 
-Update the context processor to also inject `active_polls` (the list, not just count) for logged-in users.
-
 - [ ] **Step 3: Add polls management link to `admin_page.html`**
 
-Add a "Polls" section/link to the admin page pointing to `polls.poll_list`.
+Read `admin_page.html` first to find an appropriate insertion point (near other management section links). Add:
+
+```html
+<div class="mt-6">
+  <h2 class="text-base font-semibold text-stone-800 mb-3">Polls</h2>
+  <a href="{{ url_for('polls.poll_list') }}"
+     class="inline-flex items-center rounded-lg border border-stone-300 px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50 transition-colors">
+    Manage Polls
+    {% if active_polls_count > 0 %}
+    <span class="ml-2 inline-flex items-center justify-center rounded-full bg-red-100 text-red-700 text-xs font-medium px-2 py-0.5">
+      {{ active_polls_count }} active
+    </span>
+    {% endif %}
+  </a>
+</div>
+```
 
 - [ ] **Step 4: Run full test suite**
 
@@ -1076,7 +1193,7 @@ Expected: All pass.
 
 ```bash
 ruff check .
-mypy app/
+mypy app/ tests/
 ```
 Fix any issues.
 
@@ -1101,7 +1218,7 @@ git push origin main
 
 - [ ] **Step 3: Verify CI passes** — check GitHub Actions tab, confirm all 5 steps (lint, typecheck, security, docker build, tests) pass green.
 
-- [ ] **Step 4: Deploy to homelab** — follow README deployment instructions (or use self-hosted runner if configured).
+- [ ] **Step 4: Deploy to homelab** — [HUMAN ACTION REQUIRED] Follow README deployment instructions. Do not attempt to SSH into the homelab or run deploy commands remotely — this requires manual intervention by the repository owner.
 
 ---
 
