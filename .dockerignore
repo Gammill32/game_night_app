@@ -1,0 +1,14 @@
+.git
+.github
+.superpowers
+.worktrees
+tests/
+docs/
+*.pyc
+__pycache__
+.env
+.env.*
+*.md
+.pre-commit-config.yaml
+pyproject.toml
+requirements-dev.txt
