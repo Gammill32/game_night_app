@@ -209,10 +209,10 @@ def bgg_search():
     query = request.args.get("q", "").strip()
     if request.args.get("select"):
         return render_template("_bgg_selected.html",
-            bgg_id=request.args.get("select"),
-            name=request.args.get("name"),
-            year=request.args.get("year"),
-            thumbnail=request.args.get("thumbnail"),
+            bgg_id=request.args.get("select", ""),
+            name=request.args.get("name", ""),
+            year=request.args.get("year", ""),
+            thumbnail=request.args.get("thumbnail", ""),
         )
     if request.args.get("reset"):
         return render_template("_bgg_widget_blank.html")

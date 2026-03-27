@@ -2,6 +2,7 @@
 <ul class="divide-y divide-stone-100 rounded-xl border border-stone-200 bg-white overflow-hidden">
   {% for game in results %}
   <li>
+    <!-- thumbnail is always "" from BGG search — only /thing returns images -->
     <button type="button"
             class="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-stone-50 transition-colors"
             hx-get="{{ url_for('games.bgg_search', select=game.bgg_id, name=game.name, year=game.year, thumbnail=game.thumbnail) }}"
