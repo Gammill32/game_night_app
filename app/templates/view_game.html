@@ -140,6 +140,16 @@
 
 </div>
 
+{% if game.bgg_id %}
+<!-- BGG details panel — loaded asynchronously to avoid blocking page render -->
+<div class="bg-white rounded-xl border border-stone-200 shadow-sm p-5 mt-4"
+     hx-get="{{ url_for('games.bgg_details', game_id=game.id) }}"
+     hx-trigger="load"
+     hx-swap="innerHTML">
+  <div class="text-sm text-stone-400 animate-pulse">Loading BGG data…</div>
+</div>
+{% endif %}
+
 <!-- Previous Results (commented out, preserved as-is) -->
 <!--
 <h2>Previous Results</h2>
