@@ -20,11 +20,11 @@ class Config:
     MAIL_DEFAULT_SENDER = os.getenv("MAIL_DEFAULT_SENDER")
 
     # Flask Session Configuration
-    SESSION_TYPE = 'filesystem'
+    SESSION_TYPE = os.getenv("SESSION_TYPE", "filesystem")
     SESSION_PERMANENT = True
     SESSION_USE_SIGNER = True
     SESSION_COOKIE_PATH = "/"
-    SESSION_COOKIE_SECURE = True
+    SESSION_COOKIE_SECURE = os.getenv("FLASK_DEBUG", "0") != "1"
     SESSION_COOKIE_HTTPONLY = True
 
     # Flask Debug Settings
