@@ -1,0 +1,25 @@
+{% if results %}
+<ul class="divide-y divide-stone-100 rounded-xl border border-stone-200 bg-white overflow-hidden">
+  {% for game in results %}
+  <li>
+    <button type="button"
+            class="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-stone-50 transition-colors"
+            hx-get="{{ url_for('games.bgg_search', select=game.bgg_id, name=game.name, year=game.year, thumbnail=game.thumbnail) }}"
+            hx-target="#bgg-search-widget"
+            hx-swap="outerHTML">
+      {% if game.thumbnail %}
+      <img src="{{ game.thumbnail }}" alt="" class="h-10 w-10 object-contain rounded flex-shrink-0" />
+      {% else %}
+      <div class="h-10 w-10 bg-stone-100 rounded flex-shrink-0"></div>
+      {% endif %}
+      <div>
+        <div class="text-sm font-medium text-stone-800">{{ game.name }}</div>
+        {% if game.year %}<div class="text-xs text-stone-500">{{ game.year }}</div>{% endif %}
+      </div>
+    </button>
+  </li>
+  {% endfor %}
+</ul>
+{% else %}
+<p class="text-sm text-stone-500 px-1">No results found for "{{ query }}".</p>
+{% endif %}

@@ -2,7 +2,10 @@
 
 from flask import Blueprint, render_template, request, redirect, url_for, flash
 from flask_login import login_required, current_user
+from app.extensions import db
+from app.models import Game
 from app.services import games_services
+from app.services.bgg_service import BGGService
 from app.utils import admin_required
 from app.services import index_services
 from datetime import date
@@ -199,3 +202,36 @@ def user_stats():
         selected_opponent_names=selected_opponents
     )
 
+
+@games_bp.route("/games/bgg-search")
+@login_required
+def bgg_search():
+    query = request.args.get("q", "").strip()
+    if request.args.get("select"):
+        return render_template("_bgg_selected.html",
+            bgg_id=request.args.get("select"),
+            name=request.args.get("name"),
+            year=request.args.get("year"),
+            thumbnail=request.args.get("thumbnail"),
+        )
+    if request.args.get("reset"):
+        return render_template("_bgg_widget_blank.html")
+    if len(query) < 3:
+        return ""
+    results = BGGService.search(query)
+    return render_template("_bgg_results.html", results=results, query=query)
+
+
+@games_bp.route("/games/<int:game_id>/bgg-details")
+@login_required
+def bgg_details(game_id: int):
+    """HTMX endpoint: fetch BGG enrichment data for a game and return fragment."""
+    game = db.session.get(Game, game_id)
+    if game is None:
+        return render_template("_bgg_error.html", message="Game not found."), 404
+    if not game.bgg_id:
+        return render_template("_bgg_error.html", message="No BGG data available for this game.")
+    details = BGGService.fetch_details(game.bgg_id)
+    if not details:
+        return render_template("_bgg_error.html", message="Could not reach BoardGameGeek.")
+    return render_template("_bgg_details.html", details=details)
