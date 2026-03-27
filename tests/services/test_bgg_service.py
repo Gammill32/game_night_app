@@ -122,7 +122,8 @@ def test_fetch_details_returns_empty_on_double_202(requests_mock):
         status_code=202,
         content=b"",
     )
-    details = BGGService.fetch_details(13)
+    with patch("app.services.bgg_service._RETRY_DELAY", 0):
+        details = BGGService.fetch_details(13)
     assert details == {}
 
 
