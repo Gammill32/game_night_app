@@ -20,6 +20,7 @@ services:
       - MAIL_PASSWORD
       - MAIL_DEFAULT_SENDER
       - FLASK_APP
+      - BGG_API_TOKEN
     restart: always
     volumes:
       - /home/sgammill/projects/game_night_app/app/templates:/app/templates

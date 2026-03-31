@@ -1,5 +1,6 @@
 ####TEST 1
 
+import os
 import requests
 from app.models import db, Game
 from flask import current_app
@@ -8,6 +9,9 @@ def fetch_game_details(bgg_id):
     """Fetch game details from BoardGameGeek API."""
     url = f"https://boardgamegeek.com/xmlapi2/thing?id={bgg_id}"
     headers = {"User-Agent": "GameNightApp/1.0"}
+    bgg_token = os.getenv("BGG_API_TOKEN")
+    if bgg_token:
+        headers["Authorization"] = f"Bearer {bgg_token}"
     response = requests.get(url, headers=headers)
     if response.status_code == 200:
         return response.content
