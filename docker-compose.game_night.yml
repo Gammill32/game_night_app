@@ -1,5 +1,20 @@
 services:
 
+  postgres:
+    image: postgres:16
+    container_name: game_night_postgres
+    ports:
+      - "5434:5432"
+    environment:
+      - POSTGRES_USER
+      - POSTGRES_PASSWORD
+    volumes:
+      - /home/sgammill/projects/game_night_app/postgres_data:/var/lib/postgresql/data
+      - /home/sgammill/projects/game_night_app/init_db:/docker-entrypoint-initdb.d
+    restart: unless-stopped
+    networks:
+      - web_network
+
   game_night_app:
     build: .
     container_name: game_night_app
