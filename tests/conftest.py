@@ -11,7 +11,8 @@ from app.extensions import db as _db
 class TestConfig(Config):
     TESTING = True
     SECRET_KEY = "test-secret-key"
-    SESSION_TYPE = "null"
+    SESSION_TYPE = "filesystem"
+    SESSION_FILE_DIR = "/tmp/gamenight_test_sessions"
     WTF_CSRF_ENABLED = False
     SQLALCHEMY_DATABASE_URI = os.environ.get("TEST_DATABASE_URL")
     BCRYPT_LOG_ROUNDS = 4  # fast hashing in tests
