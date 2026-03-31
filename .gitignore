@@ -4,6 +4,9 @@
 # Superpowers
 .superpowers/
 
+# Dev scripts
+seed_user.py
+
 # Python
 __pycache__/
 *.pyc

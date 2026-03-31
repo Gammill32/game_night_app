@@ -1,8 +1,10 @@
 # tests/services/test_bgg_service.py
-import pytest
-from unittest.mock import patch, MagicMock
-from app.services.bgg_service import BGGService
+from unittest.mock import patch
 
+import pytest
+
+from app.services import bgg_service as _bgg_module
+from app.services.bgg_service import BGGService
 
 SEARCH_XML = b"""<?xml version="1.0" encoding="utf-8"?>
 <items total="2">
@@ -40,9 +42,6 @@ DETAILS_XML = b"""<?xml version="1.0" encoding="utf-8"?>
 </items>"""
 
 
-from app.services import bgg_service as _bgg_module
-
-
 @pytest.fixture(autouse=True)
 def clear_cache():
     """Clear module-level BGGService cache between tests."""
@@ -76,6 +75,7 @@ def test_search_parses_results(requests_mock):
 
 def test_search_returns_empty_on_timeout(requests_mock):
     import requests
+
     requests_mock.get(
         "https://boardgamegeek.com/xmlapi2/search",
         exc=requests.exceptions.Timeout,
@@ -140,6 +140,7 @@ def test_fetch_details_cached_on_second_call(requests_mock):
 
 def test_fetch_details_returns_empty_on_timeout(requests_mock):
     import requests
+
     requests_mock.get(
         "https://boardgamegeek.com/xmlapi2/thing",
         exc=requests.exceptions.Timeout,
@@ -150,6 +151,7 @@ def test_fetch_details_returns_empty_on_timeout(requests_mock):
 
 def test_fetch_details_returns_empty_on_connection_error(requests_mock):
     import requests
+
     requests_mock.get(
         "https://boardgamegeek.com/xmlapi2/thing",
         exc=requests.exceptions.ConnectionError,
@@ -170,6 +172,7 @@ def test_fetch_details_returns_empty_on_500(requests_mock):
 
 def test_search_returns_empty_on_connection_error(requests_mock):
     import requests
+
     requests_mock.get(
         "https://boardgamegeek.com/xmlapi2/search",
         exc=requests.exceptions.ConnectionError,
@@ -181,6 +184,7 @@ def test_search_returns_empty_on_connection_error(requests_mock):
 def test_empty_result_not_cached(requests_mock):
     """A {} error result must not be stored in cache — BGG timeouts should not poison cache."""
     import requests
+
     requests_mock.get(
         "https://boardgamegeek.com/xmlapi2/thing",
         exc=requests.exceptions.Timeout,

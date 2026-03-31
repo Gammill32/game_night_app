@@ -1,14 +1,15 @@
-import pytest
 import uuid
 from datetime import datetime, timedelta
-from app.models import Poll, PollOption, PollResponse, Person
+
+import pytest
+
 from app.extensions import db as _db
+from app.models import Person, Poll, PollResponse
 from app.services.poll_services import (
     create_poll,
-    poll_is_active,
-    get_poll_by_token,
-    submit_response,
     get_results,
+    poll_is_active,
+    submit_response,
 )
 
 
@@ -86,8 +87,9 @@ def test_submit_response_anonymous_single_select(app, db, poll_author):
     with app.app_context():
         poll = create_poll("Q", None, ["A", "B"], poll_author.id, False)
         option_id = poll.options[0].id
-        success, msg = submit_response(poll, option_ids=[option_id],
-                                       person_id=None, respondent_name="Alice")
+        success, msg = submit_response(
+            poll, option_ids=[option_id], person_id=None, respondent_name="Alice"
+        )
         assert success is True
         assert PollResponse.query.filter_by(poll_id=poll.id).count() == 1
 
@@ -138,6 +140,7 @@ def test_submit_response_logged_in_multi_select(app, db, poll_author):
 
 def test_create_poll_token_collision_raises(app, db, poll_author):
     from unittest.mock import patch
+
     with app.app_context():
         existing = create_poll("Existing", None, ["A"], poll_author.id, False)
         with patch.object(Poll, "generate_token", return_value=existing.token):

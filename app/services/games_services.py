@@ -1,7 +1,22 @@
-from app.models import db, Game, OwnedBy, Wishlist, Player, Result, GameNight, GameNightGame, GamesIndex, Person, GameRatings
-from sqlalchemy import func, distinct, case
-from app.services.bgg_service import BGGService
 from datetime import datetime
+
+from sqlalchemy import case, distinct, func
+
+from app.models import (
+    Game,
+    GameNight,
+    GameNightGame,
+    GameRatings,
+    GamesIndex,
+    OwnedBy,
+    Person,
+    Player,
+    Result,
+    Wishlist,
+    db,
+)
+from app.services.bgg_service import BGGService
+
 
 def get_or_create_game(game_name, bgg_id=None):
     """Retrieve a game from the database by name or BGG ID, or create it if not found."""
@@ -24,15 +39,23 @@ def get_or_create_game(game_name, bgg_id=None):
                     val = bgg_details.get("name")
                     existing_by_bgg.name = val if val is not None else existing_by_bgg.name
                     val = bgg_details.get("description")
-                    existing_by_bgg.description = val if val is not None else existing_by_bgg.description
+                    existing_by_bgg.description = (
+                        val if val is not None else existing_by_bgg.description
+                    )
                     val = bgg_details.get("min_players")
-                    existing_by_bgg.min_players = val if val is not None else existing_by_bgg.min_players
+                    existing_by_bgg.min_players = (
+                        val if val is not None else existing_by_bgg.min_players
+                    )
                     val = bgg_details.get("max_players")
-                    existing_by_bgg.max_players = val if val is not None else existing_by_bgg.max_players
+                    existing_by_bgg.max_players = (
+                        val if val is not None else existing_by_bgg.max_players
+                    )
                     val = bgg_details.get("playtime")
                     existing_by_bgg.playtime = val if val is not None else existing_by_bgg.playtime
                     val = bgg_details.get("image_url")
-                    existing_by_bgg.image_url = val if val is not None else existing_by_bgg.image_url
+                    existing_by_bgg.image_url = (
+                        val if val is not None else existing_by_bgg.image_url
+                    )
                     db.session.commit()
             return existing_by_bgg, None
 
@@ -62,7 +85,9 @@ def get_or_create_game(game_name, bgg_id=None):
     return game, None
 
 
-def get_filtered_games(user_id, name_filter=None, players_filter=None, playtime_filter=None, min_rating_filter=None):
+def get_filtered_games(
+    user_id, name_filter=None, players_filter=None, playtime_filter=None, min_rating_filter=None
+):
     user = Person.query.get(user_id)
 
     # Base query
@@ -71,30 +96,25 @@ def get_filtered_games(user_id, name_filter=None, players_filter=None, playtime_
     # If not admin/owner, limit scope
     if not user.is_admin_or_owner:
         query = query.filter(
-            db.or_(
-                GamesIndex.owner_id == user_id,
-                GamesIndex.player_owner.is_(True)
-            )
+            db.or_(GamesIndex.owner_id == user_id, GamesIndex.player_owner.is_(True))
         )
 
     # Apply filters
     if name_filter:
         query = query.filter(GamesIndex.game_name.ilike(f"%{name_filter}%"))
     if players_filter is not None:
-        query = query.filter(GamesIndex.min_players <= players_filter, GamesIndex.max_players >= players_filter)
+        query = query.filter(
+            GamesIndex.min_players <= players_filter, GamesIndex.max_players >= players_filter
+        )
     if playtime_filter is not None:
         query = query.filter(GamesIndex.playtime <= playtime_filter)
 
     games = query.order_by(GamesIndex.game_name).all()
 
     # Build lookup for current user's ownership and wishlist
-    owned_game_ids = {
-        ob.game_id for ob in OwnedBy.query.filter_by(person_id=user_id).all()
-    }
+    owned_game_ids = {ob.game_id for ob in OwnedBy.query.filter_by(person_id=user_id).all()}
 
-    wishlist_game_ids = {
-        w.game_id for w in Wishlist.query.filter_by(person_id=user_id).all()
-    }
+    wishlist_game_ids = {w.game_id for w in Wishlist.query.filter_by(person_id=user_id).all()}
 
     ratings_by_game_id = {
         r.game_id: r.ranking for r in GameRatings.query.filter_by(person_id=user_id).all()
@@ -104,18 +124,20 @@ def get_filtered_games(user_id, name_filter=None, players_filter=None, playtime_
     filtered_games = []
     for game in games:
         user_rating = ratings_by_game_id.get(game.game_id)
-        
+
         # Apply the rating filter (if set)
         if min_rating_filter is not None:
             if user_rating is None or user_rating < min_rating_filter:
                 continue
 
-        filtered_games.append({
-            "game": game,
-            "user_owns_game": game.game_id in owned_game_ids,
-            "in_wishlist": game.game_id in wishlist_game_ids,
-            "user_rating": user_rating
-        })
+        filtered_games.append(
+            {
+                "game": game,
+                "user_owns_game": game.game_id in owned_game_ids,
+                "in_wishlist": game.game_id in wishlist_game_ids,
+                "user_rating": user_rating,
+            }
+        )
 
     return filtered_games
 
@@ -131,7 +153,7 @@ def add_game(user_id, game_name, bgg_id=None):
 
 def add_game_to_wishlist(user_id, game_name, bgg_id=None):
     """Adds a game to the user's wishlist by name and optional BGG ID.
-    
+
     If the game does not exist, it is created first.
     """
     game, error = get_or_create_game(game_name, bgg_id)
@@ -149,7 +171,7 @@ def add_game_to_wishlist(user_id, game_name, bgg_id=None):
 
 def modify_wishlist(user_id, game_id, add=False, remove=False):
     """Adds or removes a game from the user's wishlist.
-    
+
     - If `add=True`, the game is added to the wishlist.
     - If `remove=True`, the game is removed from the wishlist.
     """
@@ -182,12 +204,12 @@ def modify_ownership(user_id, game_id, add=True):
             db.session.commit()
             return True, f'You now own "{game.name}".'
         return False, f'You already own "{game.name}".'
-    
+
     if ownership:
         db.session.delete(ownership)
         db.session.commit()
         return True, "Game ownership removed."
-    
+
     return False, "You do not own this game."
 
 
@@ -207,8 +229,7 @@ def get_game_details(game_id, user_id):
     )
 
     game_nights = (
-        GameNight.query
-        .join(GameNightGame)
+        GameNight.query.join(GameNightGame)
         .filter(GameNightGame.game_id == game_id)
         .order_by(GameNight.date.desc())
         .all()
@@ -242,6 +263,7 @@ def update_game_rating(game_id, user_id, ranking):
 
     return True, "Rating saved successfully."
 
+
 def update_tutorial_url(game_id, tutorial_url):
     game = Game.query.get_or_404(game_id)
 
@@ -249,19 +271,31 @@ def update_tutorial_url(game_id, tutorial_url):
     db.session.commit()
     return game
 
-def get_user_stats(user_id, game_ids=None, opponent_ids=None, start_date=None, end_date=None, sort_by="wins", sort_order="desc"):
+
+def get_user_stats(
+    user_id,
+    game_ids=None,
+    opponent_ids=None,
+    start_date=None,
+    end_date=None,
+    sort_by="wins",
+    sort_order="desc",
+):
     # Base query to fetch user's game results
-    query = db.session.query(
-        GameNightGame.game_id,
-        Game.name.label("game_name"),
-        func.count(Result.id).label("games_played"),
-        func.sum(case((Result.position == 1, 1), else_=0)).label("wins"),
-        func.avg(Result.position).label("average_position"),
-        func.max(GameNightGame.created_at).label("last_played")
-    ).join(Result, GameNightGame.id == Result.game_night_game_id
-    ).join(Player, Result.player_id == Player.id
-    ).join(Game, GameNightGame.game_id == Game.id
-    ).filter(Player.people_id == user_id)
+    query = (
+        db.session.query(
+            GameNightGame.game_id,
+            Game.name.label("game_name"),
+            func.count(Result.id).label("games_played"),
+            func.sum(case((Result.position == 1, 1), else_=0)).label("wins"),
+            func.avg(Result.position).label("average_position"),
+            func.max(GameNightGame.created_at).label("last_played"),
+        )
+        .join(Result, GameNightGame.id == Result.game_night_game_id)
+        .join(Player, Result.player_id == Player.id)
+        .join(Game, GameNightGame.game_id == Game.id)
+        .filter(Player.people_id == user_id)
+    )
 
     # Apply game filter
     if game_ids:
@@ -284,12 +318,14 @@ def get_user_stats(user_id, game_ids=None, opponent_ids=None, start_date=None, e
 
     # Apply opponent filter
     if opponent_ids:
-        subquery = db.session.query(Result.game_night_game_id
-        ).join(Player, Result.player_id == Player.id
-        ).filter(Player.people_id.in_(opponent_ids)
-        ).group_by(Result.game_night_game_id
-        ).having(func.count(distinct(Player.people_id)) == len(opponent_ids)
-        ).subquery()
+        subquery = (
+            db.session.query(Result.game_night_game_id)
+            .join(Player, Result.player_id == Player.id)
+            .filter(Player.people_id.in_(opponent_ids))
+            .group_by(Result.game_night_game_id)
+            .having(func.count(distinct(Player.people_id)) == len(opponent_ids))
+            .subquery()
+        )
 
         query = query.filter(GameNightGame.id.in_(subquery))
 
@@ -302,7 +338,7 @@ def get_user_stats(user_id, game_ids=None, opponent_ids=None, start_date=None, e
         "games_played": func.count(Result.id),
         "average_position": func.avg(Result.position),
         "last_played": func.max(GameNightGame.created_at),
-        "game_name": Game.name
+        "game_name": Game.name,
     }.get(sort_by, func.sum(case((Result.position == 1, 1), else_=0)).label("wins"))
 
     if sort_order == "asc":
@@ -312,15 +348,18 @@ def get_user_stats(user_id, game_ids=None, opponent_ids=None, start_date=None, e
 
     return query.all()
 
+
 def get_selected_games(game_ids):
     if not game_ids:
         return []
     return db.session.query(Game.id, Game.name).filter(Game.id.in_(game_ids)).all()
 
+
 def get_selected_opponents(opponent_ids):
     if not opponent_ids:
         return []
-    return db.session.query(
-        Person.id, Person.first_name, Person.last_name
-    ).filter(Person.id.in_(opponent_ids)).all()
-
+    return (
+        db.session.query(Person.id, Person.first_name, Person.last_name)
+        .filter(Person.id.in_(opponent_ids))
+        .all()
+    )

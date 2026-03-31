@@ -1,12 +1,21 @@
 # app/services/game_night_service.py
-from app.models import db, UserRecentFutureGameNight, AdminRecentFutureGameNight, UserGameNightList, AdminGameNightList
-from sqlalchemy import text
-from datetime import timedelta
 import calendar
+from datetime import timedelta
+
+from sqlalchemy import text
+
+from app.models import (
+    AdminGameNightList,
+    AdminRecentFutureGameNight,
+    UserGameNightList,
+    UserRecentFutureGameNight,
+    db,
+)
+
 
 def get_game_nights(user, start_date=None, end_date=None):
     """Fetches game nights based on user role, optionally filtering by date range."""
-    
+
     # Select the appropriate model
     GameNightModel = AdminGameNightList if user.owner else UserGameNightList
 
@@ -25,22 +34,32 @@ def get_game_nights(user, start_date=None, end_date=None):
     query = query.order_by(GameNightModel.date.asc() if start_date else GameNightModel.date.desc())
 
     return query.all()
-        
+
+
 def get_earliest_game_night():
     """Retrieves the earliest game night date."""
     return db.session.scalar(text("SELECT earliest_date FROM public.earliest_game_night"))
 
+
 def get_recent_and_future_game_nights(user):
     """Fetches recent and future game nights."""
     if user.owner:
-        return AdminRecentFutureGameNight.query.order_by(AdminRecentFutureGameNight.date.desc()).all()
+        return AdminRecentFutureGameNight.query.order_by(
+            AdminRecentFutureGameNight.date.desc()
+        ).all()
     else:
-        return UserRecentFutureGameNight.query.filter_by(user_id=user.id).order_by(UserRecentFutureGameNight.date.desc()).all()
+        return (
+            UserRecentFutureGameNight.query.filter_by(user_id=user.id)
+            .order_by(UserRecentFutureGameNight.date.desc())
+            .all()
+        )
+
 
 def get_calendar_data(year, month):
     """Generates calendar data for the given month."""
     cal = calendar.Calendar(firstweekday=6)  # Start on Sunday
     return cal.monthdayscalendar(year, month)
+
 
 def get_navigation_dates(start_date, earliest_game_night):
     """Computes previous and next month navigation."""

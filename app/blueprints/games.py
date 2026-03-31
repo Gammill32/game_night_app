@@ -1,14 +1,15 @@
 # blueprints/games.py
 
-from flask import Blueprint, render_template, request, redirect, url_for, flash
-from flask_login import login_required, current_user
+from datetime import date
+
+from flask import Blueprint, flash, redirect, render_template, request, url_for
+from flask_login import current_user, login_required
+
 from app.extensions import db
 from app.models import Game
-from app.services import games_services
+from app.services import games_services, index_services
 from app.services.bgg_service import BGGService
 from app.utils import admin_required
-from app.services import index_services
-from datetime import date
 
 games_bp = Blueprint("games", __name__)
 
@@ -17,15 +18,21 @@ games_bp = Blueprint("games", __name__)
 @login_required
 def games_index():
     name_filter = request.args.get("name", "").strip()
-    players_filter = request.args.get("players", type=int) if request.args.get("players_enabled") else None
-    playtime_filter = request.args.get("playtime", type=int) if request.args.get("playtime_enabled") else None
-    min_rating_filter = request.args.get("min_rating", type=int) if request.args.get("min_rating_enabled") else None
-    
-    games_with_ownership = games_services.get_filtered_games(current_user.id, name_filter, players_filter, playtime_filter, min_rating_filter)
-    
-    context = {
-        "games": games_with_ownership
-    }
+    players_filter = (
+        request.args.get("players", type=int) if request.args.get("players_enabled") else None
+    )
+    playtime_filter = (
+        request.args.get("playtime", type=int) if request.args.get("playtime_enabled") else None
+    )
+    min_rating_filter = (
+        request.args.get("min_rating", type=int) if request.args.get("min_rating_enabled") else None
+    )
+
+    games_with_ownership = games_services.get_filtered_games(
+        current_user.id, name_filter, players_filter, playtime_filter, min_rating_filter
+    )
+
+    context = {"games": games_with_ownership}
     return render_template("games_index.html", **context)
 
 
@@ -35,12 +42,12 @@ def add_game():
     if request.method == "POST":
         name = request.form.get("name", "").strip()
         bgg_id = request.form.get("bgg_id", "").strip()
-        
+
         success, message = games_services.add_game(current_user.id, name, bgg_id)
         flash(message, "success" if success else "error")
-        
+
         return redirect(url_for("games.add_game"))
-    
+
     context = {}
     return render_template("add_game.html", **context)
 
@@ -48,7 +55,9 @@ def add_game():
 @games_bp.route("/game/<int:game_id>")
 @login_required
 def view_game(game_id):
-    game, leaderboard, game_nights, user_rating = games_services.get_game_details(game_id, current_user.id)
+    game, leaderboard, game_nights, user_rating = games_services.get_game_details(
+        game_id, current_user.id
+    )
 
     context = {
         "game": game,
@@ -64,7 +73,9 @@ def view_game(game_id):
 def claim_game(game_id):
     success, message = games_services.modify_ownership(current_user.id, game_id, add=True)
     if success:
-        games_services.modify_wishlist(current_user.id, game_id, remove=True)  # Remove from wishlist if ownership is claimed
+        games_services.modify_wishlist(
+            current_user.id, game_id, remove=True
+        )  # Remove from wishlist if ownership is claimed
     flash(message, "success" if success else "error")
     return redirect(url_for("games.games_index"))
 
@@ -81,10 +92,8 @@ def remove_ownership(game_id):
 @login_required
 def wishlist():
     wishlist_games = games_services.get_wishlist(current_user.id)
-    
-    context = {
-        "games": wishlist_games
-    }
+
+    context = {"games": wishlist_games}
     return render_template("wishlist.html", **context)
 
 
@@ -94,12 +103,12 @@ def add_to_wishlist():
     if request.method == "POST":
         name = request.form.get("name", "").strip()
         bgg_id = request.form.get("bgg_id", "").strip()
-        
+
         success, message = games_services.add_game_to_wishlist(current_user.id, name, bgg_id)
         flash(message, "success" if success else "error")
-        
+
         return redirect(url_for("games.wishlist"))
-    
+
     context = {}
     return render_template("add_to_wishlist.html", **context)
 
@@ -111,10 +120,11 @@ def remove_from_wishlist(game_id):
     flash(message, "success" if success else "error")
     return redirect(url_for("games.wishlist"))
 
+
 @games_bp.route("/wishlist/toggle/<int:game_id>", methods=["POST"])
 @login_required
 def toggle_wishlist(game_id):
-    from app.models import Wishlist, OwnedBy  # Adjust if needed
+    from app.models import OwnedBy, Wishlist  # Adjust if needed
 
     # If already owned, prevent wishlisting
     owns_game = OwnedBy.query.filter_by(game_id=game_id, person_id=current_user.id).first()
@@ -131,6 +141,7 @@ def toggle_wishlist(game_id):
     flash(message, "success" if success else "error")
     return redirect(request.referrer or url_for("games.wishlist"))
 
+
 @games_bp.route("/game/<int:game_id>/rating", methods=["POST"])
 @login_required
 def update_rating(game_id):
@@ -140,6 +151,7 @@ def update_rating(game_id):
 
     flash(message, "success" if success else "error")
     return redirect(url_for("games.view_game", game_id=game_id))
+
 
 @games_bp.route("/games/<int:game_id>/update_tutorial", methods=["POST"])
 @login_required
@@ -151,6 +163,7 @@ def update_tutorial_url(game_id):
     flash("Tutorial URL updated.", "success")
 
     return redirect(url_for("games.view_game", game_id=game_id))
+
 
 @games_bp.route("/user_stats", methods=["GET"])
 @login_required
@@ -179,7 +192,7 @@ def user_stats():
         start_date=start_date,
         end_date=end_date,
         sort_by=sort_by,
-        sort_order=sort_order
+        sort_order=sort_order,
     )
 
     # Get selected game and opponent display names for tags
@@ -199,7 +212,7 @@ def user_stats():
         selected_game_ids=game_ids,
         selected_opponent_ids=opponent_ids,
         selected_game_names=selected_games,
-        selected_opponent_names=selected_opponents
+        selected_opponent_names=selected_opponents,
     )
 
 
@@ -208,7 +221,8 @@ def user_stats():
 def bgg_search():
     query = request.args.get("q", "").strip()
     if request.args.get("select"):
-        return render_template("_bgg_selected.html",
+        return render_template(
+            "_bgg_selected.html",
             bgg_id=request.args.get("select", ""),
             name=request.args.get("name", ""),
             year=request.args.get("year", ""),

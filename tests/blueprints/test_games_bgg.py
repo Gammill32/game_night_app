@@ -1,6 +1,7 @@
 # tests/blueprints/test_games_bgg.py
-import pytest
 from unittest.mock import patch
+
+import pytest
 
 
 def test_bgg_search_returns_fragment(auth_client):
@@ -27,8 +28,9 @@ def test_bgg_search_requires_login(client):
 @pytest.fixture()
 def bgg_game(app):
     """A minimal Game row for BGG details tests."""
-    from app.models import Game
     from app.extensions import db as _db
+    from app.models import Game
+
     with app.app_context():
         game = Game(name="Catan", bgg_id=13)
         _db.session.add(game)

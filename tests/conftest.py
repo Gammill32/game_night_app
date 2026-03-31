@@ -1,9 +1,11 @@
 import os
 import unittest.mock
+
 import pytest
+
 from app import create_app
-from app.extensions import db as _db
 from app.config import Config
+from app.extensions import db as _db
 
 
 class TestConfig(Config):
@@ -48,8 +50,8 @@ def client(app, db):
 @pytest.fixture()
 def auth_client(app, db):
     """Test client pre-logged-in as a standard user."""
-    from app.models import Person
     from app.extensions import bcrypt
+    from app.models import Person
 
     with app.app_context():
         user = Person(
@@ -75,8 +77,8 @@ def auth_client(app, db):
 @pytest.fixture()
 def admin_client(app, db):
     """Test client pre-logged-in as an admin user."""
-    from app.models import Person
     from app.extensions import bcrypt
+    from app.models import Person
 
     with app.app_context():
         admin = Person(
@@ -102,8 +104,9 @@ def admin_client(app, db):
 @pytest.fixture(scope="session")
 def seed_data(db, app):
     """Minimal seed: one Game, one GameNight for routes with path params."""
-    from app.models import Game, GameNight
     import datetime
+
+    from app.models import Game, GameNight
 
     with app.app_context():
         game = Game(name="Test Game", bgg_id=1)

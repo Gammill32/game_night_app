@@ -1,7 +1,9 @@
-import pytest
 import uuid
-from app.models import Poll, Person
+
+import pytest
+
 from app.extensions import db as _db
+from app.models import Person, Poll
 from app.services.poll_services import create_poll
 
 
@@ -55,8 +57,10 @@ def test_poll_page_shows_closed_message(client, closed_poll):
 
 def test_submit_response_anonymous(client, open_poll):
     option_id = open_poll.options[0].id
-    resp = client.post(f"/poll/{open_poll.token}/respond",
-                       data={"option_ids": str(option_id), "respondent_name": "Alice"})
+    resp = client.post(
+        f"/poll/{open_poll.token}/respond",
+        data={"option_ids": str(option_id), "respondent_name": "Alice"},
+    )
     assert resp.status_code == 200
     assert b"Thank you" in resp.data or b"thank" in resp.data.lower()
 
@@ -65,29 +69,38 @@ def test_submit_response_sets_session_cookie(client, open_poll):
     option_id = open_poll.options[0].id
     with client.session_transaction() as sess:
         assert f"poll_{open_poll.token}_responded" not in sess
-    client.post(f"/poll/{open_poll.token}/respond",
-                data={"option_ids": str(option_id), "respondent_name": "Bob"})
+    client.post(
+        f"/poll/{open_poll.token}/respond",
+        data={"option_ids": str(option_id), "respondent_name": "Bob"},
+    )
     with client.session_transaction() as sess:
         assert sess.get(f"poll_{open_poll.token}_responded") is True
 
 
 def test_submit_response_rejects_duplicate(client, open_poll):
     option_id = open_poll.options[0].id
-    client.post(f"/poll/{open_poll.token}/respond",
-                data={"option_ids": str(option_id), "respondent_name": "Carol"})
-    resp = client.post(f"/poll/{open_poll.token}/respond",
-                       data={"option_ids": str(option_id), "respondent_name": "Carol"})
+    client.post(
+        f"/poll/{open_poll.token}/respond",
+        data={"option_ids": str(option_id), "respondent_name": "Carol"},
+    )
+    resp = client.post(
+        f"/poll/{open_poll.token}/respond",
+        data={"option_ids": str(option_id), "respondent_name": "Carol"},
+    )
     assert resp.status_code == 200
     assert b"already" in resp.data.lower()
 
 
 def test_admin_can_create_poll(admin_client):
-    resp = admin_client.post("/polls/create", data={
-        "title": "New Poll",
-        "description": "",
-        "option_labels": ["Option A", "Option B"],
-        "multi_select": "false",
-    })
+    resp = admin_client.post(
+        "/polls/create",
+        data={
+            "title": "New Poll",
+            "description": "",
+            "option_labels": ["Option A", "Option B"],
+            "multi_select": "false",
+        },
+    )
     assert resp.status_code in (200, 302)
     assert Poll.query.filter_by(title="New Poll").first() is not None
 
@@ -105,7 +118,6 @@ def test_admin_poll_list_shows_polls(admin_client, open_poll):
 
 def test_submit_response_rejects_missing_name(client, open_poll):
     option_id = open_poll.options[0].id
-    resp = client.post(f"/poll/{open_poll.token}/respond",
-                       data={"option_ids": str(option_id)})
+    resp = client.post(f"/poll/{open_poll.token}/respond", data={"option_ids": str(option_id)})
     assert resp.status_code == 200
     assert b"name" in resp.data.lower() or b"error" in resp.data.lower()

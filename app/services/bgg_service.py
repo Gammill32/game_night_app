@@ -1,12 +1,12 @@
-import os
-import time
-import threading
 import logging
+import os
+import threading
+import time
 import xml.etree.ElementTree as ET
 from typing import Any
 
-import requests
 import cachetools
+import requests
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +20,7 @@ def _bgg_headers() -> dict:
     if token:
         return {"Authorization": f"Bearer {token}"}
     return {}
+
 
 # Module-level cache and lock. TTLCache is not thread-safe on its own;
 # the RLock is required because APScheduler runs in a background thread
@@ -119,13 +120,15 @@ class BGGService:
             year_el = item.find("yearpublished")
             if name_el is None:
                 continue
-            results.append({
-                "bgg_id": int(item.get("id", 0)),
-                "name": name_el.get("value", ""),
-                "year": year_el.get("value", "") if year_el is not None else "",
-                # BGG search results do not include thumbnails — only /thing does.
-                "thumbnail": "",
-            })
+            results.append(
+                {
+                    "bgg_id": int(item.get("id", 0)),
+                    "name": name_el.get("value", ""),
+                    "year": year_el.get("value", "") if year_el is not None else "",
+                    # BGG search results do not include thumbnails — only /thing does.
+                    "thumbnail": "",
+                }
+            )
         return results
 
     @staticmethod
@@ -170,11 +173,9 @@ class BGGService:
             "complexity": _float("statistics/ratings/averageweight"),
             "bgg_rank": _int("statistics/ratings/ranks/rank[@name='boardgame']"),
             "categories": [
-                el.get("value", "")
-                for el in item.findall("link[@type='boardgamecategory']")
+                el.get("value", "") for el in item.findall("link[@type='boardgamecategory']")
             ],
             "mechanics": [
-                el.get("value", "")
-                for el in item.findall("link[@type='boardgamemechanic']")
+                el.get("value", "") for el in item.findall("link[@type='boardgamemechanic']")
             ],
         }

@@ -1,5 +1,4 @@
 from datetime import datetime
-from typing import Optional
 
 from app.extensions import db
 from app.models import Poll, PollOption, PollResponse
@@ -16,11 +15,11 @@ def poll_is_active(poll: Poll) -> bool:
 
 def create_poll(
     title: str,
-    description: Optional[str],
+    description: str | None,
     option_labels: list[str],
-    created_by_id: Optional[int],
+    created_by_id: int | None,
     multi_select: bool,
-    closes_at: Optional[datetime] = None,
+    closes_at: datetime | None = None,
 ) -> Poll:
     """Create a new poll with options. Returns the saved Poll."""
     for _attempt in range(3):
@@ -48,12 +47,12 @@ def create_poll(
     return poll
 
 
-def get_poll_by_token(token: str) -> Optional[Poll]:
+def get_poll_by_token(token: str) -> Poll | None:
     """Fetch a poll by its shareable token."""
     return Poll.query.filter_by(token=token).first()
 
 
-def has_responded(poll: Poll, person_id: Optional[int], respondent_name: Optional[str]) -> bool:
+def has_responded(poll: Poll, person_id: int | None, respondent_name: str | None) -> bool:
     """Check if this respondent has already submitted a response."""
     query = PollResponse.query.filter_by(poll_id=poll.id)
     if person_id is not None:
@@ -68,8 +67,8 @@ def has_responded(poll: Poll, person_id: Optional[int], respondent_name: Optiona
 def submit_response(
     poll: Poll,
     option_ids: list[int],
-    person_id: Optional[int],
-    respondent_name: Optional[str],
+    person_id: int | None,
+    respondent_name: str | None,
 ) -> tuple[bool, str]:
     """Submit a response. Returns (success, message)."""
     if not poll_is_active(poll):
@@ -92,12 +91,14 @@ def submit_response(
             return False, "Invalid option selected."
 
     for oid in option_ids:
-        db.session.add(PollResponse(
-            poll_id=poll.id,
-            option_id=oid,
-            person_id=person_id,
-            respondent_name=original_name,
-        ))
+        db.session.add(
+            PollResponse(
+                poll_id=poll.id,
+                option_id=oid,
+                person_id=person_id,
+                respondent_name=original_name,
+            )
+        )
 
     db.session.commit()
     return True, "Response recorded. Thank you!"
@@ -114,14 +115,13 @@ def get_results(poll: Poll) -> list[dict]:
 
 def _get_existing_responses(
     poll: Poll,
-    person_id: Optional[int],
-    normalised_name: Optional[str],
+    person_id: int | None,
+    normalised_name: str | None,
 ) -> list[PollResponse]:
     query = PollResponse.query.filter_by(poll_id=poll.id)
     if person_id is not None:
         return query.filter_by(person_id=person_id).all()
     if normalised_name:
         all_anon = query.filter(PollResponse.person_id.is_(None)).all()
-        return [r for r in all_anon
-                if (r.respondent_name or "").strip().lower() == normalised_name]
+        return [r for r in all_anon if (r.respondent_name or "").strip().lower() == normalised_name]
     return []

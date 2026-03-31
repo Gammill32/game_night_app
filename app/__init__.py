@@ -1,8 +1,9 @@
 import logging
+
 from flask import Flask
 
 from app.config import Config
-from app.extensions import db, bcrypt, mail, login_manager, migrate, sess
+from app.extensions import bcrypt, db, login_manager, mail, migrate, sess
 
 
 def init_extensions(app):
@@ -18,6 +19,7 @@ def init_extensions(app):
 def register_blueprints(app):
     """Register Flask blueprints."""
     from app import blueprints
+
     app.register_blueprint(blueprints.auth_bp)
     app.register_blueprint(blueprints.admin_bp)
     app.register_blueprint(blueprints.game_night_bp)
@@ -47,6 +49,7 @@ def register_user_loader(app):
 def start_schedulers(app):
     """Start the background scheduler for reminders."""
     from app.services.reminders_services import start_scheduler
+
     start_scheduler(app)
 
 
@@ -58,7 +61,9 @@ def create_app(config_class=None):
     app.config.from_object(config_class)
 
     if not app.debug and app.config.get("SECRET_KEY") == "dev-insecure-default":
-        raise RuntimeError("SECRET_KEY must be set to a secure value in production. Set the SECRET_KEY environment variable.")
+        raise RuntimeError(
+            "SECRET_KEY must be set to a secure value in production. Set the SECRET_KEY environment variable."
+        )
 
     setup_logging()
     init_extensions(app)

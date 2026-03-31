@@ -1,14 +1,13 @@
 # tests/test_smoke.py
 import pytest
 
-
 # Routes that redirect to login when unauthenticated
 # Verify exact paths with: flask routes
 REDIRECT_ROUTES = [
     "/",
     "/games/",
-    "/wishlist",      # games.wishlist — no /games/ prefix
-    "/user_stats",    # games.user_stats — no /games/ prefix
+    "/wishlist",  # games.wishlist — no /games/ prefix
+    "/user_stats",  # games.user_stats — no /games/ prefix
 ]
 
 # Routes that require admin

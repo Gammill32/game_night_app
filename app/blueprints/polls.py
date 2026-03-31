@@ -1,8 +1,12 @@
-from flask import Blueprint, render_template, request, redirect, url_for, session, abort, flash
-from flask_login import login_required, current_user
+from flask import Blueprint, abort, flash, redirect, render_template, request, session, url_for
+from flask_login import current_user, login_required
 
 from app.services.poll_services import (
-    create_poll, get_poll_by_token, poll_is_active, submit_response, get_results,
+    create_poll,
+    get_poll_by_token,
+    get_results,
+    poll_is_active,
+    submit_response,
 )
 from app.utils import admin_required
 
@@ -13,6 +17,7 @@ polls_bp = Blueprint("polls", __name__)
 def inject_active_polls():
     """Make active poll count and list available in all templates."""
     from app.models import Poll
+
     try:
         all_open = Poll.query.filter_by(closed=False).all()
         active = [p for p in all_open if poll_is_active(p)]
@@ -23,11 +28,13 @@ def inject_active_polls():
 
 # ── Admin routes ─────────────────────────────────────────────────────────── #
 
+
 @polls_bp.route("/polls/")
 @login_required
 @admin_required
 def poll_list():
     from app.models import Poll
+
     polls = Poll.query.order_by(Poll.created_at.desc()).all()
     return render_template("poll_list.html", polls=polls)
 
@@ -40,15 +47,14 @@ def poll_create():
         title = request.form.get("title", "").strip()
         description = request.form.get("description", "").strip() or None
         option_labels = [
-            label.strip()
-            for label in request.form.getlist("option_labels")
-            if label.strip()
+            label.strip() for label in request.form.getlist("option_labels") if label.strip()
         ]
         multi_select = request.form.get("multi_select") == "true"
 
         if not title or len(option_labels) < 2:
-            return render_template("poll_create.html",
-                                   error="A title and at least two options are required.")
+            return render_template(
+                "poll_create.html", error="A title and at least two options are required."
+            )
 
         create_poll(title, description, option_labels, current_user.id, multi_select)
         return redirect(url_for("polls.poll_list"))
@@ -60,8 +66,9 @@ def poll_create():
 @login_required
 @admin_required
 def poll_close(poll_id: int):
-    from app.models import Poll
     from app.extensions import db
+    from app.models import Poll
+
     poll = Poll.query.get_or_404(poll_id)
     poll.closed = True
     db.session.commit()
@@ -72,8 +79,9 @@ def poll_close(poll_id: int):
 @login_required
 @admin_required
 def poll_delete(poll_id: int):
-    from app.models import Poll
     from app.extensions import db
+    from app.models import Poll
+
     poll = Poll.query.get_or_404(poll_id)
     db.session.delete(poll)
     db.session.commit()
@@ -85,9 +93,10 @@ def poll_delete(poll_id: int):
 @login_required
 @admin_required
 def poll_share(poll_id: int):
-    from app.models import Poll, Person
-    from app.extensions import mail
     from flask_mail import Message
+
+    from app.extensions import mail
+    from app.models import Person, Poll
 
     poll = Poll.query.get_or_404(poll_id)
     people = Person.query.filter(Person.email.isnot(None)).order_by(Person.first_name).all()
@@ -139,6 +148,7 @@ def poll_option_row():
 
 # ── Public routes ─────────────────────────────────────────────────────────── #
 
+
 @polls_bp.route("/poll/<token>", endpoint="poll_respond")
 def poll_page(token: str):
     poll = get_poll_by_token(token)
@@ -148,11 +158,13 @@ def poll_page(token: str):
     already_responded = session.get(f"poll_{token}_responded", False)
     results = get_results(poll) if already_responded or not poll_is_active(poll) else None
 
-    return render_template("poll_respond.html",
-                           poll=poll,
-                           active=poll_is_active(poll),
-                           already_responded=already_responded,
-                           results=results)
+    return render_template(
+        "poll_respond.html",
+        poll=poll,
+        active=poll_is_active(poll),
+        already_responded=already_responded,
+        results=results,
+    )
 
 
 @polls_bp.route("/poll/<token>/respond", methods=["POST"], endpoint="poll_submit")
@@ -168,18 +180,31 @@ def poll_submit(token: str):
     try:
         option_ids = [int(oid) for oid in option_ids_raw]
     except (ValueError, TypeError):
-        return render_template("_poll_thanks.html",
-                               success=False, message="Invalid submission.", results=None, poll=poll)
+        return render_template(
+            "_poll_thanks.html",
+            success=False,
+            message="Invalid submission.",
+            results=None,
+            poll=poll,
+        )
 
     if not option_ids:
-        return render_template("_poll_thanks.html",
-                               success=False, message="Please select at least one option.",
-                               results=None, poll=poll)
+        return render_template(
+            "_poll_thanks.html",
+            success=False,
+            message="Please select at least one option.",
+            results=None,
+            poll=poll,
+        )
 
     if person_id is None and not respondent_name:
-        return render_template("_poll_thanks.html",
-                               success=False, message="Please enter your name.",
-                               results=None, poll=poll)
+        return render_template(
+            "_poll_thanks.html",
+            success=False,
+            message="Please enter your name.",
+            results=None,
+            poll=poll,
+        )
 
     success, message = submit_response(poll, option_ids, person_id, respondent_name)
 
@@ -187,5 +212,6 @@ def poll_submit(token: str):
         session[f"poll_{token}_responded"] = True
 
     results = get_results(poll)
-    return render_template("_poll_thanks.html",
-                           success=success, message=message, results=results, poll=poll)
+    return render_template(
+        "_poll_thanks.html", success=success, message=message, results=results, poll=poll
+    )
