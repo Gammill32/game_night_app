@@ -11,8 +11,6 @@ from app.extensions import db as _db
 class TestConfig(Config):
     TESTING = True
     SECRET_KEY = "test-secret-key"
-    SESSION_TYPE = "filesystem"
-    SESSION_FILE_DIR = "/tmp/gamenight_test_sessions"
     WTF_CSRF_ENABLED = False
     SQLALCHEMY_DATABASE_URI = os.environ.get("TEST_DATABASE_URL")
     BCRYPT_LOG_ROUNDS = 4  # fast hashing in tests
@@ -21,9 +19,13 @@ class TestConfig(Config):
 @pytest.fixture(scope="session")
 def app():
     """Create a test Flask app using the test PostgreSQL database."""
-    # Patch APScheduler before create_app() — background threads fire during teardown
-    # and hit a closed DB connection, causing noisy errors in CI logs.
-    with unittest.mock.patch("app.start_schedulers"):
+    from app.extensions import sess
+
+    # Disable Flask-Session so Flask uses built-in cookie sessions (no file I/O).
+    # Patch APScheduler to prevent background threads firing against a closed DB.
+    with unittest.mock.patch("app.start_schedulers"), unittest.mock.patch.object(
+        sess, "init_app"
+    ):
         application = create_app(TestConfig)
 
     # Do NOT set SERVER_NAME — it breaks url_for() resolution in tests.
