@@ -1,3 +1,4 @@
+import os
 import time
 import threading
 import logging
@@ -12,6 +13,13 @@ logger = logging.getLogger(__name__)
 _BGG_BASE = "https://boardgamegeek.com/xmlapi2"
 _TIMEOUT = 5  # seconds
 _RETRY_DELAY = 1  # seconds to wait before retrying after a 202 response
+
+
+def _bgg_headers() -> dict:
+    token = os.getenv("BGG_API_TOKEN")
+    if token:
+        return {"Authorization": f"Bearer {token}"}
+    return {}
 
 # Module-level cache and lock. TTLCache is not thread-safe on its own;
 # the RLock is required because APScheduler runs in a background thread
@@ -38,6 +46,7 @@ class BGGService:
             resp = requests.get(
                 f"{_BGG_BASE}/search",
                 params={"query": query, "type": "boardgame"},
+                headers=_bgg_headers(),
                 timeout=_TIMEOUT,
             )
             resp.raise_for_status()
@@ -70,6 +79,7 @@ class BGGService:
             resp = requests.get(
                 f"{_BGG_BASE}/thing",
                 params={"id": bgg_id, "stats": 1},
+                headers=_bgg_headers(),
                 timeout=_TIMEOUT,
             )
         except Exception as exc:
@@ -82,6 +92,7 @@ class BGGService:
                 resp = requests.get(
                     f"{_BGG_BASE}/thing",
                     params={"id": bgg_id, "stats": 1},
+                    headers=_bgg_headers(),
                     timeout=_TIMEOUT,
                 )
             except Exception as exc:
