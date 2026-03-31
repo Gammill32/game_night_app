@@ -51,6 +51,9 @@ def auth_client(app, db):
     from app.models import Person
 
     with app.app_context():
+        Person.query.filter_by(email="test@example.com").delete()
+        _db.session.commit()
+
         user = Person(
             first_name="Test",
             last_name="User",
@@ -63,11 +66,10 @@ def auth_client(app, db):
         _db.session.commit()
 
         with app.test_client() as client:
-            # auth_bp has no url_prefix — login route is /login, not /auth/login
             client.post("/login", data={"email": "test@example.com", "password": "password"})
             yield client
 
-        _db.session.delete(user)
+        Person.query.filter_by(email="test@example.com").delete()
         _db.session.commit()
 
 
@@ -78,6 +80,9 @@ def admin_client(app, db):
     from app.models import Person
 
     with app.app_context():
+        Person.query.filter_by(email="admin@example.com").delete()
+        _db.session.commit()
+
         admin = Person(
             first_name="Admin",
             last_name="User",
@@ -90,11 +95,10 @@ def admin_client(app, db):
         _db.session.commit()
 
         with app.test_client() as client:
-            # auth_bp has no url_prefix — login route is /login, not /auth/login
             client.post("/login", data={"email": "admin@example.com", "password": "password"})
             yield client
 
-        _db.session.delete(admin)
+        Person.query.filter_by(email="admin@example.com").delete()
         _db.session.commit()
 
 
