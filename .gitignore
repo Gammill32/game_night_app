@@ -4,6 +4,9 @@
 # Superpowers
 .superpowers/
 
+# Serena MCP
+.serena/
+
 # Dev scripts
 seed_user.py
 
