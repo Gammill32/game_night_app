@@ -12,7 +12,7 @@ REDIRECT_ROUTES = [
 
 # Routes that require admin
 ADMIN_ROUTES = [
-    "/admin/",
+    "/admin",  # admin_bp route is /admin (no trailing slash)
 ]
 
 # Auth routes — auth_bp has no url_prefix, so routes are at root, not /auth/
@@ -48,10 +48,10 @@ def test_admin_routes_load_for_admin(admin_client, route):
 
 
 def test_view_game_loads(auth_client, seed_data):
-    response = auth_client.get(f"/games/{seed_data['game_id']}")
+    response = auth_client.get(f"/game/{seed_data['game_id']}")
     assert response.status_code == 200
 
 
 def test_view_game_night_loads(auth_client, seed_data):
-    response = auth_client.get(f"/game_nights/{seed_data['game_night_id']}")
+    response = auth_client.get(f"/game_night/{seed_data['game_night_id']}")
     assert response.status_code == 200
