@@ -26,18 +26,17 @@ def test_bgg_search_requires_login(client):
 
 
 @pytest.fixture()
-def bgg_game(app):
+def bgg_game(app, db):
     """A minimal Game row for BGG details tests."""
     from app.extensions import db as _db
     from app.models import Game
 
-    with app.app_context():
-        game = Game(name="Catan", bgg_id=13)
-        _db.session.add(game)
-        _db.session.commit()
-        yield game
-        _db.session.delete(game)
-        _db.session.commit()
+    game = Game(name="Catan", bgg_id=13)
+    _db.session.add(game)
+    _db.session.commit()
+    yield game
+    _db.session.delete(game)
+    _db.session.commit()
 
 
 def test_bgg_details_fragment_returns_html(auth_client, bgg_game):

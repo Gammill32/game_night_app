@@ -32,26 +32,19 @@ def app():
 
 @pytest.fixture(scope="session")
 def db(app):
-    """Create all tables for the test session, drop on teardown."""
-    from sqlalchemy import text
-
+    """Create all tables for the test session."""
     with app.app_context():
         _db.create_all()
         yield _db
         _db.session.remove()
         _db.engine.dispose()
-        with _db.engine.connect() as conn:
-            conn.execute(text("DROP SCHEMA public CASCADE"))
-            conn.execute(text("CREATE SCHEMA public"))
-            conn.commit()
 
 
 @pytest.fixture()
 def client(app, db):
-    """Flask test client with application context."""
+    """Flask test client — no nested app_context (session-scoped db already holds one)."""
     with app.test_client() as client:
-        with app.app_context():
-            yield client
+        yield client
 
 
 @pytest.fixture()
