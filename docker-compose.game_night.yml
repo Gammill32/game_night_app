@@ -9,8 +9,8 @@ services:
       - POSTGRES_USER
       - POSTGRES_PASSWORD
     volumes:
-      - /home/sgammill/projects/game_night_app/postgres_data:/var/lib/postgresql/data
-      - /home/sgammill/projects/game_night_app/init_db:/docker-entrypoint-initdb.d
+      - /home/sgammill/projects/game_night_db/postgres_data:/var/lib/postgresql/data
+      - /home/sgammill/projects/game_night_db/init_db:/docker-entrypoint-initdb.d
     restart: unless-stopped
     networks:
       - web_network
