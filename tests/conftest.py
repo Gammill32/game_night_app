@@ -23,9 +23,7 @@ def app():
 
     # Disable Flask-Session so Flask uses built-in cookie sessions (no file I/O).
     # Patch APScheduler to prevent background threads firing against a closed DB.
-    with unittest.mock.patch("app.start_schedulers"), unittest.mock.patch.object(
-        sess, "init_app"
-    ):
+    with unittest.mock.patch("app.start_schedulers"), unittest.mock.patch.object(sess, "init_app"):
         application = create_app(TestConfig)
 
     # Do NOT set SERVER_NAME — it breaks url_for() resolution in tests.
