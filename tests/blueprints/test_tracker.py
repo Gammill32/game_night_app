@@ -182,7 +182,7 @@ def test_track_button_visible_on_active_game_night(auth_tracker_client):
     assert b"Track" in resp.data
 
 
-def test_track_button_not_visible_on_finalized_game_night(app, db, auth_tracker_client):
+def test_track_button_not_visible_on_finalized_game_night(auth_tracker_client):
     from app.models import GameNight
     from app.extensions import db as _db
     c = auth_tracker_client["client"]
@@ -190,10 +190,11 @@ def test_track_button_not_visible_on_finalized_game_night(app, db, auth_tracker_
     gn = GameNight.query.get(gn_id)
     gn.final = True
     _db.session.commit()
-    resp = c.get(f"/game_night/{gn_id}")
-    assert resp.status_code == 200
-    assert b"/tracker/new" not in resp.data
-    # Reset
-    gn = GameNight.query.get(gn_id)
-    gn.final = False
-    _db.session.commit()
+    try:
+        resp = c.get(f"/game_night/{gn_id}")
+        assert resp.status_code == 200
+        assert b"/tracker/new" not in resp.data
+    finally:
+        gn = GameNight.query.get(gn_id)
+        gn.final = False
+        _db.session.commit()

@@ -3,7 +3,7 @@
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 
-from app.models import GameNightGame
+from app.models import GameNightGame, TrackerSession
 from app.services import admin_services, game_night_services
 from app.utils import admin_required, flash_if_no_action, game_night_access_required
 
@@ -37,7 +37,6 @@ def start_game_night():
 @game_night_access_required
 def view_game_night(game_night_id):
     """View the details of a specific game night."""
-    from app.models import TrackerSession
     context = game_night_services.get_view_game_night_details(game_night_id, current_user.id)
     game_night_games = context.get("game_night_games", [])
     tracker_sessions = {
