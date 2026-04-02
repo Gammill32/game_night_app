@@ -397,9 +397,9 @@ class TrackerField(db.Model):
     )
     type = db.Column(db.String, nullable=False)
     label = db.Column(db.String, nullable=False)
-    starting_value = db.Column(db.Integer, default=0)
-    is_score_field = db.Column(db.Boolean, default=False, nullable=False)
-    sort_order = db.Column(db.Integer, default=0)
+    starting_value = db.Column(db.Integer, server_default="0")
+    is_score_field = db.Column(db.Boolean, server_default="false", nullable=False)
+    sort_order = db.Column(db.Integer, server_default="0")
 
     session = relationship("TrackerSession", back_populates="fields")
     values = relationship("TrackerValue", back_populates="field", cascade="all, delete-orphan")

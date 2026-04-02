@@ -90,7 +90,9 @@ def upgrade():
 
 def downgrade():
     op.drop_table("tracker_team_players")
+    op.execute("ALTER TABLE tracker_values DROP CONSTRAINT IF EXISTS uq_tracker_value")
     op.drop_table("tracker_values")
     op.drop_table("tracker_teams")
+    op.execute("DROP INDEX IF EXISTS uq_one_score_field")
     op.drop_table("tracker_fields")
     op.drop_table("tracker_sessions")
