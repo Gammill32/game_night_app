@@ -1,8 +1,9 @@
 # Worktrees
 .worktrees/
 
-# Superpowers
+# Superpowers / Claude-specific docs
 .superpowers/
+docs/superpowers/
 
 # Serena MCP
 .serena/
