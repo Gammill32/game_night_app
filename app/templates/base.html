@@ -31,6 +31,9 @@
   <!-- Custom overrides -->
   <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}" />
 
+  <!-- CSRF token for JS-driven forms and HTMX -->
+  <meta name="csrf-token" content="{{ csrf_token() }}">
+
   {% block head %}{% endblock %}
 </head>
 <body class="h-full bg-stone-50 text-stone-800">
@@ -171,5 +174,26 @@
     {% endif %}
   </nav>
 
+<script>
+  (function () {
+    const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
+    // Inject CSRF hidden input into every HTML form on the page
+    document.addEventListener('DOMContentLoaded', function () {
+      document.querySelectorAll('form').forEach(function (form) {
+        if (!form.querySelector('input[name="csrf_token"]')) {
+          const input = document.createElement('input');
+          input.type = 'hidden';
+          input.name = 'csrf_token';
+          input.value = csrfToken;
+          form.appendChild(input);
+        }
+      });
+    });
+    // Inject CSRF header into every HTMX request
+    document.addEventListener('htmx:configRequest', function (evt) {
+      evt.detail.headers['X-CSRFToken'] = csrfToken;
+    });
+  })();
+</script>
 </body>
 </html>

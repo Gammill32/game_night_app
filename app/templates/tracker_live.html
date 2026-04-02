@@ -78,7 +78,8 @@
       Score: {{ player_fields | selectattr('is_score_field') | map(attribute='label') | first | default('—') }}
     </span>
     <div class="flex gap-3">
-      <form action="{{ url_for('tracker.discard_tracker', session_id=session.id) }}" method="POST">
+      <form action="{{ url_for('tracker.discard_tracker', session_id=session.id) }}" method="POST"
+            onsubmit="return confirm('Discard this tracker session? All tracked data will be permanently lost.')">
         <button class="text-stone-500 hover:text-stone-300 text-sm px-3 py-1.5">Discard</button>
       </form>
       <a href="{{ url_for('tracker.end_game', session_id=session.id) }}"

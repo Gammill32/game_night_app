@@ -9,6 +9,13 @@ from app.models import (  # noqa: F401 — partial imports used by later functio
     tracker_team_players,
 )
 
+GLOBAL_FIELD_TYPES = {"global_counter", "global_notes"}
+PER_PLAYER_FIELD_TYPES = {"counter", "checkbox", "player_notes"}
+VALID_FIELD_TYPES = GLOBAL_FIELD_TYPES | PER_PLAYER_FIELD_TYPES
+
+_DELTA_MAX = 100
+_NOTES_MAX_LEN = 500
+
 
 def get_or_create_configuring_session(game_night_game_id):
     """Return the existing configuring session or create a fresh one."""
@@ -35,12 +42,16 @@ def discard_session(session_id):
         db.session.commit()
 
 
-GLOBAL_FIELD_TYPES = {"global_counter", "global_notes"}
-PER_PLAYER_FIELD_TYPES = {"counter", "checkbox", "player_notes"}
-
-
 def add_field(session_id, *, type, label, starting_value=0, is_score_field=False):
     """Add a TrackerField to a configuring session. Does not seed values yet."""
+    session = TrackerSession.query.get(session_id)
+    if session is None or session.status != "configuring":
+        raise ValueError("Fields can only be added to a session in 'configuring' status")
+    if type not in VALID_FIELD_TYPES:
+        raise ValueError(f"Unknown field type: {type!r}. Must be one of: {sorted(VALID_FIELD_TYPES)}")
+    label = label.strip() if label else ""
+    if not label:
+        raise ValueError("Field label cannot be empty")
     existing_count = TrackerField.query.filter_by(tracker_session_id=session_id).count()
     field = TrackerField(
         tracker_session_id=session_id,
@@ -55,14 +66,36 @@ def add_field(session_id, *, type, label, starting_value=0, is_score_field=False
     return field
 
 
-def launch_session(session_id, *, mode, teams_data, player_ids):
+def launch_session(session_id, *, mode, teams_data, player_ids, field_order=None):
     """
     Activate a configuring session. Seeds all TrackerValue rows.
 
     teams_data: list of {"name": str, "player_ids": [int]} — only used when mode="teams"
     player_ids: list of Player.id — all players for the game night (individual mode)
+    field_order: list of TrackerField.id in desired sort order (optional)
     """
     session = TrackerSession.query.get_or_404(session_id)
+    if session.status != "configuring":
+        raise ValueError("Only sessions in 'configuring' status can be launched")
+
+    # Require at least one score field before launch
+    score_field = TrackerField.query.filter_by(
+        tracker_session_id=session_id, is_score_field=True
+    ).first()
+    if score_field is None:
+        raise ValueError("At least one field must be marked as the score field before launching")
+
+    # Apply drag-to-reorder sort_order if provided
+    if field_order:
+        for i, fid in enumerate(field_order):
+            TrackerField.query.filter_by(id=fid, tracker_session_id=session_id).update(
+                {"sort_order": i}
+            )
+
+    # Validate player IDs belong to this game night
+    gn_id = session.game_night_game.game_night_id
+    valid_player_ids = {p.id for p in Player.query.filter_by(game_night_id=gn_id).all()}
+
     session.mode = mode
     session.status = "active"
 
@@ -70,16 +103,19 @@ def launch_session(session_id, *, mode, teams_data, player_ids):
     entity_map = []  # list of ("player"|"team", id) pairs
     if mode == "teams":
         for td in teams_data:
+            if not td.get("name", "").strip():
+                continue
             team = TrackerTeam(tracker_session_id=session_id, name=td["name"])
             db.session.add(team)
             db.session.flush()
             for pid in td["player_ids"]:
-                db.session.execute(
-                    tracker_team_players.insert().values(team_id=team.id, player_id=pid)
-                )
+                if pid in valid_player_ids:
+                    db.session.execute(
+                        tracker_team_players.insert().values(team_id=team.id, player_id=pid)
+                    )
             entity_map.append(("team", team.id))
     else:
-        entity_map = [("player", pid) for pid in player_ids]
+        entity_map = [("player", pid) for pid in player_ids if pid in valid_player_ids]
 
     # Seed TrackerValue rows
     for field in TrackerField.query.filter_by(tracker_session_id=session_id).all():
@@ -102,26 +138,35 @@ def update_value(session_id, field_id, *, entity_type, entity_id=None, delta=Non
 
     entity_type: "player", "team", or "global"
     entity_id: Player.id or TrackerTeam.id (ignored for global)
-    delta: +1 or -1 for counter fields
+    delta: integer increment/decrement for counter fields (clamped to ±100)
     value: new string value for checkbox/notes fields
     """
-    field = TrackerField.query.get(field_id)
+    session = TrackerSession.query.get(session_id)
+    if session is None or session.status != "active":
+        raise ValueError("Values can only be updated for sessions in 'active' status")
+
+    # Validate field belongs to this session
+    field = TrackerField.query.filter_by(id=field_id, tracker_session_id=session_id).first()
     if field is None:
-        raise ValueError(f"TrackerField {field_id} not found")
+        raise ValueError(f"TrackerField {field_id} not found in session {session_id}")
 
     player_id = entity_id if entity_type == "player" else None
     team_id = entity_id if entity_type == "team" else None
 
     tv = TrackerValue.query.filter_by(
+        tracker_session_id=session_id,
         tracker_field_id=field_id,
         player_id=player_id,
         team_id=team_id,
     ).first()
     if tv is None:
-        raise ValueError(f"TrackerValue not found for field {field_id}, entity_type={entity_type}, entity_id={entity_id}")
+        raise ValueError(
+            f"TrackerValue not found for field {field_id}, entity_type={entity_type}, entity_id={entity_id}"
+        )
 
     if delta is not None:
-        # Counter update
+        # Clamp delta to prevent abuse
+        delta = max(-_DELTA_MAX, min(_DELTA_MAX, delta))
         current = int(tv.value)
         tv.value = str(current + delta)
     elif value is not None:
@@ -130,10 +175,19 @@ def update_value(session_id, field_id, *, entity_type, entity_id=None, delta=Non
             try:
                 int(value)
             except ValueError:
-                raise ValueError(f"Counter field '{field.label}' requires an integer value, got: {value!r}")
+                raise ValueError(
+                    f"Counter field '{field.label}' requires an integer value, got: {value!r}"
+                )
         elif field.type == "checkbox":
             if value not in ("true", "false"):
-                raise ValueError(f"Checkbox field '{field.label}' requires 'true' or 'false', got: {value!r}")
+                raise ValueError(
+                    f"Checkbox field '{field.label}' requires 'true' or 'false', got: {value!r}"
+                )
+        elif field.type in ("player_notes", "global_notes"):
+            if len(value) > _NOTES_MAX_LEN:
+                raise ValueError(
+                    f"Note value exceeds maximum length of {_NOTES_MAX_LEN} characters"
+                )
         tv.value = value
 
     db.session.commit()
@@ -180,15 +234,26 @@ def save_results(session_id, rankings):
     session = TrackerSession.query.get(session_id)
     if session is None:
         raise ValueError(f"TrackerSession {session_id} not found")
+    if session.status != "active":
+        raise ValueError("Results can only be saved for sessions in 'active' status")
 
     gng_id = session.game_night_game_id
 
+    # Build valid participant sets from seeded TrackerValues
+    seeded = TrackerValue.query.filter_by(tracker_session_id=session_id).all()
+    valid_player_ids = {tv.player_id for tv in seeded if tv.player_id is not None}
+    valid_team_ids = {tv.team_id for tv in seeded if tv.team_id is not None}
+
     for entry in rankings:
-        if entry["player_id"] is not None:
-            # Individual mode
+        if entry.get("player_id") is not None:
+            if entry["player_id"] not in valid_player_ids:
+                raise ValueError(
+                    f"Player {entry['player_id']} is not a participant in this session"
+                )
             _upsert_result(gng_id, entry["player_id"], entry["position"], entry["score"])
-        elif entry["team_id"] is not None:
-            # Team mode — award same position/score to every team member
+        elif entry.get("team_id") is not None:
+            if entry["team_id"] not in valid_team_ids:
+                raise ValueError(f"Team {entry['team_id']} is not in this session")
             team = TrackerTeam.query.get(entry["team_id"])
             for player in team.players:
                 _upsert_result(gng_id, player.id, entry["position"], entry["score"])

@@ -3,12 +3,13 @@ import logging
 from flask import Flask
 
 from app.config import Config
-from app.extensions import bcrypt, db, login_manager, mail, migrate, sess
+from app.extensions import bcrypt, csrf, db, login_manager, mail, migrate, sess
 
 
 def init_extensions(app):
     """Initialize Flask extensions."""
     sess.init_app(app)
+    csrf.init_app(app)
     db.init_app(app)
     bcrypt.init_app(app)
     mail.init_app(app)

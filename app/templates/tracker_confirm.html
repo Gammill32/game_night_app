@@ -35,8 +35,13 @@
           {% for entry in rankings %}
           <tr class="border-t border-stone-100 {% if loop.index is odd %}bg-white{% else %}bg-stone-50{% endif %}">
             <td class="px-4 py-3">
-              <select name="position_{{ entry.player_id or entry.team_id }}"
+              {% if entry.player_id is not none %}
+              <select name="position_p_{{ entry.player_id }}"
                       class="border border-stone-300 rounded px-2 py-1 text-sm font-semibold">
+              {% else %}
+              <select name="position_t_{{ entry.team_id }}"
+                      class="border border-stone-300 rounded px-2 py-1 text-sm font-semibold">
+              {% endif %}
                 {% for i in range(1, rankings | length + 1) %}
                 <option value="{{ i }}" {% if i == entry.position %}selected{% endif %}>
                   {{ i }}{{ 'st' if i == 1 else ('nd' if i == 2 else ('rd' if i == 3 else 'th')) }}
@@ -51,7 +56,11 @@
               {% elif entry.team %}
                 {{ entry.team.name }}
               {% endif %}
-              <input type="hidden" name="score_{{ entry.player_id or entry.team_id }}" value="{{ entry.score }}">
+              {% if entry.player_id is not none %}
+              <input type="hidden" name="score_p_{{ entry.player_id }}" value="{{ entry.score }}">
+              {% else %}
+              <input type="hidden" name="score_t_{{ entry.team_id }}" value="{{ entry.score }}">
+              {% endif %}
             </td>
             <td class="px-4 py-3 text-center font-bold text-stone-800">{{ entry.score }}</td>
           </tr>

@@ -22,7 +22,7 @@
            hx-post="{{ url_for('tracker.update_value', session_id=session.id) }}"
            hx-target="#cell-{{ field.id }}-{{ entity_type }}-{{ entity_id or 'global' }}"
            hx-swap="outerHTML"
-           hx-vals='js:{"field_id": "{{ field.id }}", "entity_type": "{{ entity_type }}", "entity_id": "{{ entity_id or '' }}", "value": this.checked ? "false" : "true"}'>
+           hx-vals='js:{"field_id": "{{ field.id }}", "entity_type": "{{ entity_type }}", "entity_id": "{{ entity_id or '' }}", "value": this.checked ? "true" : "false"}'>
   {% else %}
     {# player_notes or global_notes #}
     <input type="text" value="{{ tv.value }}"

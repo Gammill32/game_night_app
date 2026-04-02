@@ -61,7 +61,7 @@
           <input id="new-field-label" type="text" placeholder="e.g. Victory Points"
                  class="w-full border border-stone-300 rounded px-3 py-1.5 text-sm">
         </div>
-        <div>
+        <div id="starting-value-div">
           <label class="text-xs font-medium text-stone-600 block mb-1">Starting Value</label>
           <input id="new-field-start" type="number" value="0"
                  class="w-full border border-stone-300 rounded px-3 py-1.5 text-sm">
@@ -134,6 +134,17 @@
       document.getElementById('launch-mode').value = r.value;
     });
   });
+  // Hide/show Starting Value based on field type
+  (function () {
+    const typeSelect = document.getElementById('new-field-type');
+    const startDiv = document.getElementById('starting-value-div');
+    function syncStartVisibility() {
+      const counterTypes = ['counter', 'global_counter'];
+      startDiv.style.display = counterTypes.includes(typeSelect.value) ? '' : 'none';
+    }
+    typeSelect.addEventListener('change', syncStartVisibility);
+    syncStartVisibility();
+  })();
   // SortableJS for field reordering
   new Sortable(document.getElementById('fields-list'), {
     animation: 150,

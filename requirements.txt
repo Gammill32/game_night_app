@@ -14,3 +14,4 @@ gunicorn==21.2.0
 Flask-Migrate==4.0.7
 cachetools==5.3.3
 defusedxml==0.7.1
+Flask-WTF==1.2.1
