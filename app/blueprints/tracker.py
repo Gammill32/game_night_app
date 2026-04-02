@@ -3,8 +3,7 @@
 from flask import Blueprint, abort, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 
-from app.extensions import db
-from app.models import GameNight, GameNightGame, Player, TrackerField, TrackerSession, TrackerValue
+from app.models import GameNightGame, Player, TrackerField, TrackerSession, TrackerValue  # noqa: F401
 from app.services import tracker_services
 
 tracker_bp = Blueprint("tracker", __name__)

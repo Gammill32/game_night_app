@@ -4,7 +4,7 @@ import uuid
 import pytest
 
 from app.extensions import db as _db
-from app.models import Game, GameNight, GameNightGame, Person, Player, TrackerSession, TrackerField
+from app.models import Game, GameNight, GameNightGame, Person, Player, TrackerSession, TrackerField  # noqa: F401
 
 
 @pytest.fixture()
