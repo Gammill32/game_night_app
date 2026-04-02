@@ -188,6 +188,10 @@ def toggle_game_night_field(game_night_id, field):
     db.session.commit()
 
     if field == "final" and getattr(game_night, field) is True:
+        # Auto-close linked availability poll
+        if game_night.availability_poll and not game_night.availability_poll.closed:
+            game_night.availability_poll.closed = True
+            db.session.commit()
         try:
             from app.services.badge_services import evaluate_badges_for_night
 
@@ -350,6 +354,7 @@ def get_view_game_night_details(game_night_id, current_user_id):
         "wishlist_game_ids": wishlist_game_ids,
         "owned_game_ids": owned_game_ids,
         "user_ratings_by_game_id": user_ratings_by_game_id,
+        "availability_poll": game_night.availability_poll,
     }
 
 

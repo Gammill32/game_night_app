@@ -208,6 +208,35 @@
   </div>
   {% endif %}
 
+  <!-- Availability Poll -->
+  {% if current_user.admin or current_user.owner %}
+  <div class="bg-white rounded-xl border border-stone-200 shadow-sm p-5">
+    <h2 class="text-lg font-semibold text-stone-800 mb-3">Availability Poll</h2>
+    {% if availability_poll %}
+      <div class="mb-3 space-y-1">
+        {% for option in availability_poll.options %}
+          {% set count = availability_poll.responses | selectattr("option_id", "equalto", option.id) | list | length %}
+          <div class="flex items-center gap-2 text-sm text-stone-700">
+            <span class="font-medium w-28">{{ option.label }}</span>
+            <span class="px-2 py-0.5 rounded-full bg-stone-100 text-stone-600 text-xs font-medium">{{ count }}</span>
+          </div>
+        {% endfor %}
+      </div>
+      <a href="{{ url_for('polls.poll_respond', token=availability_poll.token) }}"
+         class="inline-flex items-center rounded-lg border border-stone-300 px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50 transition-colors">
+        View Poll
+      </a>
+    {% else %}
+      <form action="{{ url_for('game_night.create_availability_poll', game_night_id=game_night.id) }}" method="POST">
+        <button type="submit"
+                class="inline-flex items-center rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 transition-colors">
+          Create Availability Poll
+        </button>
+      </form>
+    {% endif %}
+  </div>
+  {% endif %}
+
   <!-- Admin Controls -->
   {% if current_user.admin or current_user.owner %}
   <div class="bg-white rounded-xl border border-stone-200 shadow-sm p-5">

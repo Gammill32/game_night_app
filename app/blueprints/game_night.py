@@ -192,6 +192,17 @@ def delete_game_night(game_night_id):
     return redirect(url_for("main.index"))
 
 
+@game_night_bp.route("/game_night/<int:game_night_id>/create_availability_poll", methods=["POST"])
+@login_required
+@admin_required
+def create_availability_poll(game_night_id):
+    from app.services.poll_services import create_availability_poll as _create_poll
+
+    _create_poll(game_night_id, current_user.id)
+    flash("Availability poll created.", "success")
+    return redirect(url_for("game_night.view_game_night", game_night_id=game_night_id))
+
+
 @game_night_bp.route("/game_night/<int:game_night_id>/recap")
 def recap_game_night(game_night_id):
     """Public read-only recap of a completed game night."""

@@ -24,6 +24,7 @@ class GameNight(db.Model):
         "GameNominations", back_populates="game_night", cascade="all, delete-orphan"
     )
     votes = db.relationship("GameVotes", back_populates="game_night", cascade="all, delete-orphan")
+    availability_poll = db.relationship("Poll", back_populates="game_night", uselist=False)
 
 
 class Person(db.Model, UserMixin):
@@ -310,8 +311,10 @@ class Poll(db.Model):
     closed = db.Column(db.Boolean, default=False, nullable=False)
     token = db.Column(db.Text, unique=True, nullable=False)
     multi_select = db.Column(db.Boolean, default=False, nullable=False)
+    game_night_id = db.Column(db.Integer, db.ForeignKey("gamenights.id"), nullable=True)
 
     creator = db.relationship("Person", foreign_keys=[created_by])
+    game_night = db.relationship("GameNight", back_populates="availability_poll")
     options = db.relationship(
         "PollOption",
         back_populates="poll",

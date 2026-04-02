@@ -47,6 +47,24 @@ def create_poll(
     return poll
 
 
+def create_availability_poll(game_night_id: int, user_id: int) -> Poll:
+    """Create a standard Can/Maybe/Can't poll linked to a game night."""
+    from app.models import GameNight
+
+    gn = GameNight.query.get_or_404(game_night_id)
+    date_str = gn.date.strftime("%B %-d, %Y")
+    poll = create_poll(
+        title=f"Availability — Game Night {date_str}",
+        description=None,
+        option_labels=["Can Make It", "Maybe", "Can't Make It"],
+        created_by_id=user_id,
+        multi_select=False,
+    )
+    poll.game_night_id = game_night_id
+    db.session.commit()
+    return poll
+
+
 def get_poll_by_token(token: str) -> Poll | None:
     """Fetch a poll by its shareable token."""
     return Poll.query.filter_by(token=token).first()
