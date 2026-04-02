@@ -4,7 +4,15 @@ import uuid
 import pytest
 
 from app.extensions import db as _db
-from app.models import Game, GameNight, GameNightGame, Person, Player, TrackerSession, TrackerField  # noqa: F401
+from app.models import (  # noqa: F401
+    Game,
+    GameNight,
+    GameNightGame,
+    Person,
+    Player,
+    TrackerField,
+    TrackerSession,
+)
 
 
 @pytest.fixture()
@@ -76,7 +84,11 @@ def test_setup_get_unauthenticated_redirects(client, db, seed_data):
 
 
 def test_live_tracker_loads(app, db, auth_tracker_client):
-    from app.services.tracker_services import get_or_create_configuring_session, add_field, launch_session
+    from app.services.tracker_services import (
+        add_field,
+        get_or_create_configuring_session,
+        launch_session,
+    )
     c = auth_tracker_client["client"]
     gng_id = auth_tracker_client["gng_id"]
     session = get_or_create_configuring_session(gng_id)
@@ -102,8 +114,12 @@ def test_add_field_htmx_returns_fragment(app, db, auth_tracker_client):
 
 
 def test_value_update_htmx_returns_cell(app, db, auth_tracker_client):
-    from app.services.tracker_services import get_or_create_configuring_session, add_field, launch_session
     from app.models import TrackerValue
+    from app.services.tracker_services import (
+        add_field,
+        get_or_create_configuring_session,
+        launch_session,
+    )
     c = auth_tracker_client["client"]
     gng_id = auth_tracker_client["gng_id"]
     session = get_or_create_configuring_session(gng_id)
@@ -122,7 +138,12 @@ def test_value_update_htmx_returns_cell(app, db, auth_tracker_client):
 
 
 def test_end_game_get_returns_rankings(app, db, auth_tracker_client):
-    from app.services.tracker_services import get_or_create_configuring_session, add_field, launch_session, update_value
+    from app.services.tracker_services import (
+        add_field,
+        get_or_create_configuring_session,
+        launch_session,
+        update_value,
+    )
     c = auth_tracker_client["client"]
     gng_id = auth_tracker_client["gng_id"]
     session = get_or_create_configuring_session(gng_id)
@@ -139,10 +160,13 @@ def test_end_game_get_returns_rankings(app, db, auth_tracker_client):
 
 
 def test_save_results_marks_completed(app, db, auth_tracker_client):
-    from app.services.tracker_services import (
-        get_or_create_configuring_session, add_field, launch_session, update_value
-    )
     from app.models import Result
+    from app.services.tracker_services import (
+        add_field,
+        get_or_create_configuring_session,
+        launch_session,
+        update_value,
+    )
     c = auth_tracker_client["client"]
     gng_id = auth_tracker_client["gng_id"]
     session = get_or_create_configuring_session(gng_id)
@@ -183,8 +207,8 @@ def test_track_button_visible_on_active_game_night(auth_tracker_client):
 
 
 def test_track_button_not_visible_on_finalized_game_night(auth_tracker_client):
-    from app.models import GameNight
     from app.extensions import db as _db
+    from app.models import GameNight
     c = auth_tracker_client["client"]
     gn_id = auth_tracker_client["gn_id"]
     gn = GameNight.query.get(gn_id)
