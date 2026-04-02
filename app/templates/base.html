@@ -30,6 +30,8 @@
 
   <!-- Custom overrides -->
   <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}" />
+
+  {% block head %}{% endblock %}
 </head>
 <body class="h-full bg-stone-50 text-stone-800">
 
