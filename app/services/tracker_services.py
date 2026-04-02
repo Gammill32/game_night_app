@@ -96,6 +96,50 @@ def launch_session(session_id, *, mode, teams_data, player_ids):
     return session
 
 
+def update_value(session_id, field_id, *, entity_type, entity_id=None, delta=None, value=None):
+    """
+    Update a single TrackerValue.
+
+    entity_type: "player", "team", or "global"
+    entity_id: Player.id or TrackerTeam.id (ignored for global)
+    delta: +1 or -1 for counter fields
+    value: new string value for checkbox/notes fields
+    """
+    field = TrackerField.query.get(field_id)
+    if field is None:
+        raise ValueError(f"TrackerField {field_id} not found")
+
+    player_id = entity_id if entity_type == "player" else None
+    team_id = entity_id if entity_type == "team" else None
+
+    tv = TrackerValue.query.filter_by(
+        tracker_field_id=field_id,
+        player_id=player_id,
+        team_id=team_id,
+    ).first()
+    if tv is None:
+        raise ValueError(f"TrackerValue not found for field {field_id}, entity_type={entity_type}, entity_id={entity_id}")
+
+    if delta is not None:
+        # Counter update
+        current = int(tv.value)
+        tv.value = str(current + delta)
+    elif value is not None:
+        # Validate type
+        if field.type in ("counter", "global_counter"):
+            try:
+                int(value)
+            except ValueError:
+                raise ValueError(f"Counter field '{field.label}' requires an integer value, got: {value!r}")
+        elif field.type == "checkbox":
+            if value not in ("true", "false"):
+                raise ValueError(f"Checkbox field '{field.label}' requires 'true' or 'false', got: {value!r}")
+        tv.value = value
+
+    db.session.commit()
+    return tv
+
+
 def _seed_value(session_id, field, *, player_id, team_id):
     initial = str(field.starting_value) if field.type in ("counter", "global_counter") else (
         "false" if field.type == "checkbox" else ""

@@ -50,6 +50,55 @@ def tracker_night(app, db):
     _db.session.commit()
 
 
+@pytest.fixture()
+def active_session(app, db, tracker_night):
+    """A launched tracker session with VP counter (score) and a checkbox."""
+    from app.services.tracker_services import get_or_create_configuring_session, add_field, launch_session
+    session = get_or_create_configuring_session(tracker_night["gng_id"])
+    add_field(session.id, type="counter", label="VP", starting_value=0, is_score_field=True)
+    add_field(session.id, type="checkbox", label="Crown", starting_value=0, is_score_field=False)
+    launch_session(session.id, mode="individual", teams_data=[],
+                   player_ids=[tracker_night["pl1_id"], tracker_night["pl2_id"]])
+    yield {"session_id": session.id, "pl1_id": tracker_night["pl1_id"],
+           "pl2_id": tracker_night["pl2_id"], "gng_id": tracker_night["gng_id"]}
+
+
+def test_update_value_increments_counter(app, db, active_session):
+    from app.services.tracker_services import update_value
+    sid = active_session["session_id"]
+    field = TrackerField.query.filter_by(tracker_session_id=sid, label="VP").first()
+    update_value(sid, field.id, entity_type="player", entity_id=active_session["pl1_id"], delta=1)
+    update_value(sid, field.id, entity_type="player", entity_id=active_session["pl1_id"], delta=1)
+    val = TrackerValue.query.filter_by(tracker_field_id=field.id, player_id=active_session["pl1_id"]).first()
+    assert val.value == "2"
+
+
+def test_update_value_can_go_negative(app, db, active_session):
+    from app.services.tracker_services import update_value
+    sid = active_session["session_id"]
+    field = TrackerField.query.filter_by(tracker_session_id=sid, label="VP").first()
+    update_value(sid, field.id, entity_type="player", entity_id=active_session["pl1_id"], delta=-1)
+    val = TrackerValue.query.filter_by(tracker_field_id=field.id, player_id=active_session["pl1_id"]).first()
+    assert val.value == "-1"
+
+
+def test_update_value_sets_checkbox(app, db, active_session):
+    from app.services.tracker_services import update_value
+    sid = active_session["session_id"]
+    field = TrackerField.query.filter_by(tracker_session_id=sid, label="Crown").first()
+    update_value(sid, field.id, entity_type="player", entity_id=active_session["pl1_id"], value="true")
+    val = TrackerValue.query.filter_by(tracker_field_id=field.id, player_id=active_session["pl1_id"]).first()
+    assert val.value == "true"
+
+
+def test_update_value_rejects_invalid_counter_value(app, db, active_session):
+    from app.services.tracker_services import update_value
+    sid = active_session["session_id"]
+    field = TrackerField.query.filter_by(tracker_session_id=sid, label="VP").first()
+    with pytest.raises(ValueError):
+        update_value(sid, field.id, entity_type="player", entity_id=active_session["pl1_id"], value="banana")
+
+
 def test_get_or_create_configuring_session_creates_new(app, db, tracker_night):
     from app.services.tracker_services import get_or_create_configuring_session
     session = get_or_create_configuring_session(tracker_night["gng_id"])
