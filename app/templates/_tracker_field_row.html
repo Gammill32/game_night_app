@@ -1,1 +1,13 @@
-<li data-field-id="{{ field.id }}">{{ field.label }}</li>
+{# Partial: one row in the setup fields list. Returned by POST /tracker/<id>/field #}
+<li data-field-id="{{ field.id }}"
+    class="flex items-center gap-3 bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 cursor-move">
+  <span class="text-stone-400 select-none">⠿</span>
+  <span class="text-sm font-medium text-stone-700 flex-1">{{ field.label }}</span>
+  <span class="text-xs px-2 py-0.5 rounded-full bg-stone-200 text-stone-600">{{ field.type.replace('_', ' ') }}</span>
+  {% if field.type in ('counter', 'global_counter') %}
+    <span class="text-xs text-stone-500">starts at {{ field.starting_value }}</span>
+  {% endif %}
+  {% if field.is_score_field %}
+    <span class="text-xs text-yellow-600 font-semibold">★ score</span>
+  {% endif %}
+</li>

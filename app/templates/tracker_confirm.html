@@ -1,14 +1,75 @@
 {% extends "base.html" %}
-{% block title %}Confirm Results{% endblock %}
+
+{% block title %}Confirm Results — {{ session.game_night_game.game.name }}{% endblock %}
+
 {% block content %}
-{% for entry in rankings %}
-{% if entry.player %}
-<span>{{ entry.player.person.first_name }}</span>
-{% endif %}
-{% for field in session.fields %}
-{% if field.is_score_field %}
-<span>{{ field.label }}</span>
-{% endif %}
-{% endfor %}
-{% endfor %}
+<div class="max-w-2xl mx-auto space-y-6">
+  <div>
+    <a href="{{ url_for('tracker.live_tracker', session_id=session.id) }}"
+       class="text-sm text-stone-500 hover:text-red-600 inline-block mb-3">&larr; Back to Tracker</a>
+    <h1 class="text-2xl font-bold text-stone-800">Confirm Results</h1>
+    <p class="text-stone-500 text-sm mt-1">{{ session.game_night_game.game.name }} &mdash; auto-ranked by
+      <strong>{{ session.fields | selectattr('is_score_field') | map(attribute='label') | first }}</strong>
+    </p>
+  </div>
+
+  {% if has_existing_results %}
+  <div class="bg-yellow-50 border border-yellow-200 rounded-lg px-4 py-3 text-sm text-yellow-800">
+    &#9888; Results already exist for this game. Saving will overwrite them.
+  </div>
+  {% endif %}
+
+  <form action="{{ url_for('tracker.save_results', session_id=session.id) }}" method="POST">
+    <div class="bg-white rounded-xl shadow-sm border border-stone-200 overflow-hidden">
+      <table class="w-full border-collapse">
+        <thead class="bg-stone-50">
+          <tr>
+            <th class="text-left px-4 py-3 text-stone-500 text-xs uppercase tracking-wide w-24">Position</th>
+            <th class="text-left px-4 py-3 text-stone-500 text-xs uppercase tracking-wide">Player</th>
+            <th class="text-center px-4 py-3 text-yellow-600 text-xs uppercase tracking-wide">
+              {{ session.fields | selectattr('is_score_field') | map(attribute='label') | first }} ★
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for entry in rankings %}
+          <tr class="border-t border-stone-100 {% if loop.index is odd %}bg-white{% else %}bg-stone-50{% endif %}">
+            <td class="px-4 py-3">
+              <select name="position_{{ entry.player_id or entry.team_id }}"
+                      class="border border-stone-300 rounded px-2 py-1 text-sm font-semibold">
+                {% for i in range(1, rankings | length + 1) %}
+                <option value="{{ i }}" {% if i == entry.position %}selected{% endif %}>
+                  {{ i }}{{ 'st' if i == 1 else ('nd' if i == 2 else ('rd' if i == 3 else 'th')) }}
+                </option>
+                {% endfor %}
+              </select>
+            </td>
+            <td class="px-4 py-3 font-medium text-stone-800 text-sm">
+              {% if entry.position == 1 %}&#127942; {% endif %}
+              {% if entry.player %}
+                {{ entry.player.person.first_name }} {{ entry.player.person.last_name }}
+              {% elif entry.team %}
+                {{ entry.team.name }}
+              {% endif %}
+              <input type="hidden" name="score_{{ entry.player_id or entry.team_id }}" value="{{ entry.score }}">
+            </td>
+            <td class="px-4 py-3 text-center font-bold text-stone-800">{{ entry.score }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="flex justify-between mt-4">
+      <button type="submit"
+              class="bg-green-600 text-white font-semibold px-6 py-2 rounded-lg hover:bg-green-700">
+        Save Results &rarr;
+      </button>
+    </div>
+  </form>
+
+  <form action="{{ url_for('tracker.discard_tracker', session_id=session.id) }}" method="POST" class="inline">
+    <button type="submit" class="text-stone-500 hover:text-stone-700 text-sm px-4 py-2">Discard</button>
+  </form>
+</div>
 {% endblock %}
