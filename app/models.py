@@ -127,6 +127,7 @@ class GameNightGame(db.Model):
     game_night = relationship("GameNight", back_populates="game_night_games")
     game = relationship("Game", back_populates="game_night_games")
     results = relationship("Result", back_populates="game_night_game", cascade="all, delete-orphan")
+    tracker_session = relationship("TrackerSession", back_populates="game_night_game", uselist=False, cascade="all, delete-orphan")
 
 
 class Result(db.Model):
@@ -357,3 +358,82 @@ class PersonBadge(db.Model):
     person = relationship("Person", back_populates="person_badges")
     badge = relationship("Badge", back_populates="person_badges")
     game_night = relationship("GameNight")
+
+
+# ---------------------------------------------------------------------------
+# Live Tracker
+# ---------------------------------------------------------------------------
+
+tracker_team_players = db.Table(
+    "tracker_team_players",
+    db.Column("team_id", db.Integer, db.ForeignKey("tracker_teams.id", ondelete="CASCADE"), primary_key=True),
+    db.Column("player_id", db.Integer, db.ForeignKey("players.id"), primary_key=True),
+)
+
+
+class TrackerSession(db.Model):
+    __tablename__ = "tracker_sessions"
+
+    id = db.Column(db.Integer, primary_key=True)
+    game_night_game_id = db.Column(
+        db.Integer, db.ForeignKey("gamenightgames.id", ondelete="CASCADE"), unique=True, nullable=False
+    )
+    mode = db.Column(db.String, nullable=False)   # "individual" or "teams"
+    status = db.Column(db.String, nullable=False)  # "configuring", "active", "completed"
+    created_at = db.Column(db.DateTime, server_default=func.now())
+
+    game_night_game = relationship("GameNightGame", back_populates="tracker_session")
+    fields = relationship("TrackerField", back_populates="session", cascade="all, delete-orphan", order_by="TrackerField.sort_order")
+    teams = relationship("TrackerTeam", back_populates="session", cascade="all, delete-orphan")
+    values = relationship("TrackerValue", back_populates="session", cascade="all, delete-orphan")
+
+
+class TrackerField(db.Model):
+    __tablename__ = "tracker_fields"
+
+    id = db.Column(db.Integer, primary_key=True)
+    tracker_session_id = db.Column(
+        db.Integer, db.ForeignKey("tracker_sessions.id", ondelete="CASCADE"), nullable=False
+    )
+    type = db.Column(db.String, nullable=False)
+    label = db.Column(db.String, nullable=False)
+    starting_value = db.Column(db.Integer, default=0)
+    is_score_field = db.Column(db.Boolean, default=False, nullable=False)
+    sort_order = db.Column(db.Integer, default=0)
+
+    session = relationship("TrackerSession", back_populates="fields")
+    values = relationship("TrackerValue", back_populates="field", cascade="all, delete-orphan")
+
+
+class TrackerTeam(db.Model):
+    __tablename__ = "tracker_teams"
+
+    id = db.Column(db.Integer, primary_key=True)
+    tracker_session_id = db.Column(
+        db.Integer, db.ForeignKey("tracker_sessions.id", ondelete="CASCADE"), nullable=False
+    )
+    name = db.Column(db.String, nullable=False)
+
+    session = relationship("TrackerSession", back_populates="teams")
+    players = relationship("Player", secondary=tracker_team_players)
+    values = relationship("TrackerValue", back_populates="team", cascade="all, delete-orphan")
+
+
+class TrackerValue(db.Model):
+    __tablename__ = "tracker_values"
+
+    id = db.Column(db.Integer, primary_key=True)
+    tracker_session_id = db.Column(
+        db.Integer, db.ForeignKey("tracker_sessions.id", ondelete="CASCADE"), nullable=False
+    )
+    tracker_field_id = db.Column(
+        db.Integer, db.ForeignKey("tracker_fields.id", ondelete="CASCADE"), nullable=False
+    )
+    player_id = db.Column(db.Integer, db.ForeignKey("players.id"), nullable=True)
+    team_id = db.Column(db.Integer, db.ForeignKey("tracker_teams.id", ondelete="CASCADE"), nullable=True)
+    value = db.Column(db.Text, nullable=False, default="0")
+
+    session = relationship("TrackerSession", back_populates="values")
+    field = relationship("TrackerField", back_populates="values")
+    player = relationship("Player")
+    team = relationship("TrackerTeam", back_populates="values")
