@@ -120,10 +120,10 @@
               class="bg-red-600 text-white font-semibold px-6 py-2 rounded-lg hover:bg-red-700">
         Launch Tracker &rarr;
       </button>
-      <form action="{{ url_for('tracker.discard_tracker', session_id=session.id) }}" method="POST" class="inline">
-        <button type="submit" class="text-stone-500 hover:text-stone-700 px-4 py-2 text-sm">Discard</button>
-      </form>
     </div>
+  </form>
+  <form action="{{ url_for('tracker.discard_tracker', session_id=session.id) }}" method="POST" class="inline">
+    <button type="submit" class="text-stone-500 hover:text-stone-700 px-4 py-2 text-sm">Discard</button>
   </form>
 </div>
 
