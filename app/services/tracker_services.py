@@ -140,6 +140,74 @@ def update_value(session_id, field_id, *, entity_type, entity_id=None, delta=Non
     return tv
 
 
+def compute_rankings(session_id):
+    """
+    Return a list of dicts sorted descending by score field value.
+    Each dict: {"player_id", "team_id", "player", "team", "position", "score"}
+    Ties share a position with a gap (two 1sts → next is 3rd).
+    """
+    score_field = TrackerField.query.filter_by(
+        tracker_session_id=session_id, is_score_field=True
+    ).first()
+    if score_field is None:
+        raise ValueError(f"No score field found for session {session_id}")
+
+    values = TrackerValue.query.filter_by(tracker_field_id=score_field.id).all()
+    sorted_vals = sorted(values, key=lambda v: int(v.value), reverse=True)
+
+    rankings = []
+    pos = 1
+    for i, v in enumerate(sorted_vals):
+        if i > 0 and int(v.value) < int(sorted_vals[i - 1].value):
+            pos = i + 1
+        rankings.append({
+            "player_id": v.player_id,
+            "team_id": v.team_id,
+            "player": v.player,
+            "team": v.team,
+            "position": pos,
+            "score": int(v.value),
+        })
+    return rankings
+
+
+def save_results(session_id, rankings):
+    """
+    Write Result rows using fetch-or-create upsert. Mirrors log_results pattern.
+    In team mode, all team members get the team's position and score.
+    Marks session status = "completed".
+    """
+    session = TrackerSession.query.get(session_id)
+    if session is None:
+        raise ValueError(f"TrackerSession {session_id} not found")
+
+    gng_id = session.game_night_game_id
+
+    for entry in rankings:
+        if entry["player_id"] is not None:
+            # Individual mode
+            _upsert_result(gng_id, entry["player_id"], entry["position"], entry["score"])
+        elif entry["team_id"] is not None:
+            # Team mode — award same position/score to every team member
+            team = TrackerTeam.query.get(entry["team_id"])
+            for player in team.players:
+                _upsert_result(gng_id, player.id, entry["position"], entry["score"])
+
+    session.status = "completed"
+    db.session.commit()
+
+
+def _upsert_result(game_night_game_id, player_id, position, score):
+    result = Result.query.filter_by(
+        game_night_game_id=game_night_game_id, player_id=player_id
+    ).first()
+    if not result:
+        result = Result(game_night_game_id=game_night_game_id, player_id=player_id)
+        db.session.add(result)
+    result.position = position
+    result.score = score
+
+
 def _seed_value(session_id, field, *, player_id, team_id):
     initial = str(field.starting_value) if field.type in ("counter", "global_counter") else (
         "false" if field.type == "checkbox" else ""

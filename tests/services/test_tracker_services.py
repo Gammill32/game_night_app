@@ -162,3 +162,70 @@ def test_launch_session_seeds_values_for_individual(app, db, tracker_night):
     assert round_val.value == "1"
     assert round_val.player_id is None
     assert round_val.team_id is None
+
+
+def test_compute_rankings_sorts_descending(app, db, active_session):
+    from app.services.tracker_services import update_value, compute_rankings
+    sid = active_session["session_id"]
+    field = TrackerField.query.filter_by(tracker_session_id=sid, label="VP").first()
+    update_value(sid, field.id, entity_type="player", entity_id=active_session["pl1_id"], delta=10)
+    update_value(sid, field.id, entity_type="player", entity_id=active_session["pl2_id"], delta=7)
+    rankings = compute_rankings(sid)
+    assert rankings[0]["player_id"] == active_session["pl1_id"]
+    assert rankings[0]["position"] == 1
+    assert rankings[0]["score"] == 10
+    assert rankings[1]["player_id"] == active_session["pl2_id"]
+    assert rankings[1]["position"] == 2
+    assert rankings[1]["score"] == 7
+
+
+def test_compute_rankings_ties_share_position(app, db, active_session):
+    from app.services.tracker_services import update_value, compute_rankings
+    sid = active_session["session_id"]
+    field = TrackerField.query.filter_by(tracker_session_id=sid, label="VP").first()
+    update_value(sid, field.id, entity_type="player", entity_id=active_session["pl1_id"], delta=5)
+    update_value(sid, field.id, entity_type="player", entity_id=active_session["pl2_id"], delta=5)
+    rankings = compute_rankings(sid)
+    assert rankings[0]["position"] == 1
+    assert rankings[1]["position"] == 1
+
+
+def test_save_results_creates_result_rows(app, db, active_session):
+    from app.services.tracker_services import update_value, compute_rankings, save_results
+    from app.models import Result
+    sid = active_session["session_id"]
+    field = TrackerField.query.filter_by(tracker_session_id=sid, label="VP").first()
+    gng_id = active_session["gng_id"]
+    update_value(sid, field.id, entity_type="player", entity_id=active_session["pl1_id"], delta=10)
+    update_value(sid, field.id, entity_type="player", entity_id=active_session["pl2_id"], delta=7)
+    rankings = compute_rankings(sid)
+    save_results(sid, rankings)
+    results = Result.query.filter_by(game_night_game_id=gng_id).all()
+    assert len(results) == 2
+    winner = next(r for r in results if r.player_id == active_session["pl1_id"])
+    assert winner.position == 1
+    assert winner.score == 10
+    session = TrackerSession.query.get(sid)
+    assert session.status == "completed"
+
+
+def test_save_results_upserts_existing_rows(app, db, active_session):
+    from app.services.tracker_services import update_value, compute_rankings, save_results
+    from app.models import Result
+    from app.extensions import db as _db
+    sid = active_session["session_id"]
+    field = TrackerField.query.filter_by(tracker_session_id=sid, label="VP").first()
+    gng_id = active_session["gng_id"]
+    update_value(sid, field.id, entity_type="player", entity_id=active_session["pl1_id"], delta=10)
+    rankings = compute_rankings(sid)
+    save_results(sid, rankings)
+    # Save again with different score — reset status first
+    session = TrackerSession.query.get(sid)
+    session.status = "active"
+    _db.session.commit()
+    update_value(sid, field.id, entity_type="player", entity_id=active_session["pl1_id"], delta=5)
+    rankings = compute_rankings(sid)
+    save_results(sid, rankings)
+    results = Result.query.filter_by(game_night_game_id=gng_id).all()
+    # No duplicate rows
+    assert len(results) == 2
