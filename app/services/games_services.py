@@ -13,6 +13,7 @@ from app.models import (
     Player,
     Result,
     Wishlist,
+    WishlistVote,
     db,
 )
 from app.services.bgg_service import BGGService
@@ -244,6 +245,67 @@ def get_game_details(game_id, user_id):
 def get_wishlist(user_id):
     """Displays the user's wishlist."""
     return Game.query.join(Wishlist).filter(Wishlist.person_id == user_id).order_by(Game.name).all()
+
+
+def get_group_wishlist(user_id):
+    """Returns all wishlisted/voted games with total want count, sorted descending."""
+    wishlist_counts = (
+        db.session.query(Wishlist.game_id, func.count(Wishlist.id).label("wl_count"))
+        .group_by(Wishlist.game_id)
+        .subquery()
+    )
+    vote_counts = (
+        db.session.query(WishlistVote.game_id, func.count(WishlistVote.id).label("vote_count"))
+        .group_by(WishlistVote.game_id)
+        .subquery()
+    )
+
+    rows = (
+        db.session.query(
+            Game,
+            func.coalesce(wishlist_counts.c.wl_count, 0).label("wl_count"),
+            func.coalesce(vote_counts.c.vote_count, 0).label("vote_count"),
+        )
+        .outerjoin(wishlist_counts, Game.id == wishlist_counts.c.game_id)
+        .outerjoin(vote_counts, Game.id == vote_counts.c.game_id)
+        .filter((wishlist_counts.c.wl_count > 0) | (vote_counts.c.vote_count > 0))
+        .order_by(
+            (
+                func.coalesce(wishlist_counts.c.wl_count, 0)
+                + func.coalesce(vote_counts.c.vote_count, 0)
+            ).desc()
+        )
+        .all()
+    )
+
+    user_wishlisted = {w.game_id for w in Wishlist.query.filter_by(person_id=user_id).all()}
+    user_voted = {v.game_id for v in WishlistVote.query.filter_by(person_id=user_id).all()}
+
+    return [
+        {
+            "game": game,
+            "total_want": wl_count + vote_count,
+            "user_wishlisted": game.id in user_wishlisted,
+            "user_voted": game.id in user_voted,
+        }
+        for game, wl_count, vote_count in rows
+    ]
+
+
+def toggle_wishlist_vote(user_id, game_id):
+    """Add or remove a wishlist vote. Blocked if the game is already on the user's wishlist."""
+    if Wishlist.query.filter_by(person_id=user_id, game_id=game_id).first():
+        return False, "This game is already on your wishlist."
+
+    existing = WishlistVote.query.filter_by(person_id=user_id, game_id=game_id).first()
+    if existing:
+        db.session.delete(existing)
+        db.session.commit()
+        return True, "Vote removed."
+
+    db.session.add(WishlistVote(person_id=user_id, game_id=game_id))
+    db.session.commit()
+    return True, "Vote added."
 
 
 def update_game_rating(game_id, user_id, ranking):

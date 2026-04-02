@@ -43,6 +43,9 @@ class Person(db.Model, UserMixin):
     wishlist_items = db.relationship(
         "Wishlist", back_populates="person", cascade="all, delete-orphan"
     )
+    wishlist_votes = db.relationship(
+        "WishlistVote", back_populates="person", cascade="all, delete-orphan"
+    )
     ratings = relationship("GameRatings", back_populates="person", cascade="all, delete-orphan")
     person_badges = relationship(
         "PersonBadge", back_populates="person", cascade="all, delete-orphan"
@@ -75,6 +78,9 @@ class Game(db.Model):
     votes = db.relationship("GameVotes", back_populates="game", cascade="all, delete-orphan")
     wishlist_entries = db.relationship(
         "Wishlist", back_populates="game", cascade="all, delete-orphan"
+    )
+    wishlist_vote_entries = db.relationship(
+        "WishlistVote", back_populates="game", cascade="all, delete-orphan"
     )
     ratings = relationship("GameRatings", back_populates="game", cascade="all, delete-orphan")
 
@@ -183,6 +189,16 @@ class Wishlist(db.Model):
 
     person = db.relationship("Person", back_populates="wishlist_items")
     game = db.relationship("Game", back_populates="wishlist_entries")
+
+
+class WishlistVote(db.Model):
+    __tablename__ = "wishlist_votes"
+    id = db.Column(db.Integer, primary_key=True)
+    person_id = db.Column(db.Integer, db.ForeignKey("people.id"), nullable=False)
+    game_id = db.Column(db.Integer, db.ForeignKey("games.id"), nullable=False)
+
+    person = db.relationship("Person", back_populates="wishlist_votes")
+    game = db.relationship("Game", back_populates="wishlist_vote_entries")
 
 
 class GamesIndex(db.Model):  # SQL View

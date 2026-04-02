@@ -6,6 +6,8 @@ services:
       POSTGRES_USER: gamenight
       POSTGRES_PASSWORD: gamenight
       POSTGRES_DB: gamenight
+    ports:
+      - "5432:5432"
     volumes:
       - gamenight_dev_db:/var/lib/postgresql/data
 

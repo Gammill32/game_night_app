@@ -91,10 +91,15 @@ def remove_ownership(game_id):
 @games_bp.route("/wishlist", methods=["GET"])
 @login_required
 def wishlist():
-    wishlist_games = games_services.get_wishlist(current_user.id)
+    items = games_services.get_group_wishlist(current_user.id)
+    return render_template("wishlist.html", items=items)
 
-    context = {"games": wishlist_games}
-    return render_template("wishlist.html", **context)
+
+@games_bp.route("/wishlist/mine", methods=["GET"])
+@login_required
+def my_wishlist():
+    wishlist_games = games_services.get_wishlist(current_user.id)
+    return render_template("my_wishlist.html", games=wishlist_games)
 
 
 @games_bp.route("/wishlist/add", methods=["GET", "POST"])
@@ -107,7 +112,7 @@ def add_to_wishlist():
         success, message = games_services.add_game_to_wishlist(current_user.id, name, bgg_id)
         flash(message, "success" if success else "error")
 
-        return redirect(url_for("games.wishlist"))
+        return redirect(url_for("games.my_wishlist"))
 
     context = {}
     return render_template("add_to_wishlist.html", **context)
@@ -118,19 +123,27 @@ def add_to_wishlist():
 def remove_from_wishlist(game_id):
     success, message = games_services.modify_wishlist(current_user.id, game_id, remove=True)
     flash(message, "success" if success else "error")
+    return redirect(url_for("games.my_wishlist"))
+
+
+@games_bp.route("/wishlist/vote/<int:game_id>", methods=["POST"])
+@login_required
+def vote_wishlist(game_id):
+    success, message = games_services.toggle_wishlist_vote(current_user.id, game_id)
+    flash(message, "success" if success else "info")
     return redirect(url_for("games.wishlist"))
 
 
 @games_bp.route("/wishlist/toggle/<int:game_id>", methods=["POST"])
 @login_required
 def toggle_wishlist(game_id):
-    from app.models import OwnedBy, Wishlist  # Adjust if needed
+    from app.models import OwnedBy, Wishlist
 
     # If already owned, prevent wishlisting
     owns_game = OwnedBy.query.filter_by(game_id=game_id, person_id=current_user.id).first()
     if owns_game:
         flash("You already own this game — no need to wishlist it.", "info")
-        return redirect(request.referrer or url_for("games.wishlist"))
+        return redirect(request.referrer or url_for("games.my_wishlist"))
 
     existing = Wishlist.query.filter_by(game_id=game_id, person_id=current_user.id).first()
     if existing:
@@ -139,7 +152,7 @@ def toggle_wishlist(game_id):
         success, message = games_services.modify_wishlist(current_user.id, game_id, add=True)
 
     flash(message, "success" if success else "error")
-    return redirect(request.referrer or url_for("games.wishlist"))
+    return redirect(request.referrer or url_for("games.my_wishlist"))
 
 
 @games_bp.route("/game/<int:game_id>/rating", methods=["POST"])
