@@ -113,9 +113,9 @@ def test_finalize_succeeds_even_if_badge_evaluation_raises(admin_client, app, db
     from app.models import GameNight as GN
 
     updated = GN.query.get(gn_id)
-    assert updated.final is True, (
-        "Game night must be marked final even when badge evaluation raises"
-    )
+    assert (
+        updated.final is True
+    ), "Game night must be marked final even when badge evaluation raises"
 
     Player.query.filter_by(id=pl_id).delete()
     GameNight.query.filter_by(id=gn_id).delete()
