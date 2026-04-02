@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Confirm Results{% endblock %}
+{% block content %}
+{% for entry in rankings %}
+{% if entry.player %}
+<span>{{ entry.player.person.first_name }}</span>
+{% endif %}
+{% for field in session.fields %}
+{% if field.is_score_field %}
+<span>{{ field.label }}</span>
+{% endif %}
+{% endfor %}
+{% endfor %}
+{% endblock %}

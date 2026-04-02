@@ -119,3 +119,56 @@ def test_value_update_htmx_returns_cell(app, db, auth_tracker_client):
     assert resp.status_code == 200
     val = TrackerValue.query.filter_by(tracker_field_id=field.id, player_id=auth_tracker_client["player_id"]).first()
     assert val.value == "1"
+
+
+def test_end_game_get_returns_rankings(app, db, auth_tracker_client):
+    from app.services.tracker_services import get_or_create_configuring_session, add_field, launch_session, update_value
+    c = auth_tracker_client["client"]
+    gng_id = auth_tracker_client["gng_id"]
+    session = get_or_create_configuring_session(gng_id)
+    field = add_field(session.id, type="counter", label="VP", starting_value=0, is_score_field=True)
+    launch_session(session.id, mode="individual", teams_data=[],
+                   player_ids=[auth_tracker_client["player_id"]])
+    update_value(session.id, field.id, entity_type="player",
+                 entity_id=auth_tracker_client["player_id"], delta=5)
+    resp = c.get(f"/tracker/{session.id}/end")
+    assert resp.status_code == 200
+    assert b"VP" in resp.data
+    session_obj = TrackerSession.query.get(session.id)
+    assert session_obj.status == "active"  # GET does not mutate status
+
+
+def test_save_results_marks_completed(app, db, auth_tracker_client):
+    from app.services.tracker_services import (
+        get_or_create_configuring_session, add_field, launch_session, update_value
+    )
+    from app.models import Result
+    c = auth_tracker_client["client"]
+    gng_id = auth_tracker_client["gng_id"]
+    session = get_or_create_configuring_session(gng_id)
+    field = add_field(session.id, type="counter", label="VP", starting_value=0, is_score_field=True)
+    launch_session(session.id, mode="individual", teams_data=[],
+                   player_ids=[auth_tracker_client["player_id"]])
+    update_value(session.id, field.id, entity_type="player",
+                 entity_id=auth_tracker_client["player_id"], delta=5)
+    resp = c.post(f"/tracker/{session.id}/save", data={
+        f"position_{auth_tracker_client['player_id']}": "1",
+        f"score_{auth_tracker_client['player_id']}": "5",
+    })
+    assert resp.status_code == 302
+    session_obj = TrackerSession.query.get(session.id)
+    assert session_obj.status == "completed"
+    result = Result.query.filter_by(game_night_game_id=gng_id, player_id=auth_tracker_client["player_id"]).first()
+    assert result is not None
+    assert result.position == 1
+
+
+def test_discard_deletes_session(app, db, auth_tracker_client):
+    from app.services.tracker_services import get_or_create_configuring_session
+    c = auth_tracker_client["client"]
+    gng_id = auth_tracker_client["gng_id"]
+    session = get_or_create_configuring_session(gng_id)
+    sid = session.id
+    resp = c.post(f"/tracker/{sid}/discard")
+    assert resp.status_code == 302
+    assert TrackerSession.query.get(sid) is None

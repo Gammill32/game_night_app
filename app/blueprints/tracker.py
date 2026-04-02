@@ -120,3 +120,45 @@ def update_value(session_id):
     field = TrackerField.query.get(field_id)
     return render_template("_tracker_cell.html", tv=tv, field=field, session=session,
                            entity_type=entity_type, entity_id=entity_id)
+
+
+@tracker_bp.route("/tracker/<int:session_id>/end")
+@login_required
+def end_game(session_id):
+    session = _get_session_or_404(session_id)
+    _assert_participant_or_admin(session)
+    rankings = tracker_services.compute_rankings(session_id)
+    gng = session.game_night_game
+    has_existing_results = bool(gng.results)
+    return render_template(
+        "tracker_confirm.html",
+        session=session, rankings=rankings,
+        has_existing_results=has_existing_results,
+    )
+
+
+@tracker_bp.route("/tracker/<int:session_id>/save", methods=["POST"])
+@login_required
+def save_results(session_id):
+    session = _get_session_or_404(session_id)
+    _assert_participant_or_admin(session)
+    rankings = []
+    for key, pos in request.form.items():
+        if key.startswith("position_"):
+            player_id = int(key.split("_", 1)[1])
+            score = int(request.form.get(f"score_{player_id}", 0))
+            rankings.append({"player_id": player_id, "team_id": None,
+                              "position": int(pos), "score": score})
+    tracker_services.save_results(session_id, rankings)
+    gn_id = session.game_night_game.game_night_id
+    return redirect(url_for("game_night.view_game_night", game_night_id=gn_id))
+
+
+@tracker_bp.route("/tracker/<int:session_id>/discard", methods=["POST"])
+@login_required
+def discard_tracker(session_id):
+    session = _get_session_or_404(session_id)
+    _assert_participant_or_admin(session)
+    gn_id = session.game_night_game.game_night_id
+    tracker_services.discard_session(session_id)
+    return redirect(url_for("game_night.view_game_night", game_night_id=gn_id))
