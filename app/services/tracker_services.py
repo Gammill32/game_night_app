@@ -48,7 +48,9 @@ def add_field(session_id, *, type, label, starting_value=0, is_score_field=False
     if session is None or session.status != "configuring":
         raise ValueError("Fields can only be added to a session in 'configuring' status")
     if type not in VALID_FIELD_TYPES:
-        raise ValueError(f"Unknown field type: {type!r}. Must be one of: {sorted(VALID_FIELD_TYPES)}")
+        raise ValueError(
+            f"Unknown field type: {type!r}. Must be one of: {sorted(VALID_FIELD_TYPES)}"
+        )
     label = label.strip() if label else ""
     if not label:
         raise ValueError("Field label cannot be empty")
@@ -214,14 +216,16 @@ def compute_rankings(session_id):
     for i, v in enumerate(sorted_vals):
         if i > 0 and int(v.value) < int(sorted_vals[i - 1].value):
             pos = i + 1
-        rankings.append({
-            "player_id": v.player_id,
-            "team_id": v.team_id,
-            "player": v.player,
-            "team": v.team,
-            "position": pos,
-            "score": int(v.value),
-        })
+        rankings.append(
+            {
+                "player_id": v.player_id,
+                "team_id": v.team_id,
+                "player": v.player,
+                "team": v.team,
+                "position": pos,
+                "score": int(v.value),
+            }
+        )
     return rankings
 
 
@@ -274,8 +278,10 @@ def _upsert_result(game_night_game_id, player_id, position, score):
 
 
 def _seed_value(session_id, field, *, player_id, team_id):
-    initial = str(field.starting_value) if field.type in ("counter", "global_counter") else (
-        "false" if field.type == "checkbox" else ""
+    initial = (
+        str(field.starting_value)
+        if field.type in ("counter", "global_counter")
+        else ("false" if field.type == "checkbox" else "")
     )
     v = TrackerValue(
         tracker_session_id=session_id,

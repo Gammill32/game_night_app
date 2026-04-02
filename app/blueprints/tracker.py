@@ -60,16 +60,16 @@ def setup_tracker(gng_id):
     if completed:
         return redirect(url_for("game_night.view_game_night", game_night_id=gn.id))
     # Resume active session if one exists
-    active = TrackerSession.query.filter_by(
-        game_night_game_id=gng_id, status="active"
-    ).first()
+    active = TrackerSession.query.filter_by(game_night_game_id=gng_id, status="active").first()
     if active:
         return redirect(url_for("tracker.live_tracker", session_id=active.id))
     session = tracker_services.get_or_create_configuring_session(gng_id)
     players = Player.query.filter_by(game_night_id=gn.id).all()
-    fields = TrackerField.query.filter_by(
-        tracker_session_id=session.id
-    ).order_by(TrackerField.sort_order).all()
+    fields = (
+        TrackerField.query.filter_by(tracker_session_id=session.id)
+        .order_by(TrackerField.sort_order)
+        .all()
+    )
     return render_template(
         "tracker_setup.html", session=session, gng=gng, gn=gn, players=players, fields=fields
     )
@@ -83,9 +83,7 @@ def launch_tracker(gng_id):
 
     session_id = int(request.form["session_id"])
     # Verify session belongs to this gng — prevents IDOR
-    session = TrackerSession.query.filter_by(
-        id=session_id, game_night_game_id=gng_id
-    ).first()
+    session = TrackerSession.query.filter_by(id=session_id, game_night_game_id=gng_id).first()
     if session is None:
         abort(400, "Invalid session for this game.")
 
@@ -93,8 +91,7 @@ def launch_tracker(gng_id):
     player_ids = [int(pid) for pid in request.form.getlist("player_ids")]
     field_order_str = request.form.get("field_order", "").strip()
     field_order = (
-        [int(fid) for fid in field_order_str.split(",") if fid.strip()]
-        if field_order_str else None
+        [int(fid) for fid in field_order_str.split(",") if fid.strip()] if field_order_str else None
     )
 
     teams_data = []
@@ -106,8 +103,11 @@ def launch_tracker(gng_id):
 
     try:
         tracker_services.launch_session(
-            session_id, mode=mode, teams_data=teams_data,
-            player_ids=player_ids, field_order=field_order,
+            session_id,
+            mode=mode,
+            teams_data=teams_data,
+            player_ids=player_ids,
+            field_order=field_order,
         )
     except ValueError as e:
         flash(str(e), "error")
@@ -128,14 +128,21 @@ def live_tracker(session_id):
     all_values = TrackerValue.query.filter_by(tracker_session_id=session_id).all()
     # Build value lookup: {(field_id, player_id, team_id): TrackerValue}
     value_map = {(v.tracker_field_id, v.player_id, v.team_id): v for v in all_values}
-    players = Player.query.filter_by(game_night_id=gn.id).all() if session.mode == "individual" else []
+    players = (
+        Player.query.filter_by(game_night_id=gn.id).all() if session.mode == "individual" else []
+    )
     teams = session.teams if session.mode == "teams" else []
     global_fields = [f for f in session.fields if f.type in ("global_counter", "global_notes")]
     player_fields = [f for f in session.fields if f.type not in ("global_counter", "global_notes")]
     return render_template(
         "tracker_live.html",
-        session=session, gn=gn, players=players, teams=teams,
-        global_fields=global_fields, player_fields=player_fields, value_map=value_map,
+        session=session,
+        gn=gn,
+        players=players,
+        teams=teams,
+        global_fields=global_fields,
+        player_fields=player_fields,
+        value_map=value_map,
     )
 
 
@@ -150,8 +157,11 @@ def add_field(session_id):
     is_score_field = request.form.get("is_score_field", "false").lower() == "true"
     try:
         field = tracker_services.add_field(
-            session_id, type=field_type, label=label,
-            starting_value=starting_value, is_score_field=is_score_field,
+            session_id,
+            type=field_type,
+            label=label,
+            starting_value=starting_value,
+            is_score_field=is_score_field,
         )
     except ValueError as e:
         return str(e), 400
@@ -170,15 +180,23 @@ def update_value(session_id):
     value = request.form.get("value")
     try:
         tv = tracker_services.update_value(
-            session_id, field_id, entity_type=entity_type, entity_id=entity_id,
-            delta=delta, value=value,
+            session_id,
+            field_id,
+            entity_type=entity_type,
+            entity_id=entity_id,
+            delta=delta,
+            value=value,
         )
     except ValueError as e:
         return str(e), 400
     field = TrackerField.query.get(field_id)
     return render_template(
-        "_tracker_cell.html", tv=tv, field=field, session=session,
-        entity_type=entity_type, entity_id=entity_id,
+        "_tracker_cell.html",
+        tv=tv,
+        field=field,
+        session=session,
+        entity_type=entity_type,
+        entity_id=entity_id,
     )
 
 
@@ -188,10 +206,12 @@ def end_game(session_id):
     session = _get_session_or_404(session_id)
     _assert_participant_or_admin(session)
     if session.status == "completed":
-        return redirect(url_for(
-            "game_night.view_game_night",
-            game_night_id=session.game_night_game.game_night_id,
-        ))
+        return redirect(
+            url_for(
+                "game_night.view_game_night",
+                game_night_id=session.game_night_game.game_night_id,
+            )
+        )
     try:
         rankings = tracker_services.compute_rankings(session_id)
     except ValueError:
@@ -201,7 +221,8 @@ def end_game(session_id):
     has_existing_results = bool(gng.results)
     return render_template(
         "tracker_confirm.html",
-        session=session, rankings=rankings,
+        session=session,
+        rankings=rankings,
         has_existing_results=has_existing_results,
     )
 
@@ -214,15 +235,17 @@ def save_results(session_id):
     rankings = []
     for key, pos in request.form.items():
         if key.startswith("position_p_"):
-            player_id = int(key[len("position_p_"):])
+            player_id = int(key[len("position_p_") :])
             score = int(request.form.get(f"score_p_{player_id}", 0))
-            rankings.append({"player_id": player_id, "team_id": None,
-                              "position": int(pos), "score": score})
+            rankings.append(
+                {"player_id": player_id, "team_id": None, "position": int(pos), "score": score}
+            )
         elif key.startswith("position_t_"):
-            team_id = int(key[len("position_t_"):])
+            team_id = int(key[len("position_t_") :])
             score = int(request.form.get(f"score_t_{team_id}", 0))
-            rankings.append({"player_id": None, "team_id": team_id,
-                              "position": int(pos), "score": score})
+            rankings.append(
+                {"player_id": None, "team_id": team_id, "position": int(pos), "score": score}
+            )
     try:
         tracker_services.save_results(session_id, rankings)
     except ValueError as e:

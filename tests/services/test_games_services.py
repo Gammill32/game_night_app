@@ -117,6 +117,7 @@ def test_view_game_shows_fatigued_badge(auth_client, game_with_plays):
 
 # --- Always Bridesmaid ---
 
+
 @pytest.fixture()
 def bridesmaid_setup(app, db):
     """A game nominated twice but never played; another game nominated and played."""
@@ -166,7 +167,11 @@ def bridesmaid_setup(app, db):
 
     # Nominate and play played_game in first night
     nominations.append(
-        GameNominations(game_night_id=game_nights[0].id, player_id=players_map[game_nights[0].id].id, game_id=played_game.id)
+        GameNominations(
+            game_night_id=game_nights[0].id,
+            player_id=players_map[game_nights[0].id].id,
+            game_id=played_game.id,
+        )
     )
     _db.session.add(nominations[-1])
     gng = GameNightGame(game_night_id=game_nights[0].id, game_id=played_game.id, round=1)
@@ -177,7 +182,9 @@ def bridesmaid_setup(app, db):
     yield {"bridesmaid": bridesmaid, "played_game": played_game, "game_nights": game_nights}
 
     # Teardown
-    GameNominations.query.filter(GameNominations.game_id.in_([bridesmaid.id, played_game.id])).delete()
+    GameNominations.query.filter(
+        GameNominations.game_id.in_([bridesmaid.id, played_game.id])
+    ).delete()
     Result.query.filter_by(game_night_game_id=gng.id).delete()
     _db.session.delete(gng)
     for pl in players_map.values():

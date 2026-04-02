@@ -5,11 +5,12 @@ Revises: 8b9f3a3784a3
 Create Date: 2026-04-02 12:00:00.000000
 
 """
+
 import sqlalchemy as sa
 from alembic import op
 
-revision = 'd1e2f3a4b5c6'
-down_revision = '8b9f3a3784a3'
+revision = "d1e2f3a4b5c6"
+down_revision = "8b9f3a3784a3"
 branch_labels = None
 depends_on = None
 
@@ -36,7 +37,9 @@ def upgrade():
         sa.Column("starting_value", sa.Integer(), server_default="0"),
         sa.Column("is_score_field", sa.Boolean(), server_default="false", nullable=False),
         sa.Column("sort_order", sa.Integer(), server_default="0"),
-        sa.ForeignKeyConstraint(["tracker_session_id"], ["tracker_sessions.id"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(
+            ["tracker_session_id"], ["tracker_sessions.id"], ondelete="CASCADE"
+        ),
         sa.PrimaryKeyConstraint("id"),
     )
     # Enforce exactly one score field per session
@@ -51,7 +54,9 @@ def upgrade():
         sa.Column("id", sa.Integer(), nullable=False),
         sa.Column("tracker_session_id", sa.Integer(), nullable=False),
         sa.Column("name", sa.String(), nullable=False),
-        sa.ForeignKeyConstraint(["tracker_session_id"], ["tracker_sessions.id"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(
+            ["tracker_session_id"], ["tracker_sessions.id"], ondelete="CASCADE"
+        ),
         sa.PrimaryKeyConstraint("id"),
     )
 
@@ -72,7 +77,9 @@ def upgrade():
         sa.Column("player_id", sa.Integer(), nullable=True),
         sa.Column("team_id", sa.Integer(), nullable=True),
         sa.Column("value", sa.Text(), nullable=False, server_default="0"),
-        sa.ForeignKeyConstraint(["tracker_session_id"], ["tracker_sessions.id"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(
+            ["tracker_session_id"], ["tracker_sessions.id"], ondelete="CASCADE"
+        ),
         sa.ForeignKeyConstraint(["tracker_field_id"], ["tracker_fields.id"], ondelete="CASCADE"),
         sa.ForeignKeyConstraint(["player_id"], ["players.id"]),
         sa.ForeignKeyConstraint(["team_id"], ["tracker_teams.id"], ondelete="CASCADE"),

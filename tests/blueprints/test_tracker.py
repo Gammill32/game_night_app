@@ -20,6 +20,7 @@ def auth_tracker_client(app, db):
     """Admin client with a game night + game set up."""
     from app.extensions import bcrypt
     from app.models import Poll
+
     _db.session.rollback()
     existing = Person.query.filter_by(email="tracker_admin@example.com").first()
     if existing:
@@ -30,9 +31,12 @@ def auth_tracker_client(app, db):
         _db.session.commit()
 
     admin = Person(
-        first_name="Tracker", last_name="Admin", email="tracker_admin@example.com",
+        first_name="Tracker",
+        last_name="Admin",
+        email="tracker_admin@example.com",
         password=bcrypt.generate_password_hash("password", rounds=4).decode("utf-8"),
-        admin=True, owner=False,
+        admin=True,
+        owner=False,
     )
     _db.session.add(admin)
     _db.session.flush()
@@ -52,8 +56,16 @@ def auth_tracker_client(app, db):
 
     with app.test_client() as client:
         client.post("/login", data={"email": "tracker_admin@example.com", "password": "password"})
-        yield {"client": client, "gng_id": gng.id, "gn_id": gn.id,
-               "player_id": player.id, "admin_id": admin.id, "game": game, "gn": gn, "gng": gng}
+        yield {
+            "client": client,
+            "gng_id": gng.id,
+            "gn_id": gn.id,
+            "player_id": player.id,
+            "admin_id": admin.id,
+            "game": game,
+            "gn": gn,
+            "gng": gng,
+        }
 
     _db.session.rollback()
     TrackerSession.query.filter_by(game_night_game_id=gng.id).delete()
@@ -71,14 +83,18 @@ def auth_tracker_client(app, db):
 def non_participant_client(app, db, auth_tracker_client):
     """Logged-in client for a user who is NOT a participant in auth_tracker_client's game night."""
     from app.extensions import bcrypt
+
     _db.session.rollback()
     Person.query.filter_by(email="outsider@example.com").delete()
     _db.session.commit()
 
     outsider = Person(
-        first_name="Out", last_name="Sider", email="outsider@example.com",
+        first_name="Out",
+        last_name="Sider",
+        email="outsider@example.com",
         password=bcrypt.generate_password_hash("password", rounds=4).decode("utf-8"),
-        admin=False, owner=False,
+        admin=False,
+        owner=False,
     )
     _db.session.add(outsider)
     _db.session.commit()
@@ -93,6 +109,7 @@ def non_participant_client(app, db, auth_tracker_client):
 
 
 # ── setup / auth ──────────────────────────────────────────────────────────────
+
 
 def test_setup_get_creates_configuring_session(auth_tracker_client):
     c = auth_tracker_client["client"]
@@ -126,16 +143,32 @@ def test_setup_get_completed_session_redirects(app, db, auth_tracker_client):
         save_results,
         update_value,
     )
+
     c = auth_tracker_client["client"]
     gng_id = auth_tracker_client["gng_id"]
     session = get_or_create_configuring_session(gng_id)
     field = add_field(session.id, type="counter", label="VP", starting_value=0, is_score_field=True)
-    launch_session(session.id, mode="individual", teams_data=[],
-                   player_ids=[auth_tracker_client["player_id"]])
-    update_value(session.id, field.id, entity_type="player",
-                 entity_id=auth_tracker_client["player_id"], delta=3)
-    save_results(session.id, [{"player_id": auth_tracker_client["player_id"],
-                                "team_id": None, "position": 1, "score": 3}])
+    launch_session(
+        session.id, mode="individual", teams_data=[], player_ids=[auth_tracker_client["player_id"]]
+    )
+    update_value(
+        session.id,
+        field.id,
+        entity_type="player",
+        entity_id=auth_tracker_client["player_id"],
+        delta=3,
+    )
+    save_results(
+        session.id,
+        [
+            {
+                "player_id": auth_tracker_client["player_id"],
+                "team_id": None,
+                "position": 1,
+                "score": 3,
+            }
+        ],
+    )
     resp = c.get(f"/game_night/{gng_id}/tracker/new")
     assert resp.status_code == 302
     assert f"/game_night/{auth_tracker_client['gn_id']}" in resp.headers["Location"]
@@ -143,12 +176,14 @@ def test_setup_get_completed_session_redirects(app, db, auth_tracker_client):
 
 # ── launch ────────────────────────────────────────────────────────────────────
 
+
 def test_launch_tracker_idor_protection(app, db, auth_tracker_client):
     """launch_tracker rejects session_id belonging to a different gng (S-3)."""
     from app.services.tracker_services import (
         add_field,
         get_or_create_configuring_session,
     )
+
     # Create a second game / gng so we have a different gng_id
     game2 = Game(name=f"TG2 {uuid.uuid4().hex[:4]}", bgg_id=None)
     gn2 = GameNight(date=datetime.date(2024, 7, 1), final=False)
@@ -166,11 +201,14 @@ def test_launch_tracker_idor_protection(app, db, auth_tracker_client):
         # Try to launch session2 via gng1's URL — should get 400
         c = auth_tracker_client["client"]
         gng1_id = auth_tracker_client["gng_id"]
-        resp = c.post(f"/game_night/{gng1_id}/tracker", data={
-            "session_id": str(session2.id),
-            "mode": "individual",
-            "player_ids": [str(auth_tracker_client["player_id"])],
-        })
+        resp = c.post(
+            f"/game_night/{gng1_id}/tracker",
+            data={
+                "session_id": str(session2.id),
+                "mode": "individual",
+                "player_ids": [str(auth_tracker_client["player_id"])],
+            },
+        )
         assert resp.status_code == 400
     finally:
         TrackerSession.query.filter_by(game_night_game_id=gng2.id).delete()
@@ -186,16 +224,20 @@ def test_launch_without_score_field_flashes_error(app, db, auth_tracker_client):
         add_field,
         get_or_create_configuring_session,
     )
+
     c = auth_tracker_client["client"]
     gng_id = auth_tracker_client["gng_id"]
     session = get_or_create_configuring_session(gng_id)
     # Add a field that is NOT a score field
     add_field(session.id, type="counter", label="HP", starting_value=10, is_score_field=False)
-    resp = c.post(f"/game_night/{gng_id}/tracker", data={
-        "session_id": str(session.id),
-        "mode": "individual",
-        "player_ids": [str(auth_tracker_client["player_id"])],
-    })
+    resp = c.post(
+        f"/game_night/{gng_id}/tracker",
+        data={
+            "session_id": str(session.id),
+            "mode": "individual",
+            "player_ids": [str(auth_tracker_client["player_id"])],
+        },
+    )
     # Should redirect back to setup, not to live tracker
     assert resp.status_code == 302
     assert "/tracker/new" in resp.headers["Location"]
@@ -206,18 +248,21 @@ def test_launch_without_score_field_flashes_error(app, db, auth_tracker_client):
 
 # ── live tracker ──────────────────────────────────────────────────────────────
 
+
 def test_live_tracker_loads(app, db, auth_tracker_client):
     from app.services.tracker_services import (
         add_field,
         get_or_create_configuring_session,
         launch_session,
     )
+
     c = auth_tracker_client["client"]
     gng_id = auth_tracker_client["gng_id"]
     session = get_or_create_configuring_session(gng_id)
     add_field(session.id, type="counter", label="VP", starting_value=0, is_score_field=True)
-    launch_session(session.id, mode="individual", teams_data=[],
-                   player_ids=[auth_tracker_client["player_id"]])
+    launch_session(
+        session.id, mode="individual", teams_data=[], player_ids=[auth_tracker_client["player_id"]]
+    )
     resp = c.get(f"/tracker/{session.id}")
     assert resp.status_code == 200
     assert b"VP" in resp.data
@@ -225,17 +270,23 @@ def test_live_tracker_loads(app, db, auth_tracker_client):
 
 # ── add field ─────────────────────────────────────────────────────────────────
 
+
 def test_add_field_htmx_returns_fragment(app, db, auth_tracker_client):
     from app.services.tracker_services import get_or_create_configuring_session
+
     c = auth_tracker_client["client"]
     gng_id = auth_tracker_client["gng_id"]
     session = get_or_create_configuring_session(gng_id)
-    resp = c.post(f"/tracker/{session.id}/field", data={
-        "type": "counter", "label": "Life", "starting_value": "20", "is_score_field": "true"
-    })
+    resp = c.post(
+        f"/tracker/{session.id}/field",
+        data={"type": "counter", "label": "Life", "starting_value": "20", "is_score_field": "true"},
+    )
     assert resp.status_code == 200
     assert b"Life" in resp.data
-    assert TrackerField.query.filter_by(tracker_session_id=session.id, label="Life").first() is not None
+    assert (
+        TrackerField.query.filter_by(tracker_session_id=session.id, label="Life").first()
+        is not None
+    )
 
 
 def test_add_field_on_active_session_returns_400(app, db, auth_tracker_client):
@@ -245,43 +296,56 @@ def test_add_field_on_active_session_returns_400(app, db, auth_tracker_client):
         get_or_create_configuring_session,
         launch_session,
     )
+
     c = auth_tracker_client["client"]
     gng_id = auth_tracker_client["gng_id"]
     session = get_or_create_configuring_session(gng_id)
     add_field(session.id, type="counter", label="VP", starting_value=0, is_score_field=True)
-    launch_session(session.id, mode="individual", teams_data=[],
-                   player_ids=[auth_tracker_client["player_id"]])
-    resp = c.post(f"/tracker/{session.id}/field", data={
-        "type": "counter", "label": "HP", "starting_value": "10", "is_score_field": "false"
-    })
+    launch_session(
+        session.id, mode="individual", teams_data=[], player_ids=[auth_tracker_client["player_id"]]
+    )
+    resp = c.post(
+        f"/tracker/{session.id}/field",
+        data={"type": "counter", "label": "HP", "starting_value": "10", "is_score_field": "false"},
+    )
     assert resp.status_code == 400
 
 
 def test_add_field_unknown_type_returns_400(app, db, auth_tracker_client):
     """Unknown field type is rejected (S-6)."""
     from app.services.tracker_services import get_or_create_configuring_session
+
     c = auth_tracker_client["client"]
     gng_id = auth_tracker_client["gng_id"]
     session = get_or_create_configuring_session(gng_id)
-    resp = c.post(f"/tracker/{session.id}/field", data={
-        "type": "sql_injection", "label": "Bad", "starting_value": "0", "is_score_field": "false"
-    })
+    resp = c.post(
+        f"/tracker/{session.id}/field",
+        data={
+            "type": "sql_injection",
+            "label": "Bad",
+            "starting_value": "0",
+            "is_score_field": "false",
+        },
+    )
     assert resp.status_code == 400
 
 
 def test_add_field_empty_label_returns_400(app, db, auth_tracker_client):
     """Empty label is rejected (M-5)."""
     from app.services.tracker_services import get_or_create_configuring_session
+
     c = auth_tracker_client["client"]
     gng_id = auth_tracker_client["gng_id"]
     session = get_or_create_configuring_session(gng_id)
-    resp = c.post(f"/tracker/{session.id}/field", data={
-        "type": "counter", "label": "", "starting_value": "0", "is_score_field": "false"
-    })
+    resp = c.post(
+        f"/tracker/{session.id}/field",
+        data={"type": "counter", "label": "", "starting_value": "0", "is_score_field": "false"},
+    )
     assert resp.status_code == 400
 
 
 # ── value update ──────────────────────────────────────────────────────────────
+
 
 def test_value_update_htmx_returns_cell(app, db, auth_tracker_client):
     from app.models import TrackerValue
@@ -290,18 +354,23 @@ def test_value_update_htmx_returns_cell(app, db, auth_tracker_client):
         get_or_create_configuring_session,
         launch_session,
     )
+
     c = auth_tracker_client["client"]
     gng_id = auth_tracker_client["gng_id"]
     session = get_or_create_configuring_session(gng_id)
     field = add_field(session.id, type="counter", label="VP", starting_value=0, is_score_field=True)
-    launch_session(session.id, mode="individual", teams_data=[],
-                   player_ids=[auth_tracker_client["player_id"]])
-    resp = c.post(f"/tracker/{session.id}/value", data={
-        "field_id": str(field.id),
-        "entity_type": "player",
-        "entity_id": str(auth_tracker_client["player_id"]),
-        "delta": "1",
-    })
+    launch_session(
+        session.id, mode="individual", teams_data=[], player_ids=[auth_tracker_client["player_id"]]
+    )
+    resp = c.post(
+        f"/tracker/{session.id}/value",
+        data={
+            "field_id": str(field.id),
+            "entity_type": "player",
+            "entity_id": str(auth_tracker_client["player_id"]),
+            "delta": "1",
+        },
+    )
     assert resp.status_code == 200
     val = TrackerValue.query.filter_by(
         tracker_field_id=field.id, player_id=auth_tracker_client["player_id"]
@@ -316,6 +385,7 @@ def test_value_update_cross_session_field_rejected(app, db, auth_tracker_client)
         get_or_create_configuring_session,
         launch_session,
     )
+
     # Create a second game/gng/session
     game2 = Game(name=f"TG2 {uuid.uuid4().hex[:4]}", bgg_id=None)
     gn2 = GameNight(date=datetime.date(2024, 8, 1), final=False)
@@ -332,23 +402,31 @@ def test_value_update_cross_session_field_rejected(app, db, auth_tracker_client)
         # Session A with one field
         session_a = get_or_create_configuring_session(gng_id)
         add_field(session_a.id, type="counter", label="VP", starting_value=0, is_score_field=True)
-        launch_session(session_a.id, mode="individual", teams_data=[],
-                       player_ids=[auth_tracker_client["player_id"]])
+        launch_session(
+            session_a.id,
+            mode="individual",
+            teams_data=[],
+            player_ids=[auth_tracker_client["player_id"]],
+        )
 
         # Session B with its own field
         session_b = get_or_create_configuring_session(gng2.id)
-        field_b = add_field(session_b.id, type="counter", label="VP2", starting_value=0, is_score_field=True)
-        launch_session(session_b.id, mode="individual", teams_data=[],
-                       player_ids=[player2.id])
+        field_b = add_field(
+            session_b.id, type="counter", label="VP2", starting_value=0, is_score_field=True
+        )
+        launch_session(session_b.id, mode="individual", teams_data=[], player_ids=[player2.id])
 
         # Try to update session_b's field via session_a's URL
         c = auth_tracker_client["client"]
-        resp = c.post(f"/tracker/{session_a.id}/value", data={
-            "field_id": str(field_b.id),
-            "entity_type": "player",
-            "entity_id": str(auth_tracker_client["player_id"]),
-            "delta": "1",
-        })
+        resp = c.post(
+            f"/tracker/{session_a.id}/value",
+            data={
+                "field_id": str(field_b.id),
+                "entity_type": "player",
+                "entity_id": str(auth_tracker_client["player_id"]),
+                "delta": "1",
+            },
+        )
         assert resp.status_code == 400
     finally:
         TrackerSession.query.filter_by(game_night_game_id=gng2.id).delete()
@@ -361,6 +439,7 @@ def test_value_update_cross_session_field_rejected(app, db, auth_tracker_client)
 
 # ── end game ──────────────────────────────────────────────────────────────────
 
+
 def test_end_game_get_returns_rankings(app, db, auth_tracker_client):
     from app.services.tracker_services import (
         add_field,
@@ -368,14 +447,21 @@ def test_end_game_get_returns_rankings(app, db, auth_tracker_client):
         launch_session,
         update_value,
     )
+
     c = auth_tracker_client["client"]
     gng_id = auth_tracker_client["gng_id"]
     session = get_or_create_configuring_session(gng_id)
     field = add_field(session.id, type="counter", label="VP", starting_value=0, is_score_field=True)
-    launch_session(session.id, mode="individual", teams_data=[],
-                   player_ids=[auth_tracker_client["player_id"]])
-    update_value(session.id, field.id, entity_type="player",
-                 entity_id=auth_tracker_client["player_id"], delta=5)
+    launch_session(
+        session.id, mode="individual", teams_data=[], player_ids=[auth_tracker_client["player_id"]]
+    )
+    update_value(
+        session.id,
+        field.id,
+        entity_type="player",
+        entity_id=auth_tracker_client["player_id"],
+        delta=5,
+    )
     resp = c.get(f"/tracker/{session.id}/end")
     assert resp.status_code == 200
     assert b"VP" in resp.data
@@ -392,21 +478,38 @@ def test_end_game_completed_session_redirects(app, db, auth_tracker_client):
         save_results,
         update_value,
     )
+
     c = auth_tracker_client["client"]
     gng_id = auth_tracker_client["gng_id"]
     session = get_or_create_configuring_session(gng_id)
     field = add_field(session.id, type="counter", label="VP", starting_value=0, is_score_field=True)
-    launch_session(session.id, mode="individual", teams_data=[],
-                   player_ids=[auth_tracker_client["player_id"]])
-    update_value(session.id, field.id, entity_type="player",
-                 entity_id=auth_tracker_client["player_id"], delta=3)
-    save_results(session.id, [{"player_id": auth_tracker_client["player_id"],
-                                "team_id": None, "position": 1, "score": 3}])
+    launch_session(
+        session.id, mode="individual", teams_data=[], player_ids=[auth_tracker_client["player_id"]]
+    )
+    update_value(
+        session.id,
+        field.id,
+        entity_type="player",
+        entity_id=auth_tracker_client["player_id"],
+        delta=3,
+    )
+    save_results(
+        session.id,
+        [
+            {
+                "player_id": auth_tracker_client["player_id"],
+                "team_id": None,
+                "position": 1,
+                "score": 3,
+            }
+        ],
+    )
     resp = c.get(f"/tracker/{session.id}/end")
     assert resp.status_code == 302
 
 
 # ── save results ──────────────────────────────────────────────────────────────
+
 
 def test_save_results_marks_completed(app, db, auth_tracker_client):
     from app.models import Result
@@ -416,19 +519,29 @@ def test_save_results_marks_completed(app, db, auth_tracker_client):
         launch_session,
         update_value,
     )
+
     c = auth_tracker_client["client"]
     gng_id = auth_tracker_client["gng_id"]
     session = get_or_create_configuring_session(gng_id)
     field = add_field(session.id, type="counter", label="VP", starting_value=0, is_score_field=True)
-    launch_session(session.id, mode="individual", teams_data=[],
-                   player_ids=[auth_tracker_client["player_id"]])
-    update_value(session.id, field.id, entity_type="player",
-                 entity_id=auth_tracker_client["player_id"], delta=5)
+    launch_session(
+        session.id, mode="individual", teams_data=[], player_ids=[auth_tracker_client["player_id"]]
+    )
+    update_value(
+        session.id,
+        field.id,
+        entity_type="player",
+        entity_id=auth_tracker_client["player_id"],
+        delta=5,
+    )
     player_id = auth_tracker_client["player_id"]
-    resp = c.post(f"/tracker/{session.id}/save", data={
-        f"position_p_{player_id}": "1",
-        f"score_p_{player_id}": "5",
-    })
+    resp = c.post(
+        f"/tracker/{session.id}/save",
+        data={
+            f"position_p_{player_id}": "1",
+            f"score_p_{player_id}": "5",
+        },
+    )
     assert resp.status_code == 302
     session_obj = TrackerSession.query.get(session.id)
     assert session_obj.status == "completed"
@@ -444,17 +557,22 @@ def test_save_results_arbitrary_player_id_rejected(app, db, auth_tracker_client)
         get_or_create_configuring_session,
         launch_session,
     )
+
     c = auth_tracker_client["client"]
     gng_id = auth_tracker_client["gng_id"]
     session = get_or_create_configuring_session(gng_id)
     add_field(session.id, type="counter", label="VP", starting_value=0, is_score_field=True)
-    launch_session(session.id, mode="individual", teams_data=[],
-                   player_ids=[auth_tracker_client["player_id"]])
+    launch_session(
+        session.id, mode="individual", teams_data=[], player_ids=[auth_tracker_client["player_id"]]
+    )
     # Submit a fabricated player_id that was never seeded
-    resp = c.post(f"/tracker/{session.id}/save", data={
-        "position_p_99999": "1",
-        "score_p_99999": "10",
-    })
+    resp = c.post(
+        f"/tracker/{session.id}/save",
+        data={
+            "position_p_99999": "1",
+            "score_p_99999": "10",
+        },
+    )
     # Should redirect back to end_game with error
     assert resp.status_code == 302
     assert "/end" in resp.headers["Location"]
@@ -462,8 +580,10 @@ def test_save_results_arbitrary_player_id_rejected(app, db, auth_tracker_client)
 
 # ── discard ───────────────────────────────────────────────────────────────────
 
+
 def test_discard_deletes_session(app, db, auth_tracker_client):
     from app.services.tracker_services import get_or_create_configuring_session
+
     c = auth_tracker_client["client"]
     gng_id = auth_tracker_client["gng_id"]
     session = get_or_create_configuring_session(gng_id)
@@ -474,6 +594,7 @@ def test_discard_deletes_session(app, db, auth_tracker_client):
 
 
 # ── view_game_night integration ───────────────────────────────────────────────
+
 
 def test_track_button_visible_on_active_game_night(auth_tracker_client):
     c = auth_tracker_client["client"]
@@ -486,6 +607,7 @@ def test_track_button_visible_on_active_game_night(auth_tracker_client):
 def test_track_button_not_visible_on_finalized_game_night(auth_tracker_client):
     from app.extensions import db as _db
     from app.models import GameNight
+
     c = auth_tracker_client["client"]
     gn_id = auth_tracker_client["gn_id"]
     gn = GameNight.query.get(gn_id)
@@ -503,11 +625,13 @@ def test_track_button_not_visible_on_finalized_game_night(auth_tracker_client):
 
 # ── team mode ─────────────────────────────────────────────────────────────────
 
+
 @pytest.fixture()
 def team_tracker_client(app, db):
     """Admin client with two players set up for team-mode tracking."""
     from app.extensions import bcrypt
     from app.models import Poll
+
     _db.session.rollback()
     for email in ["team_admin@example.com", "team_player2@example.com"]:
         existing = Person.query.filter_by(email=email).first()
@@ -519,14 +643,20 @@ def team_tracker_client(app, db):
     _db.session.commit()
 
     admin = Person(
-        first_name="Team", last_name="Admin", email="team_admin@example.com",
+        first_name="Team",
+        last_name="Admin",
+        email="team_admin@example.com",
         password=bcrypt.generate_password_hash("password", rounds=4).decode("utf-8"),
-        admin=True, owner=False,
+        admin=True,
+        owner=False,
     )
     player2_person = Person(
-        first_name="Player", last_name="Two", email="team_player2@example.com",
+        first_name="Player",
+        last_name="Two",
+        email="team_player2@example.com",
         password=bcrypt.generate_password_hash("password", rounds=4).decode("utf-8"),
-        admin=False, owner=False,
+        admin=False,
+        owner=False,
     )
     _db.session.add_all([admin, player2_person])
     _db.session.flush()
@@ -548,10 +678,16 @@ def team_tracker_client(app, db):
     with app.test_client() as client:
         client.post("/login", data={"email": "team_admin@example.com", "password": "password"})
         yield {
-            "client": client, "gng_id": gng.id, "gn_id": gn.id,
-            "player1_id": p1.id, "player2_id": p2.id,
-            "gng": gng, "gn": gn, "game": game,
-            "admin": admin, "player2_person": player2_person,
+            "client": client,
+            "gng_id": gng.id,
+            "gn_id": gn.id,
+            "player1_id": p1.id,
+            "player2_id": p2.id,
+            "gng": gng,
+            "gn": gn,
+            "game": game,
+            "admin": admin,
+            "player2_person": player2_person,
         }
 
     _db.session.rollback()
@@ -574,6 +710,7 @@ def test_team_mode_live_tracker_loads(app, db, team_tracker_client):
         get_or_create_configuring_session,
         launch_session,
     )
+
     c = team_tracker_client["client"]
     gng_id = team_tracker_client["gng_id"]
     p1_id = team_tracker_client["player1_id"]
@@ -581,12 +718,15 @@ def test_team_mode_live_tracker_loads(app, db, team_tracker_client):
 
     session = get_or_create_configuring_session(gng_id)
     add_field(session.id, type="counter", label="Score", starting_value=0, is_score_field=True)
-    launch_session(session.id, mode="teams",
-                   teams_data=[
-                       {"name": "Red", "player_ids": [p1_id]},
-                       {"name": "Blue", "player_ids": [p2_id]},
-                   ],
-                   player_ids=[])
+    launch_session(
+        session.id,
+        mode="teams",
+        teams_data=[
+            {"name": "Red", "player_ids": [p1_id]},
+            {"name": "Blue", "player_ids": [p2_id]},
+        ],
+        player_ids=[],
+    )
     resp = c.get(f"/tracker/{session.id}")
     assert resp.status_code == 200
     assert b"Red" in resp.data
@@ -602,19 +742,25 @@ def test_team_mode_save_results_writes_all_members(app, db, team_tracker_client)
         launch_session,
         update_value,
     )
+
     c = team_tracker_client["client"]
     gng_id = team_tracker_client["gng_id"]
     p1_id = team_tracker_client["player1_id"]
     p2_id = team_tracker_client["player2_id"]
 
     session = get_or_create_configuring_session(gng_id)
-    field = add_field(session.id, type="counter", label="Score", starting_value=0, is_score_field=True)
-    launch_session(session.id, mode="teams",
-                   teams_data=[
-                       {"name": "Red", "player_ids": [p1_id]},
-                       {"name": "Blue", "player_ids": [p2_id]},
-                   ],
-                   player_ids=[])
+    field = add_field(
+        session.id, type="counter", label="Score", starting_value=0, is_score_field=True
+    )
+    launch_session(
+        session.id,
+        mode="teams",
+        teams_data=[
+            {"name": "Red", "player_ids": [p1_id]},
+            {"name": "Blue", "player_ids": [p2_id]},
+        ],
+        player_ids=[],
+    )
 
     # Update scores for both teams
     teams = TrackerTeam.query.filter_by(tracker_session_id=session.id).all()
@@ -623,12 +769,15 @@ def test_team_mode_save_results_writes_all_members(app, db, team_tracker_client)
     update_value(session.id, field.id, entity_type="team", entity_id=red.id, delta=10)
     update_value(session.id, field.id, entity_type="team", entity_id=blue.id, delta=5)
 
-    resp = c.post(f"/tracker/{session.id}/save", data={
-        f"position_t_{red.id}": "1",
-        f"score_t_{red.id}": "10",
-        f"position_t_{blue.id}": "2",
-        f"score_t_{blue.id}": "5",
-    })
+    resp = c.post(
+        f"/tracker/{session.id}/save",
+        data={
+            f"position_t_{red.id}": "1",
+            f"score_t_{red.id}": "10",
+            f"position_t_{blue.id}": "2",
+            f"score_t_{blue.id}": "5",
+        },
+    )
     assert resp.status_code == 302
 
     session_obj = TrackerSession.query.get(session.id)
@@ -650,18 +799,24 @@ def test_team_mode_compute_rankings(app, db, team_tracker_client):
         launch_session,
         update_value,
     )
+
     gng_id = team_tracker_client["gng_id"]
     p1_id = team_tracker_client["player1_id"]
     p2_id = team_tracker_client["player2_id"]
 
     session = get_or_create_configuring_session(gng_id)
-    field = add_field(session.id, type="counter", label="Score", starting_value=0, is_score_field=True)
-    launch_session(session.id, mode="teams",
-                   teams_data=[
-                       {"name": "Alpha", "player_ids": [p1_id]},
-                       {"name": "Beta", "player_ids": [p2_id]},
-                   ],
-                   player_ids=[])
+    field = add_field(
+        session.id, type="counter", label="Score", starting_value=0, is_score_field=True
+    )
+    launch_session(
+        session.id,
+        mode="teams",
+        teams_data=[
+            {"name": "Alpha", "player_ids": [p1_id]},
+            {"name": "Beta", "player_ids": [p2_id]},
+        ],
+        player_ids=[],
+    )
 
     teams = TrackerTeam.query.filter_by(tracker_session_id=session.id).all()
     alpha = next(t for t in teams if t.name == "Alpha")
