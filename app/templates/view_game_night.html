@@ -52,6 +52,19 @@
                 </button>
               </form>
 
+              {% set tracker_session = tracker_sessions.get(gng.game_night_game_id) %}
+              {% if tracker_session and tracker_session.status == 'active' %}
+              <a href="{{ url_for('tracker.live_tracker', session_id=tracker_session.id) }}"
+                 class="inline-flex items-center rounded-lg border border-blue-300 px-3 py-1.5 text-xs font-medium text-blue-600 hover:bg-blue-50 transition-colors">
+                &#9654; Resume Tracker
+              </a>
+              {% else %}
+              <a href="{{ url_for('tracker.setup_tracker', gng_id=gng.game_night_game_id) }}"
+                 class="inline-flex items-center rounded-lg border border-stone-300 px-3 py-1.5 text-xs font-medium text-stone-600 hover:bg-stone-50 transition-colors">
+                &#128202; Track
+              </a>
+              {% endif %}
+
               <form action="{{ url_for('game_night.manage_game_in_night', game_night_id=game_night.id) }}" method="POST">
                 <input type="hidden" name="action" value="remove">
                 <input type="hidden" name="game_night_game_id" value="{{ gng.game_night_game_id }}">

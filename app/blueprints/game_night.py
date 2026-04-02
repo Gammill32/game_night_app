@@ -37,7 +37,19 @@ def start_game_night():
 @game_night_access_required
 def view_game_night(game_night_id):
     """View the details of a specific game night."""
+    from app.models import TrackerSession
     context = game_night_services.get_view_game_night_details(game_night_id, current_user.id)
+    game_night_games = context.get("game_night_games", [])
+    tracker_sessions = {
+        ts.game_night_game_id: ts
+        for ts in TrackerSession.query.filter(
+            TrackerSession.game_night_game_id.in_(
+                [gng.game_night_game_id for gng in game_night_games]
+            ),
+            TrackerSession.status.in_(["configuring", "active"]),
+        ).all()
+    } if game_night_games else {}
+    context["tracker_sessions"] = tracker_sessions
     return render_template("view_game_night.html", **context)
 
 

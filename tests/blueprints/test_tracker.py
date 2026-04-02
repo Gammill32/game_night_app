@@ -172,3 +172,28 @@ def test_discard_deletes_session(app, db, auth_tracker_client):
     resp = c.post(f"/tracker/{sid}/discard")
     assert resp.status_code == 302
     assert TrackerSession.query.get(sid) is None
+
+
+def test_track_button_visible_on_active_game_night(auth_tracker_client):
+    c = auth_tracker_client["client"]
+    gn_id = auth_tracker_client["gn_id"]
+    resp = c.get(f"/game_night/{gn_id}")
+    assert resp.status_code == 200
+    assert b"Track" in resp.data
+
+
+def test_track_button_not_visible_on_finalized_game_night(app, db, auth_tracker_client):
+    from app.models import GameNight
+    from app.extensions import db as _db
+    c = auth_tracker_client["client"]
+    gn_id = auth_tracker_client["gn_id"]
+    gn = GameNight.query.get(gn_id)
+    gn.final = True
+    _db.session.commit()
+    resp = c.get(f"/game_night/{gn_id}")
+    assert resp.status_code == 200
+    assert b"/tracker/new" not in resp.data
+    # Reset
+    gn = GameNight.query.get(gn_id)
+    gn.final = False
+    _db.session.commit()
