@@ -8,7 +8,7 @@ from flask_login import current_user
 def admin_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        if not (current_user.admin or current_user.owner):
+        if not current_user.is_authenticated or not (current_user.admin or current_user.owner):
             flash("Access denied. Admins only.", "error")
             return redirect(url_for("main.index"))
         return f(*args, **kwargs)

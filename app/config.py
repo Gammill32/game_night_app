@@ -29,6 +29,7 @@ class Config:
     SESSION_COOKIE_PATH = "/"
     SESSION_COOKIE_SECURE = os.getenv("FLASK_DEBUG", "0") != "1"
     SESSION_COOKIE_HTTPONLY = True
+    SESSION_COOKIE_SAMESITE = "Lax"
 
     # Flask Debug Settings
     ENV = os.getenv("FLASK_ENV", "production")

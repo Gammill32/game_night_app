@@ -7,10 +7,13 @@ def get_all_people():
 
 
 def toggle_admin_status(user_id):
-    """Toggle the admin status of a user."""
+    """Toggle the admin status of a user. Owners cannot be demoted."""
     user = Person.query.get(user_id)
     if not user:
         return False, "User not found."
+
+    if user.owner:
+        return False, "Owner accounts cannot have admin status changed."
 
     user.admin = not user.admin
     action = "promoted to" if user.admin else "demoted from"
@@ -20,13 +23,16 @@ def toggle_admin_status(user_id):
 
 
 def remove_user(user_id, current_user_id):
-    """Remove a user from the system if they are not the current user."""
+    """Remove a user from the system. Cannot remove self or owner accounts."""
     user = Person.query.get(user_id)
     if not user:
         return False, "User not found."
 
     if user.id == current_user_id:
         return False, "You cannot remove yourself."
+
+    if user.owner:
+        return False, "Owner accounts cannot be removed."
 
     db.session.delete(user)
     db.session.commit()

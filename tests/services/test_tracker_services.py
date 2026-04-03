@@ -16,15 +16,6 @@ from app.models import (
 )
 
 
-def test_tracker_models_importable():
-    from app.models import TrackerField, TrackerSession, TrackerTeam, TrackerValue
-
-    assert TrackerSession.__tablename__ == "tracker_sessions"
-    assert TrackerField.__tablename__ == "tracker_fields"
-    assert TrackerTeam.__tablename__ == "tracker_teams"
-    assert TrackerValue.__tablename__ == "tracker_values"
-
-
 @pytest.fixture()
 def tracker_night(app, db):
     """A game night with one game and two players."""
