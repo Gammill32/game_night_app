@@ -178,11 +178,16 @@ To auto-fix lint and format issues:
 ruff check --fix . && ruff format .
 ```
 
-> **Version note:** The project pins `ruff==0.4.4` in `requirements-dev.txt`. If your system has a different version of ruff installed, you may see different warnings. The CI version (0.4.4) is authoritative — install it in a virtualenv to be sure:
+> **Version note:** The project pins `ruff==0.4.4` in `requirements-dev.txt`. Your system ruff may be a different (newer) version and will report "All checks passed" locally while CI still fails. **Always use the pinned version before pushing:**
 > ```bash
 > python3 -m venv .venv && source .venv/bin/activate
 > pip install -r requirements.txt -r requirements-dev.txt
-> ruff check . && ruff format --check .
+> ruff check --fix . && ruff format .
+> ```
+> Or with a one-off temp venv:
+> ```bash
+> python3 -m venv /tmp/ruff-venv && /tmp/ruff-venv/bin/pip install ruff==0.4.4 -q
+> /tmp/ruff-venv/bin/ruff check --fix . && /tmp/ruff-venv/bin/ruff format .
 > ```
 
 ---
