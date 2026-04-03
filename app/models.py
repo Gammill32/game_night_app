@@ -363,6 +363,7 @@ class PollResponse(db.Model):
 
 class PollInvitee(db.Model):
     __tablename__ = "poll_invitees"
+    __table_args__ = (db.UniqueConstraint("poll_id", "person_id", name="uq_poll_invitees"),)
 
     id = db.Column(db.Integer, primary_key=True)
     poll_id = db.Column(db.Integer, db.ForeignKey("polls.id", ondelete="CASCADE"), nullable=False)

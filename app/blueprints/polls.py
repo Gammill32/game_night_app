@@ -1,5 +1,6 @@
 from flask import Blueprint, abort, flash, redirect, render_template, request, session, url_for
 from flask_login import current_user, login_required
+from sqlalchemy.orm import selectinload
 
 from app.services.poll_services import (
     create_poll,
@@ -23,7 +24,7 @@ def inject_active_polls():
     from app.models import Poll
 
     try:
-        all_open = Poll.query.filter_by(closed=False).all()
+        all_open = Poll.query.filter_by(closed=False).options(selectinload(Poll.invitees)).all()
         active_all = [p for p in all_open if poll_is_active(p)]
 
         is_admin = current_user.is_authenticated and (current_user.admin or current_user.owner)
@@ -63,6 +64,8 @@ def poll_list():
 def poll_create():
     from app.models import Person
 
+    people = Person.query.order_by(Person.first_name).all()
+
     if request.method == "POST":
         title = request.form.get("title", "").strip()
         description = request.form.get("description", "").strip() or None
@@ -72,8 +75,6 @@ def poll_create():
         multi_select = request.form.get("multi_select") == "true"
         private = request.form.get("private") == "true"
         invitee_ids = [int(i) for i in request.form.getlist("invitee_ids") if i.isdigit()]
-
-        people = Person.query.order_by(Person.first_name).all()
 
         if not title or len(option_labels) < 2:
             return render_template(
@@ -120,7 +121,12 @@ def poll_edit(poll_id: int):
             try:
                 closes_at = datetime.fromisoformat(closes_at_str)
             except ValueError:
-                pass
+                return render_template(
+                    "poll_edit.html",
+                    poll=poll,
+                    people=people,
+                    error="Invalid close date format. Please use the date picker.",
+                )
 
         option_updates: dict[int, str] = {}
         for key, val in request.form.items():
