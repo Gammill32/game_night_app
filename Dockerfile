@@ -16,4 +16,4 @@ ENV FLASK_APP=app
 
 EXPOSE 8000
 
-ENTRYPOINT ["sleep", "infinity"]
+ENTRYPOINT ["scripts/entrypoint.sh"]
