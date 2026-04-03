@@ -3,45 +3,47 @@
 {% block title %}Add to Wishlist{% endblock %}
 
 {% block content %}
-<h1>Add a Game to Your Wishlist</h1>
+<h1 class="text-2xl font-bold text-stone-800 mb-6">Add a Game to Your Wishlist</h1>
 
-<!-- Explanation Section -->
-<div class="info-box">
-  <h3>How to Find the BGG ID</h3>
-  <p>
+<!-- BGG ID help -->
+<div class="bg-white rounded-xl border border-stone-200 shadow-sm p-5 mb-6">
+  <h2 class="text-base font-semibold text-stone-800 mb-2">How to Find the BGG ID</h2>
+  <p class="text-sm text-stone-600 mb-2">
     To add a game to your wishlist, you can use the BoardGameGeek ID (BGG ID). Follow these steps:
   </p>
-  <ol>
+  <ol class="list-decimal list-inside space-y-2 text-sm text-stone-600">
     <li>
-      Go to <a href="https://boardgamegeek.com" target="_blank">BoardGameGeek</a> and search for your game.
+      Go to <a href="https://boardgamegeek.com" target="_blank" class="text-red-600 hover:underline">BoardGameGeek</a> and search for your game.
     </li>
     <li>
       Open the game's page and check the URL. The BGG ID is the number that appears in the URL.
-      <p>For example, in this URL:</p>
-      <code>https:&#8203;//boardgamegeek.com&#8203;/boardgame&#8203;/342942&#8203;/ark-nova</code>
-      <p>The BGG ID is <strong>342942</strong>.</p>
+      <p class="mt-1">For example, in this URL:</p>
+      <code class="block mt-1 rounded bg-stone-100 px-3 py-2 text-xs text-stone-700">https:&#8203;//boardgamegeek.com&#8203;/boardgame&#8203;/342942&#8203;/ark-nova</code>
+      <p class="mt-1">The BGG ID is <strong>342942</strong>.</p>
     </li>
   </ol>
-  <p>
+  <p class="mt-3 text-sm text-stone-500">
     If you cannot obtain the BGG ID, you can enter the game name instead. Providing the BGG ID is preferred for accurate game data.
   </p>
 </div>
 
-<!-- Form Section -->
-<form action="{{ url_for('games.add_to_wishlist') }}" method="POST" class="standard-form">
-  <div class="form-group">
-    <label for="bgg_id">BGG ID (Preferred):</label>
-    <input type="number" id="bgg_id" name="bgg_id" class="form-control" placeholder="Enter BGG ID">
-  </div>
+<!-- Form -->
+<div class="bg-white rounded-xl border border-stone-200 shadow-sm p-5">
+  <form action="{{ url_for('games.add_to_wishlist') }}" method="POST">
+    <div class="mb-4">
+      <label for="bgg_id" class="block text-sm font-medium text-stone-700 mb-1">BGG ID (Preferred)</label>
+      <input type="number" id="bgg_id" name="bgg_id" class="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent" placeholder="Enter BGG ID">
+    </div>
 
-  <div class="form-group">
-    <label for="name">Game Name (Optional):</label>
-    <input type="text" id="name" name="name" class="form-control" placeholder="Enter Game Name">
-  </div>
+    <div class="mb-6">
+      <label for="name" class="block text-sm font-medium text-stone-700 mb-1">Game Name (Optional)</label>
+      <input type="text" id="name" name="name" class="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent" placeholder="Enter Game Name">
+    </div>
 
-  <div class="form-actions">
-    <button type="submit" class="btn btn--success">Add to Wishlist</button>
-    <a href="{{ url_for('games.wishlist') }}" class="btn btn--primary">Back to Wishlist</a>
-  </div>
-</form>
+    <div class="flex gap-3">
+      <button type="submit" class="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 transition-colors">Add to Wishlist</button>
+      <a href="{{ url_for('games.my_wishlist') }}" class="inline-flex items-center rounded-lg border border-stone-300 px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50 transition-colors">Back to Wishlist</a>
+    </div>
+  </form>
+</div>
 {% endblock %}

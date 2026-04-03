@@ -3,151 +3,198 @@
 {% block title %}Game Night Details{% endblock %}
 
 {% block content %}
-<div class="game-night-container">
-  <h1 class="game-night-title">Game Night on {{ game_night.date.strftime('%B %d, %Y') }}</h1>
-  <p class="game-night-notes">{{ game_night.notes or 'No notes available.' }}</p>
+<div class="max-w-3xl mx-auto space-y-6">
 
-  <section class="players-section">
-    <h2>Players</h2>
-    <ul class="players-list">
+  <!-- Header -->
+  <div>
+    <h1 class="text-2xl font-bold text-stone-800 mb-1">Game Night on {{ game_night.date.strftime('%B %d, %Y') }}</h1>
+    <p class="text-sm text-stone-500">{{ game_night.notes or 'No notes available.' }}</p>
+  </div>
+
+  <!-- Players -->
+  <div class="bg-white rounded-xl border border-stone-200 shadow-sm p-5">
+    <h2 class="text-lg font-semibold text-stone-800 mb-3">Players</h2>
+    <ul class="flex flex-wrap gap-2">
       {% for player in players %}
-        <li>{{ player.person.first_name }} {{ player.person.last_name }}</li>
+        <li class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-stone-100 text-stone-700">
+          {{ player.person.first_name }} {{ player.person.last_name }}
+        </li>
       {% else %}
-        <li>No players found.</li>
+        <li class="text-sm text-stone-500">No players found.</li>
       {% endfor %}
     </ul>
-  </section>
+  </div>
 
+  <!-- Games Played -->
   {% if game_night_games %}
-  <section class="games-played-section">
-    <h2>Games Played</h2>
-    <ul class="game-list">
+  <div class="bg-white rounded-xl border border-stone-200 shadow-sm p-5">
+    <h2 class="text-lg font-semibold text-stone-800 mb-4">Games Played</h2>
+    <ul class="space-y-6">
       {% for gng in game_night_games %}
-      <li class="game-list__item">
-        <div class="game-list__info">
-          <a href="{{ url_for('games.view_game', game_id=gng.game_id) }}">
-            <img src="{{ gng.game_image_url }}" alt="{{ gng.game_name }}" class="game-list__thumbnail">
+      <li class="border-b border-stone-100 last:border-0 pb-6 last:pb-0">
+        <div class="flex gap-4">
+          <a href="{{ url_for('games.view_game', game_id=gng.game_id) }}" class="flex-shrink-0">
+            <img src="{{ gng.game_image_url }}" alt="{{ gng.game_name }}" class="h-16 w-16 rounded-lg object-cover border border-stone-200">
           </a>
-          <div class="game-list__info-content">
-            <strong class="game-list__title">{{ gng.game_name }}</strong>
-  
-            <div class="game-list__meta">
-              <p>Round {{ gng.round }}</p>
-              <p>Your Rating: {{ user_ratings_by_game_id.get(gng.game_id, 'Not Rated') }}</p>
+          <div class="flex-1 min-w-0">
+            <div class="flex items-start justify-between gap-2 mb-1">
+              <strong class="text-sm font-semibold text-stone-800">{{ gng.game_name }}</strong>
+              <span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-stone-100 text-stone-600 whitespace-nowrap">Round {{ gng.round }}</span>
             </div>
-  
+            <p class="text-xs text-stone-500 mb-3">Your Rating: {{ user_ratings_by_game_id.get(gng.game_id, 'Not Rated') }}</p>
+
             {% if not game_night.final and (current_user.admin or current_user.owner) %}
-            <div class="admin-controls">
-              <form action="{{ url_for('game_night.log_results', game_night_id=game_night.id, game_night_game_id=gng.game_night_game_id) }}" method="GET" class="form-inline">
-                <button type="submit" class="btn btn--success">Log Results</button>
+            <div class="flex flex-wrap gap-2 mb-3">
+              <form action="{{ url_for('game_night.log_results', game_night_id=game_night.id, game_night_game_id=gng.game_night_game_id) }}" method="GET">
+                <button type="submit"
+                        class="inline-flex items-center rounded-lg bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700 transition-colors">
+                  Log Results
+                </button>
               </form>
-  
-              <form action="{{ url_for('game_night.manage_game_in_night', game_night_id=game_night.id) }}" method="POST" class="form-inline">
+
+              {% set tracker_session = tracker_sessions.get(gng.game_night_game_id) %}
+              {% if tracker_session and tracker_session.status == 'active' %}
+              <a href="{{ url_for('tracker.live_tracker', session_id=tracker_session.id) }}"
+                 class="inline-flex items-center rounded-lg border border-blue-300 px-3 py-1.5 text-xs font-medium text-blue-600 hover:bg-blue-50 transition-colors">
+                &#9654; Resume Tracker
+              </a>
+              {% else %}
+              <a href="{{ url_for('tracker.setup_tracker', gng_id=gng.game_night_game_id) }}"
+                 class="inline-flex items-center rounded-lg border border-stone-300 px-3 py-1.5 text-xs font-medium text-stone-600 hover:bg-stone-50 transition-colors">
+                &#128202; Track
+              </a>
+              {% endif %}
+
+              <form action="{{ url_for('game_night.manage_game_in_night', game_night_id=game_night.id) }}" method="POST">
                 <input type="hidden" name="action" value="remove">
                 <input type="hidden" name="game_night_game_id" value="{{ gng.game_night_game_id }}">
-                <button type="submit" class="btn btn--danger">Remove Game</button>
+                <button type="submit"
+                        class="inline-flex items-center rounded-lg border border-stone-300 px-3 py-1.5 text-xs font-medium text-stone-700 hover:bg-stone-50 transition-colors">
+                  Remove Game
+                </button>
               </form>
-  
+
               {% if gng.game_id not in owned_game_ids %}
-              <form action="{{ url_for('games.toggle_wishlist', game_id=gng.game_id) }}" method="POST" class="form-inline">
-                <button type="submit" class="btn btn--success">
+              <form action="{{ url_for('games.toggle_wishlist', game_id=gng.game_id) }}" method="POST">
+                <button type="submit"
+                        class="inline-flex items-center rounded-lg border border-stone-300 px-3 py-1.5 text-xs font-medium text-stone-700 hover:bg-stone-50 transition-colors">
                   {% if gng.game_id in wishlist_game_ids %}Remove from Wishlist{% else %}Add to Wishlist{% endif %}
                 </button>
               </form>
               {% endif %}
             </div>
             {% endif %}
-  
-            <table class="styled-table table--narrow">
-              <thead>
-                <tr>
-                  <th>Player</th>
-                  <th>Place</th>
-                  <th>Score</th>
-                </tr>
-              </thead>
-              <tbody>
-                {% for result in gng.results %}
-                <tr>
-                  <td>{{ result.first_name }} {{ result.last_name }}</td>
-                  <td>{% if result.position is not none %}{{ result.position }}{% else %}-{% endif %}</td>
-                  <td>{% if result.score is not none %}{{ result.score }}{% else %}-{% endif %}</td>
-                </tr>
-                {% else %}
-                <tr>
-                  <td colspan="3">No results logged.</td>
-                </tr>
-                {% endfor %}
-              </tbody>
-            </table>
+
+            <!-- Results table -->
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm">
+                <thead>
+                  <tr class="border-b border-stone-200">
+                    <th class="text-left py-1.5 pr-4 text-xs font-medium text-stone-500">Player</th>
+                    <th class="text-left py-1.5 pr-4 text-xs font-medium text-stone-500">Place</th>
+                    <th class="text-left py-1.5 text-xs font-medium text-stone-500">Score</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for result in gng.results %}
+                  <tr class="border-b border-stone-100 last:border-0">
+                    <td class="py-1.5 pr-4 text-sm text-stone-700">{{ result.first_name }} {{ result.last_name }}</td>
+                    <td class="py-1.5 pr-4 text-sm text-stone-700">{% if result.position is not none %}{{ result.position }}{% else %}-{% endif %}</td>
+                    <td class="py-1.5 text-sm text-stone-700">{% if result.score is not none %}{{ result.score }}{% else %}-{% endif %}</td>
+                  </tr>
+                  {% else %}
+                  <tr>
+                    <td colspan="3" class="py-2 text-sm text-stone-500">No results logged.</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       </li>
       {% endfor %}
     </ul>
-  </section>
+  </div>
   {% endif %}
 
+  <!-- Add a Game (admin) -->
   {% if not game_night.final and (current_user.admin or current_user.owner) %}
-  <section class="add-game-section">
-    <h2>Add a Game</h2>
-    <a href="{{ url_for('game_night.add_game_to_night', game_night_id=game_night.id) }}" class="btn btn--success">Add a Game</a>
-  </section>
+  <div class="bg-white rounded-xl border border-stone-200 shadow-sm p-5">
+    <h2 class="text-lg font-semibold text-stone-800 mb-3">Add a Game</h2>
+    <a href="{{ url_for('game_night.add_game_to_night', game_night_id=game_night.id) }}"
+       class="inline-flex items-center rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 transition-colors">
+      Add a Game
+    </a>
+  </div>
   {% endif %}
 
+  <!-- Nominations & Voting -->
   {% if not game_night.closed %}
-  <section class="nominations-section">
-    <h2>Nominate a Game</h2>
-    <a href="{{ url_for('voting.nominate_game_page', game_night_id=game_night.id) }}" class="btn btn--success">Nominate a Game</a>
-  </section>
+  <div class="bg-white rounded-xl border border-stone-200 shadow-sm p-5">
+    <h2 class="text-lg font-semibold text-stone-800 mb-3">Nominate a Game</h2>
+    <a href="{{ url_for('voting.nominate_game_page', game_night_id=game_night.id) }}"
+       class="inline-flex items-center rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 transition-colors">
+      Nominate a Game
+    </a>
+  </div>
 
-  <section class="voting-section">
-    <h2>Vote for Games</h2>
+  <div class="bg-white rounded-xl border border-stone-200 shadow-sm p-5">
+    <h2 class="text-lg font-semibold text-stone-800 mb-4">Vote for Games</h2>
     <form method="POST" action="{{ url_for('voting.vote_game', game_night_id=game_night.id) }}">
-      <div class="votes-container">
+      <div class="space-y-4 mb-4">
         {% for nomination in nominations %}
-        <div class="vote-option">
-          <a href="{{ url_for('games.view_game', game_id=nomination.game_id) }}">
-            <img src="{{ nomination.image_url }}" alt="{{ nomination.game_name }}" class="vote-option__thumbnail">
+        <div class="flex gap-4 items-start p-3 rounded-lg border border-stone-100 hover:border-stone-200 transition-colors">
+          <a href="{{ url_for('games.view_game', game_id=nomination.game_id) }}" class="flex-shrink-0">
+            <img src="{{ nomination.image_url }}" alt="{{ nomination.game_name }}" class="h-14 w-14 rounded-lg object-cover border border-stone-200">
           </a>
-          <strong>{{ nomination.game_name }}</strong>
-          <div class="vote-option__meta">
-            <p>Your Rating: {{ user_ratings_by_game_id.get(nomination.game_id, 'Not Rated') }}</p>
-            <p>Avg Rating: {{ nomination.avg_rating or 'No ratings yet' }}</p>
-            <p>Votes: {{ nomination.vote_score or 0 }}</p>
+          <div class="flex-1 min-w-0">
+            <strong class="text-sm font-semibold text-stone-800 block mb-1">{{ nomination.game_name }}</strong>
+            <p class="text-xs text-stone-500">Your Rating: {{ user_ratings_by_game_id.get(nomination.game_id, 'Not Rated') }}</p>
+            <p class="text-xs text-stone-500">Avg Rating: {{ nomination.avg_rating or 'No ratings yet' }}</p>
+            <p class="text-xs text-stone-500 mb-2">Votes: {{ nomination.vote_score or 0 }}</p>
+            <div class="flex items-center gap-2">
+              <label for="votes[{{ nomination.game_id }}]" class="text-xs font-medium text-stone-700">Your Rank:</label>
+              <select name="votes[{{ nomination.game_id }}]"
+                      class="rounded-lg border border-stone-300 px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent">
+                <option value="">No Vote</option>
+                {% for i in range(1, 4) %}
+                <option value="{{ i }}" {% if user_votes.get(nomination.game_id) == i %}selected{% endif %}>{{ i }}</option>
+                {% endfor %}
+              </select>
+            </div>
           </div>
-          <label for="votes[{{ nomination.game_id }}]">Your Rank:</label>
-          <select name="votes[{{ nomination.game_id }}]" class="vote-option__dropdown">
-            <option value="">No Vote</option>
-            {% for i in range(1, 4) %}
-            <option value="{{ i }}" {% if user_votes.get(nomination.game_id) == i %}selected{% endif %}>{{ i }}</option>
-            {% endfor %}
-          </select>
         </div>
         {% endfor %}
       </div>
-      <button type="submit" class="btn btn--success">Submit Votes</button>
+      <button type="submit"
+              class="inline-flex items-center rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 transition-colors">
+        Submit Votes
+      </button>
     </form>
-  </section>
+  </div>
   {% endif %}
 
+  <!-- Top Places (finalized) -->
   {% if game_night.final %}
-  <section class="winner-section podium">
-    <h2>Top Places</h2>
+  <div class="bg-white rounded-xl border border-stone-200 shadow-sm p-5">
+    <h2 class="text-lg font-semibold text-stone-800 mb-4">Top Places</h2>
     {% if top_places %}
-    <div class="podium__container">
+    <div class="flex flex-wrap gap-4">
       {% for place, player_ids in top_places %}
       {% if player_ids %}
-      <div class="podium__place podium__place--{{ place }}">
-        {% if place == 1 %}<span class="podium__crown">👑</span>{% endif %}
-        <h3>{{ place }}{{ 'st' if place == 1 else 'nd' if place == 2 else 'rd' if place == 3 else 'th' }} Place</h3>
-        <ul>
+      <div class="flex-1 min-w-[120px] text-center p-4 rounded-xl border border-stone-200 bg-stone-50">
+        {% if place == 1 %}<div class="text-2xl mb-1">👑</div>{% endif %}
+        <h3 class="text-sm font-semibold text-stone-800 mb-2">
+          {{ place }}{{ 'st' if place == 1 else 'nd' if place == 2 else 'rd' if place == 3 else 'th' }} Place
+        </h3>
+        <ul class="space-y-0.5">
           {% for player_id in player_ids %}
           {% set player = players | selectattr("id", "equalto", player_id) | first %}
           {% if player and player.person %}
-          <li>{{ player.person.first_name }} {{ player.person.last_name }}</li>
+          <li class="text-xs text-stone-700">{{ player.person.first_name }} {{ player.person.last_name }}</li>
           {% else %}
-          <li>Unknown Player (ID: {{ player_id }})</li>
+          <li class="text-xs text-stone-500">Unknown Player (ID: {{ player_id }})</li>
           {% endif %}
           {% endfor %}
         </ul>
@@ -156,25 +203,64 @@
       {% endfor %}
     </div>
     {% else %}
-    <p>No results to display.</p>
+    <p class="text-sm text-stone-500">No results to display.</p>
     {% endif %}
-  </section>
+  </div>
   {% endif %}
 
+  <!-- Availability Poll -->
   {% if current_user.admin or current_user.owner %}
-  <section class="admin-controls">
-    <form action="{{ url_for('game_night.toggle_game_night_field', game_night_id=game_night.id, field='closed') }}" method="POST" class="form-inline">
-      <button type="submit" class="btn btn--danger">
-        {% if game_night.closed %}Open Voting{% else %}Close Voting{% endif %}
-      </button>
-    </form>
-    <form action="{{ url_for('game_night.toggle_game_night_field', game_night_id=game_night.id, field='final') }}" method="POST" class="form-inline">
-      <button type="submit" class="btn btn--danger">
-        {% if game_night.final %}Open Results{% else %}Finalize Results{% endif %}
-      </button>
-    </form>
-    <a href="{{ url_for('game_night.edit_game_night', game_night_id=game_night.id) }}" class="btn btn--success">Edit Game Night</a>
-  </section>
+  <div class="bg-white rounded-xl border border-stone-200 shadow-sm p-5">
+    <h2 class="text-lg font-semibold text-stone-800 mb-3">Availability Poll</h2>
+    {% if availability_poll %}
+      <div class="mb-3 space-y-1">
+        {% for option in availability_poll.options %}
+          {% set count = availability_poll.responses | selectattr("option_id", "equalto", option.id) | list | length %}
+          <div class="flex items-center gap-2 text-sm text-stone-700">
+            <span class="font-medium w-28">{{ option.label }}</span>
+            <span class="px-2 py-0.5 rounded-full bg-stone-100 text-stone-600 text-xs font-medium">{{ count }}</span>
+          </div>
+        {% endfor %}
+      </div>
+      <a href="{{ url_for('polls.poll_respond', token=availability_poll.token) }}"
+         class="inline-flex items-center rounded-lg border border-stone-300 px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50 transition-colors">
+        View Poll
+      </a>
+    {% else %}
+      <form action="{{ url_for('game_night.create_availability_poll', game_night_id=game_night.id) }}" method="POST">
+        <button type="submit"
+                class="inline-flex items-center rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 transition-colors">
+          Create Availability Poll
+        </button>
+      </form>
+    {% endif %}
+  </div>
   {% endif %}
+
+  <!-- Admin Controls -->
+  {% if current_user.admin or current_user.owner %}
+  <div class="bg-white rounded-xl border border-stone-200 shadow-sm p-5">
+    <h2 class="text-lg font-semibold text-stone-800 mb-3">Admin Controls</h2>
+    <div class="flex flex-wrap gap-3">
+      <form action="{{ url_for('game_night.toggle_game_night_field', game_night_id=game_night.id, field='closed') }}" method="POST">
+        <button type="submit"
+                class="inline-flex items-center rounded-lg border border-stone-300 px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50 transition-colors">
+          {% if game_night.closed %}Open Voting{% else %}Close Voting{% endif %}
+        </button>
+      </form>
+      <form action="{{ url_for('game_night.toggle_game_night_field', game_night_id=game_night.id, field='final') }}" method="POST">
+        <button type="submit"
+                class="inline-flex items-center rounded-lg border border-stone-300 px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50 transition-colors">
+          {% if game_night.final %}Open Results{% else %}Finalize Results{% endif %}
+        </button>
+      </form>
+      <a href="{{ url_for('game_night.edit_game_night', game_night_id=game_night.id) }}"
+         class="inline-flex items-center rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 transition-colors">
+        Edit Game Night
+      </a>
+    </div>
+  </div>
+  {% endif %}
+
 </div>
 {% endblock %}

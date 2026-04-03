@@ -1,100 +1,199 @@
 <!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>{% block title %}Game Night{% endblock %}</title>
-    <!-- Favicons -->
-    <link
-      rel="icon"
-      href="{{ url_for('static', filename='images/favicon.svg') }}"
-      type="image/svg+xml"
-    />
-    <link
-      rel="icon"
-      href="{{ url_for('static', filename='images/favicon.ico') }}"
-      sizes="any"
-    />
-    <link
-      rel="apple-touch-icon"
-      sizes="180x180"
-      href="{{ url_for('static', filename='images/apple-touch-icon.png') }}"
-    />
-    <link
-      rel="icon"
-      type="image/png"
-      sizes="96x96"
-      href="{{ url_for('static', filename='images/favicon-96x96.png') }}"
-    />
-    <link
-      rel="icon"
-      type="image/png"
-      sizes="192x192"
-      href="{{ url_for('static', filename='images/web-app-manifest-192x192.png') }}"
-    />
-    <link
-      rel="icon"
-      type="image/png"
-      sizes="512x512"
-      href="{{ url_for('static', filename='images/web-app-manifest-512x512.png') }}"
-    />
-    <link
-      rel="manifest"
-      href="{{ url_for('static', filename='images/site.webmanifest') }}"
-    />
-    <link
-      rel="stylesheet"
-      href="{{ url_for('static', filename='css/styles.css') }}"
-    />
-    <script>
-      function toggleMenu() {
-        document.getElementById("menu").classList.toggle("navbar__links--show");
+<html lang="en" class="h-full">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% block title %}Game Night{% endblock %}</title>
+
+  <!-- Favicons -->
+  <link rel="icon" href="{{ url_for('static', filename='images/favicon.svg') }}" type="image/svg+xml" />
+  <link rel="icon" href="{{ url_for('static', filename='images/favicon.ico') }}" sizes="any" />
+  <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='images/apple-touch-icon.png') }}" />
+  <link rel="manifest" href="{{ url_for('static', filename='images/site.webmanifest') }}" />
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: { DEFAULT: '#dc2626', hover: '#b91c1c' }
+          }
+        }
       }
-    </script>
-  </head>
-  <body>
-    <nav class="navbar">
-      <button class="navbar__hamburger hamburger" onclick="toggleMenu()">
-        ☰
-      </button>
+    }
+  </script>
 
-      <div class="navbar__links" id="menu">
-        <a href="{{ url_for('main.index') }}">Home</a>
-        <a href="{{ url_for('games.games_index') }}">Games</a>
-        <a href="{{ url_for('games.wishlist') }}">Wishlist</a>
-        <a href="{{ url_for('games.user_stats') }}">Stats</a>
-        {% if current_user.admin or current_user.owner %}
-        <a href="{{ url_for('admin.admin_page') }}">Admin</a>
-        {% endif %}
-      </div>
+  <!-- HTMX CDN (used in Phase 2+) -->
+  <script src="https://unpkg.com/htmx.org@1.9.12" defer></script>
 
-      <div class="navbar__user">
-        <a href="{{ url_for('auth.manage_user') }}"
-          >{{ current_user.first_name }} {{ current_user.last_name }}</a
-        >
-        <form
-          action="{{ url_for('auth.logout') }}"
-          method="POST"
-          style="display: inline"
-        >
-          <button
-            type="submit"
-            class="btn btn--danger"
-            style="margin-left: 5px"
-          >
-            Sign Out
-          </button>
-        </form>
-      </div>
+  <!-- Custom overrides -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}" />
+
+  <!-- CSRF token for JS-driven forms and HTMX -->
+  <meta name="csrf-token" content="{{ csrf_token() }}">
+
+  {% block head %}{% endblock %}
+</head>
+<body class="h-full bg-stone-50 text-stone-800">
+
+  <!-- ===== DESKTOP SIDEBAR ===== -->
+  <aside class="hidden md:flex fixed inset-y-0 left-0 w-16 flex-col bg-white border-r border-stone-200 z-30">
+    <!-- Logo -->
+    <a href="{{ url_for('main.index') }}" class="flex items-center justify-center h-16 border-b border-stone-200">
+      <img src="{{ url_for('static', filename='images/logo.png') }}" alt="Game Night" class="h-8 w-8 object-contain" />
+    </a>
+
+    <!-- Nav links -->
+    <nav class="flex flex-col items-center gap-1 flex-1 py-4">
+      {% set nav_items = [
+        ('main.index',    'Home',    'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6'),
+        ('games.games_index', 'Games', 'M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10'),
+        ('games.wishlist', 'Wishlist', 'M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z'),
+        ('games.user_stats', 'Stats', 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z'),
+      ] %}
+
+      {% for endpoint, label, icon_path in nav_items %}
+      <a href="{{ url_for(endpoint) }}"
+         title="{{ label }}"
+         class="group relative flex items-center justify-center w-10 h-10 rounded-lg text-stone-500 hover:bg-stone-100 hover:text-red-600 transition-colors">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+          <path stroke-linecap="round" stroke-linejoin="round" d="{{ icon_path }}" />
+        </svg>
+        <span class="absolute left-14 px-2 py-1 bg-stone-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 whitespace-nowrap pointer-events-none transition-opacity z-50">
+          {{ label }}
+        </span>
+      </a>
+      {% endfor %}
+
+      {% if current_user.is_authenticated and (current_user.admin or current_user.owner) %}
+      <a href="{{ url_for('polls.poll_list') }}"
+         title="Polls{% if active_polls_count > 0 %} ({{ active_polls_count }}){% endif %}"
+         class="group relative flex items-center justify-center w-10 h-10 rounded-lg text-stone-500 hover:bg-stone-100 hover:text-red-600 transition-colors">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+        </svg>
+        <span class="absolute left-14 px-2 py-1 bg-stone-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 whitespace-nowrap pointer-events-none transition-opacity z-50">
+          Polls{% if active_polls_count > 0 %} ({{ active_polls_count }}){% endif %}
+        </span>
+      </a>
+      <a href="{{ url_for('admin.admin_page') }}"
+         title="Admin"
+         class="group relative flex items-center justify-center w-10 h-10 rounded-lg text-amber-500 hover:bg-amber-50 hover:text-amber-600 transition-colors">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+          <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+        </svg>
+        <span class="absolute left-14 px-2 py-1 bg-stone-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 whitespace-nowrap pointer-events-none transition-opacity z-50">Admin</span>
+      </a>
+      {% endif %}
     </nav>
 
-    <div class="flash-messages">
-      {% with messages = get_flashed_messages(with_categories=true) %} {% if
-      messages %} {% for category, message in messages %}
-      <div class="flash-message flash-{{ category }}">{{ message }}</div>
-      {% endfor %} {% endif %} {% endwith %}
+    <!-- User + sign out at bottom -->
+    <!-- Guard with is_authenticated — Phase 3 introduces public routes that use base.html -->
+    {% if current_user.is_authenticated %}
+    <div class="flex flex-col items-center gap-1 pb-4 border-t border-stone-200 pt-4">
+      <a href="{{ url_for('auth.manage_user') }}"
+         title="{{ current_user.first_name }} {{ current_user.last_name }}"
+         class="group relative flex items-center justify-center w-10 h-10 rounded-lg bg-red-600 text-white text-xs font-bold hover:bg-red-700 transition-colors">
+        {{ current_user.first_name[0] }}{{ current_user.last_name[0] }}
+        <span class="absolute left-14 px-2 py-1 bg-stone-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 whitespace-nowrap pointer-events-none transition-opacity z-50">
+          {{ current_user.first_name }} {{ current_user.last_name }}
+        </span>
+      </a>
+      <form action="{{ url_for('auth.logout') }}" method="POST">
+        <button type="submit"
+                title="Sign Out"
+                class="group relative flex items-center justify-center w-10 h-10 rounded-lg text-stone-400 hover:bg-red-50 hover:text-red-600 transition-colors">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+          </svg>
+          <span class="absolute left-14 px-2 py-1 bg-stone-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 whitespace-nowrap pointer-events-none transition-opacity z-50">Sign Out</span>
+        </button>
+      </form>
     </div>
+    {% endif %}
+  </aside>
 
-    <div class="container">{% block content %}{% endblock %}</div>
-  </body>
+  <!-- ===== MOBILE TOP BAR ===== -->
+  <header class="md:hidden fixed top-0 left-0 right-0 h-14 bg-white border-b border-stone-200 flex items-center px-4 z-30">
+    <img src="{{ url_for('static', filename='images/logo.png') }}" alt="" class="h-7 w-7 object-contain mr-2" />
+    <span class="font-semibold text-stone-800">Game Night</span>
+  </header>
+
+  <!-- ===== MAIN CONTENT ===== -->
+  <main class="md:ml-16 pt-14 md:pt-0 pb-20 md:pb-0 min-h-full">
+
+    <!-- Flash messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+    <div class="px-4 pt-4 space-y-2">
+      {% for category, message in messages %}
+      <div class="flash-message rounded-lg px-4 py-3 text-sm font-medium
+        {% if category == 'success' %}bg-green-50 text-green-800 border border-green-200
+        {% elif category == 'danger' or category == 'error' %}bg-red-50 text-red-800 border border-red-200
+        {% elif category == 'warning' %}bg-amber-50 text-amber-800 border border-amber-200
+        {% else %}bg-blue-50 text-blue-800 border border-blue-200{% endif %}">
+        {{ message }}
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+    {% endwith %}
+
+    <!-- Page content -->
+    <div class="px-4 py-6 max-w-5xl mx-auto">
+      {% block content %}{% endblock %}
+    </div>
+  </main>
+
+  <!-- ===== MOBILE BOTTOM NAV ===== -->
+  <nav class="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-stone-200 flex z-30">
+    {% set mobile_nav = [
+      ('main.index',        'Home',    'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6'),
+      ('games.games_index', 'Games',   'M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10'),
+      ('games.user_stats',  'Stats',   'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z'),
+      ('auth.manage_user',  'Me',      'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z'),
+    ] %}
+    {% for endpoint, label, icon_path in mobile_nav %}
+    <a href="{{ url_for(endpoint) }}" class="flex flex-col items-center justify-center flex-1 py-2 text-stone-500 hover:text-red-600 transition-colors">
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mb-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+        <path stroke-linecap="round" stroke-linejoin="round" d="{{ icon_path }}" />
+      </svg>
+      <span class="text-xs">{{ label }}</span>
+    </a>
+    {% endfor %}
+    {% if current_user.is_authenticated and (current_user.admin or current_user.owner) %}
+    <a href="{{ url_for('admin.admin_page') }}" class="flex flex-col items-center justify-center flex-1 py-2 text-amber-500 hover:text-amber-600 transition-colors">
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mb-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+      </svg>
+      <span class="text-xs">Admin</span>
+    </a>
+    {% endif %}
+  </nav>
+
+<script>
+  (function () {
+    const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
+    // Inject CSRF hidden input into every HTML form on the page
+    document.addEventListener('DOMContentLoaded', function () {
+      document.querySelectorAll('form').forEach(function (form) {
+        if (!form.querySelector('input[name="csrf_token"]')) {
+          const input = document.createElement('input');
+          input.type = 'hidden';
+          input.name = 'csrf_token';
+          input.value = csrfToken;
+          form.appendChild(input);
+        }
+      });
+    });
+    // Inject CSRF header into every HTMX request
+    document.addEventListener('htmx:configRequest', function (evt) {
+      evt.detail.headers['X-CSRFToken'] = csrfToken;
+    });
+  })();
+</script>
+</body>
 </html>

@@ -2,27 +2,29 @@
 {% block title %}Nominate a Game{% endblock %}
 {% block content %}
 
-<h1>Nominate a Game for {{ game_night.date.strftime('%B %d, %Y') }}</h1>
+<h1 class="text-2xl font-bold text-stone-800 mb-6">Nominate a Game for {{ game_night.date.strftime('%B %d, %Y') }}</h1>
 
 <!-- Filters -->
-<button id="filter-toggle" class="btn">Filters</button>
+<button id="filter-toggle" class="inline-flex items-center rounded-lg border border-stone-300 px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50 transition-colors">Filters</button>
 <div id="filter-section" class="filters">
   <form method="GET">
-    <div class="form-group">
-      <label for="name">Game Name:</label>
+    <div class="space-y-1 mb-4">
+      <label for="name" class="block text-sm font-medium text-stone-700 mb-1">Game Name:</label>
       <input
         type="text"
         id="name"
         name="name"
-        class="form-control"
+        class="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
         value="{{ filters.name or '' }}"
       />
     </div>
 
-    <div class="form-group">
-      <input type="checkbox" id="players-filter-toggle" name="players_enabled" {% if filters.players is not none %}checked{% endif %}>
-      <label for="players-slider">Players</label>
-      <div id="players-slider-wrapper" class="{% if filters.players is none %}is-hidden{% endif %}">
+    <div class="space-y-1 mb-4">
+      <div class="flex items-center gap-2">
+        <input type="checkbox" id="players-filter-toggle" name="players_enabled" {% if filters.players is not none %}checked{% endif %}>
+        <label for="players-slider" class="block text-sm font-medium text-stone-700">Players</label>
+      </div>
+      <div id="players-slider-wrapper" class="{% if filters.players is none %}hidden{% endif %}">
         <input
           id="players-slider"
           type="range"
@@ -36,10 +38,12 @@
       </div>
     </div>
 
-    <div class="form-group">
-      <input type="checkbox" id="playtime-filter-toggle" name="playtime_enabled" {% if filters.playtime is not none %}checked{% endif %}>
-      <label for="playtime-slider">Playtime (Minutes)</label>
-      <div id="playtime-slider-wrapper" class="{% if filters.playtime is none %}is-hidden{% endif %}">
+    <div class="space-y-1 mb-4">
+      <div class="flex items-center gap-2">
+        <input type="checkbox" id="playtime-filter-toggle" name="playtime_enabled" {% if filters.playtime is not none %}checked{% endif %}>
+        <label for="playtime-slider" class="block text-sm font-medium text-stone-700">Playtime (Minutes)</label>
+      </div>
+      <div id="playtime-slider-wrapper" class="{% if filters.playtime is none %}hidden{% endif %}">
         <input
           id="playtime-slider"
           type="range"
@@ -53,14 +57,14 @@
       </div>
     </div>
 
-    <div class="filter-actions">
-      <button type="submit" class="btn">Apply Filters</button>
-      <a href="{{ url_for('voting.nominate_game_page', game_night_id=game_night.id) }}" class="btn">Reset Filters</a>
+    <div class="flex flex-wrap gap-3">
+      <button type="submit" class="inline-flex items-center rounded-lg border border-stone-300 px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50 transition-colors">Apply Filters</button>
+      <a href="{{ url_for('voting.nominate_game_page', game_night_id=game_night.id) }}" class="inline-flex items-center rounded-lg border border-stone-300 px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50 transition-colors">Reset Filters</a>
     </div>
   </form>
 </div>
 
-<hr />
+<hr class="my-6 border-stone-200" />
 
 <!-- Game List -->
 <form
@@ -68,19 +72,19 @@
   action="{{ url_for('voting.nominate_game', game_night_id=game_night.id) }}"
   id="nominate-game-form"
 >
-  <ul class="game-list">
+  <ul class="space-y-3">
     {% for item in eligible_games %}
       {% set game = item.game %}
-      <li class="game-list__item{% if user_nomination_id == game.id %} game-list__item--selected{% endif %}" data-game-id="{{ game.id }}">
-        <div class="game-list__info">
+      <li class="p-4 rounded-lg border border-stone-200 hover:border-red-300 hover:bg-red-50 transition-colors cursor-pointer{% if user_nomination_id == game.id %} bg-red-50 border-red-300{% endif %}" data-game-id="{{ game.id }}">
+        <div class="flex gap-4">
           <a href="{{ url_for('games.view_game', game_id=game.id) }}">
-            <img src="{{ game.image_url }}" alt="{{ game.name }}" class="game-list__thumbnail" />
+            <img src="{{ game.image_url }}" alt="{{ game.name }}" class="w-24 h-24 object-cover rounded-lg" />
           </a>
-          <div class="game-list__info-content">
-            <strong class="game-list__title">{{ game.name }}</strong>
-            <p class="game-list__description">Playtime: {{ game.playtime or 'N/A' }} minutes</p>
-            <p class="game-list__description">Players: {{ game.min_players or '?' }} - {{ game.max_players or '?' }}</p>
-            <p class="game-list__description">
+          <div class="flex-1">
+            <strong class="text-lg font-semibold text-stone-800 block mb-2">{{ game.name }}</strong>
+            <p class="text-sm text-stone-600 mb-1">Playtime: {{ game.playtime or 'N/A' }} minutes</p>
+            <p class="text-sm text-stone-600 mb-1">Players: {{ game.min_players or '?' }} - {{ game.max_players or '?' }}</p>
+            <p class="text-sm text-stone-600 mb-3">
               {% if item.avg_rating is not none %}
                 Avg Rating: {{ item.avg_rating }}/10
               {% else %}
@@ -89,7 +93,7 @@
             </p>
 
             {% if not item.owned %}
-              <button type="button" class="btn btn--success btn-wishlist-toggle" onclick="toggleWishlist({{ game.id }})">
+              <button type="button" class="inline-flex items-center rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 transition-colors" onclick="toggleWishlist({{ game.id }})">
                 {% if item.in_wishlist %}Remove from Wishlist{% else %}Add to Wishlist{% endif %}
               </button>
             {% endif %}
@@ -97,16 +101,18 @@
         </div>
       </li>
     {% else %}
-      <li class="empty-state">No games available for nomination.</li>
+      <li class="p-4 rounded-lg border border-stone-200 text-center text-stone-500">No games available for nomination.</li>
     {% endfor %}
   </ul>
 
   <input type="hidden" name="game_id" id="selected-game-id" />
 
   <!-- Sticky Footer -->
-  <div class="nominate-game-footer">
-    <button type="submit" class="btn">Nominate Selected Game</button>
-    <a href="{{ url_for('game_night.view_game_night', game_night_id=game_night.id) }}" class="btn">Back</a>
+  <div class="fixed bottom-0 left-0 right-0 bg-white border-t border-stone-200 p-4">
+    <div class="max-w-4xl mx-auto flex flex-wrap gap-3">
+      <button type="submit" class="inline-flex items-center rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 transition-colors">Nominate Selected Game</button>
+      <a href="{{ url_for('game_night.view_game_night', game_night_id=game_night.id) }}" class="inline-flex items-center rounded-lg border border-stone-300 px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50 transition-colors">Back</a>
+    </div>
   </div>
 </form>
 
@@ -120,13 +126,13 @@
     const playersToggle = document.getElementById("players-filter-toggle");
     const playersWrapper = document.getElementById("players-slider-wrapper");
     playersToggle.addEventListener("change", () => {
-      playersWrapper.classList.toggle("is-hidden", !playersToggle.checked);
+      playersWrapper.classList.toggle("hidden", !playersToggle.checked);
     });
 
     const playtimeToggle = document.getElementById("playtime-filter-toggle");
     const playtimeWrapper = document.getElementById("playtime-slider-wrapper");
     playtimeToggle.addEventListener("change", () => {
-      playtimeWrapper.classList.toggle("is-hidden", !playtimeToggle.checked);
+      playtimeWrapper.classList.toggle("hidden", !playtimeToggle.checked);
     });
 
     document.getElementById("players-slider").addEventListener("input", (e) => {
@@ -139,17 +145,19 @@
 
     const selectedGameId = "{{ user_nomination_id or '' }}";
     if (selectedGameId) {
-      const selectedItem = document.querySelector(`.game-list__item[data-game-id="${selectedGameId}"]`);
+      const selectedItem = document.querySelector(`[data-game-id="${selectedGameId}"]`);
       if (selectedItem) {
-        selectedItem.classList.add("game-list__item--selected");
+        selectedItem.classList.add("bg-red-50", "border-red-300");
         document.getElementById("selected-game-id").value = selectedGameId;
       }
     }
 
-    document.querySelectorAll(".game-list__item").forEach((item) => {
+    document.querySelectorAll("[data-game-id]").forEach((item) => {
       item.addEventListener("click", () => {
-        document.querySelectorAll(".game-list__item").forEach(i => i.classList.remove("game-list__item--selected"));
-        item.classList.add("game-list__item--selected");
+        document.querySelectorAll("[data-game-id]").forEach(i => {
+          i.classList.remove("bg-red-50", "border-red-300");
+        });
+        item.classList.add("bg-red-50", "border-red-300");
         document.getElementById("selected-game-id").value = item.dataset.gameId;
       });
     });

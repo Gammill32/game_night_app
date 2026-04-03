@@ -1,10 +1,12 @@
 # blueprints/main.py
 
-from flask import Blueprint, render_template, request
-from flask_login import login_required, current_user
-from datetime import datetime, date
 import calendar
+from datetime import date, datetime
+
 import pytz
+from flask import Blueprint, current_app, render_template, request
+from flask_login import current_user, login_required
+
 from app.services import index_services
 
 main_bp = Blueprint("main", __name__)
@@ -14,14 +16,14 @@ main_bp = Blueprint("main", __name__)
 @login_required
 def index():
     """Homepage with a calendar of game nights using SQL views."""
-    
+
     # Define Central Time Zone
-    central_timezone = pytz.timezone("America/Chicago")
+    central_timezone = pytz.timezone(current_app.config["APP_TIMEZONE"])
     today_central = datetime.now(central_timezone).date()
 
     # Get year and month from query parameters or default to current date
-    year = request.args.get('year', type=int, default=today_central.year)
-    month = request.args.get('month', type=int, default=today_central.month)
+    year = request.args.get("year", type=int, default=today_central.year)
+    month = request.args.get("month", type=int, default=today_central.month)
 
     # Define start and end dates for the month
     start_date = date(year, month, 1)
@@ -54,9 +56,9 @@ def index():
         "next_month": next_month,
         "today": today_central,
         "months": months,
-        "years": years
+        "years": years,
     }
-    return render_template('index.html', **context)
+    return render_template("index.html", **context)
 
 
 @main_bp.route("/game_nights/all")
@@ -66,7 +68,5 @@ def all_game_nights():
     game_nights = index_services.get_game_nights(current_user)
 
     # Create context dictionary
-    context = {
-        "game_nights": game_nights
-    }
-    return render_template('all_game_nights.html', **context)
+    context = {"game_nights": game_nights}
+    return render_template("all_game_nights.html", **context)

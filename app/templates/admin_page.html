@@ -3,60 +3,79 @@
 {% block title %}Admin Panel{% endblock %}
 
 {% block content %}
-<div class="admin-panel-container">
-  <h1 class="admin-panel__title">Admin Panel</h1>
-  <p class="admin-panel__description">
-    Manage users below. You can remove users, promote them to admin status, or add new users.
-  </p>
+<div class="bg-amber-50 border border-amber-200 rounded-xl p-6">
 
-  <!-- Add Person Button -->
-  <div class="admin-panel__add-person">
-    <a href="{{ url_for('admin.add_person') }}" class="btn btn--success">
+  <div class="flex items-center justify-between mb-6">
+    <h1 class="text-2xl font-bold text-stone-800">Admin Panel</h1>
+    <a href="{{ url_for('admin.add_person') }}" class="inline-flex items-center rounded-lg bg-amber-500 px-4 py-2 text-sm font-medium text-white hover:bg-amber-600 transition-colors">
       Add Person
     </a>
   </div>
 
-  <!-- User Management Table -->
-  <table class="admin-panel__table">
-    <thead>
-      <tr>
-        <th>Name</th>
-        <th>Admin</th>
-        <th>Actions</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for person in people %}
+  <p class="text-sm text-stone-600 mb-6">
+    Manage users below. You can remove users, promote them to admin status, or add new users.
+  </p>
+
+  <div class="bg-white rounded-xl border border-stone-200 shadow-sm p-5 overflow-x-auto">
+    <table class="w-full text-sm min-w-[500px]">
+      <thead>
+        <tr class="border-b border-stone-100">
+          <th class="text-left text-xs font-semibold text-stone-500 uppercase tracking-wide pb-2 px-2">Name</th>
+          <th class="text-left text-xs font-semibold text-stone-500 uppercase tracking-wide pb-2 px-2">Email</th>
+          <th class="text-left text-xs font-semibold text-stone-500 uppercase tracking-wide pb-2 px-2">Role</th>
+          <th class="text-left text-xs font-semibold text-stone-500 uppercase tracking-wide pb-2 px-2">Actions</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-stone-100">
+        {% for person in people %}
         <tr>
-          <td>{{ person.first_name }} {{ person.last_name }}</td>
-          <td>
+          <td class="py-3 px-2 font-medium text-stone-800">
+            {{ person.first_name }} {{ person.last_name }}
+          </td>
+          <td class="py-3 px-2 text-stone-600">{{ person.email }}</td>
+          <td class="py-3 px-2">
             {% if person.owner %}
-              👑
+              <span class="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-800">Owner</span>
             {% elif person.admin %}
-              ⭐
+              <span class="inline-flex items-center rounded-full bg-stone-100 px-2.5 py-0.5 text-xs font-medium text-stone-700">Admin</span>
+            {% else %}
+              <span class="inline-flex items-center rounded-full bg-stone-50 px-2.5 py-0.5 text-xs font-medium text-stone-500">Member</span>
             {% endif %}
           </td>
-          <td class="admin-panel__actions">
-            <!-- Admin Toggle -->
-            <form action="{{ url_for('admin.toggle_admin_status', user_id=person.id) }}" method="POST" class="inline-form">
-              <button type="submit" class="btn btn--primary">
-                {{ 'Demote' if person.admin else 'Promote' }}
-              </button>
-            </form>
-
-            <!-- Remove User -->
-            <form action="{{ url_for('admin.remove_user', user_id=person.id) }}" method="POST" class="inline-form">
-              <button type="submit" class="btn btn--danger">Remove</button>
-            </form>
+          <td class="py-3 px-2">
+            <div class="flex items-center gap-2">
+              {% if not person.owner %}
+              <form action="{{ url_for('admin.toggle_admin_status', user_id=person.id) }}" method="POST" class="inline">
+                <button type="submit" class="inline-flex items-center rounded-lg bg-amber-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-600 transition-colors">
+                  {{ 'Demote' if person.admin else 'Promote' }}
+                </button>
+              </form>
+              <form action="{{ url_for('admin.remove_user', user_id=person.id) }}" method="POST" class="inline">
+                <button type="submit" class="inline-flex items-center rounded-lg bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700 transition-colors">
+                  Remove
+                </button>
+              </form>
+              {% endif %}
+            </div>
           </td>
         </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-
-  <!-- Back to Home -->
-  <div class="admin-panel__back-home">
-    <a href="{{ url_for('main.index') }}" class="btn btn--primary">Back to Home</a>
+        {% endfor %}
+      </tbody>
+    </table>
   </div>
+
+  <div class="mt-6">
+    <h2 class="text-base font-semibold text-stone-800 mb-3">Polls</h2>
+    <a href="{{ url_for('polls.poll_list') }}"
+       class="inline-flex items-center rounded-lg border border-stone-300 px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50 transition-colors">
+      Manage Polls
+      {% if active_polls_count > 0 %}
+      <span class="ml-2 inline-flex items-center justify-center rounded-full bg-red-100 text-red-700 text-xs font-medium px-2 py-0.5">
+        {{ active_polls_count }} active
+      </span>
+      {% endif %}
+    </a>
+  </div>
+
 </div>
 {% endblock %}

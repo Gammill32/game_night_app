@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Share Poll — Game Night{% endblock %}
+{% block content %}
+<div class="max-w-lg">
+  <div class="flex items-center gap-3 mb-6">
+    <a href="{{ url_for('polls.poll_list') }}" class="text-sm text-stone-500 hover:text-red-600">&larr; Back to Polls</a>
+  </div>
+  <h1 class="text-2xl font-bold text-stone-800 mb-1">Share Poll</h1>
+  <p class="text-sm text-stone-500 mb-6">{{ poll.title }}</p>
+
+  <div class="bg-white rounded-xl border border-stone-200 shadow-sm p-5 mb-5">
+    <p class="text-xs font-medium text-stone-500 mb-1">Poll link</p>
+    <span class="text-xs font-mono text-stone-700 bg-stone-50 px-2 py-1 rounded select-all break-all">{{ poll_url }}</span>
+  </div>
+
+  <form method="POST" action="{{ url_for('polls.poll_share', poll_id=poll.id) }}">
+    <div class="bg-white rounded-xl border border-stone-200 shadow-sm p-5 space-y-4">
+      <div class="flex items-center justify-between">
+        <h2 class="text-sm font-semibold text-stone-700">Send to</h2>
+        <label class="flex items-center gap-2 text-sm text-stone-600 cursor-pointer">
+          <input type="checkbox" id="select-all" class="rounded border-stone-300 text-red-600 focus:ring-red-500" />
+          Select all
+        </label>
+      </div>
+
+      {% if people %}
+      <div class="space-y-2 max-h-80 overflow-y-auto">
+        {% for person in people %}
+        <label class="flex items-center gap-3 p-3 rounded-lg border border-stone-200 cursor-pointer hover:bg-stone-50 transition-colors">
+          <input type="checkbox" name="person_ids" value="{{ person.id }}"
+                 class="person-checkbox rounded border-stone-300 text-red-600 focus:ring-red-500" />
+          <div>
+            <span class="text-sm font-medium text-stone-800">{{ person.first_name }} {{ person.last_name }}</span>
+            <span class="text-xs text-stone-400 ml-2">{{ person.email }}</span>
+          </div>
+        </label>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p class="text-sm text-stone-500">No users with email addresses found.</p>
+      {% endif %}
+
+      <button type="submit"
+              class="w-full rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 transition-colors">
+        Send Emails
+      </button>
+    </div>
+  </form>
+</div>
+
+<script>
+  document.getElementById('select-all').addEventListener('change', function() {
+    document.querySelectorAll('.person-checkbox').forEach(cb => cb.checked = this.checked);
+  });
+</script>
+{% endblock %}

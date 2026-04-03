@@ -2,153 +2,213 @@
 {% block title %}Available Games{% endblock %}
 
 {% block content %}
-<div class="available-games-header">
-  <h1>Available Games</h1>
-  <a href="{{ url_for('games.add_game') }}" class="btn btn--success">Add a New Game</a>
+<div class="flex items-center justify-between mb-6">
+  <h1 class="text-2xl font-bold text-stone-800">Available Games</h1>
+  <a href="{{ url_for('games.add_game') }}" class="inline-flex items-center rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 transition-colors">Add a New Game</a>
 </div>
 
 <!-- Filters -->
-<button id="filter-toggle" class="btn">Filters</button>
-<div id="filter-section" class="filters">
-  <form method="GET">
-    <div class="form-group">
-      <label for="name">Game Name:</label>
-      <input
-        type="text"
-        id="name"
-        name="name"
-        class="form-control"
-        value="{{ request.args.get('name', '') }}"
-      />
-    </div>
+<details class="mb-6 bg-white rounded-xl border border-stone-200 shadow-sm" {% if request.args.get('name') or request.args.get('players_enabled') or request.args.get('playtime_enabled') or request.args.get('min_rating_enabled') %}open{% endif %}>
+  <summary class="px-5 py-3 text-sm font-medium text-stone-700 cursor-pointer select-none">Filters</summary>
+  <div class="px-5 pb-5">
+    <form method="GET">
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+        <div>
+          <label for="name" class="block text-sm font-medium text-stone-700 mb-1">Game Name</label>
+          <input
+            type="text"
+            id="name"
+            name="name"
+            class="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+            value="{{ request.args.get('name', '') }}"
+          />
+        </div>
 
-    <div class="form-group">
-      <input type="checkbox" id="players-filter-toggle" name="players_enabled" {% if request.args.get('players_enabled') %}checked{% endif %}>
-      <label for="players-slider">Players</label>
-      <div id="players-slider-wrapper" class="{% if not request.args.get('players_enabled') %}is-hidden{% endif %}">
-        <input
-          id="players-slider"
-          type="range"
-          name="players"
-          min="1"
-          max="20"
-          step="1"
-          value="{{ request.args.get('players', 4) }}"
-        />
-        <span id="players-value">{{ request.args.get('players', 4) }}</span>
+        <div>
+          <div class="flex items-center gap-2 mb-1">
+            <input type="checkbox" id="players-filter-toggle" name="players_enabled" {% if request.args.get('players_enabled') %}checked{% endif %} class="rounded border-stone-300">
+            <label for="players-filter-toggle" class="text-sm font-medium text-stone-700">Players</label>
+          </div>
+          <div id="players-slider-wrapper" class="{% if not request.args.get('players_enabled') %}hidden{% endif %}">
+            <div class="flex items-center gap-3">
+              <input
+                id="players-slider"
+                type="range"
+                name="players"
+                min="1"
+                max="20"
+                step="1"
+                value="{{ request.args.get('players', 4) }}"
+                class="w-full accent-red-600"
+              />
+              <span id="players-value" class="text-sm text-stone-700 w-6 text-right">{{ request.args.get('players', 4) }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <div class="flex items-center gap-2 mb-1">
+            <input type="checkbox" id="playtime-filter-toggle" name="playtime_enabled" {% if request.args.get('playtime_enabled') %}checked{% endif %} class="rounded border-stone-300">
+            <label for="playtime-filter-toggle" class="text-sm font-medium text-stone-700">Playtime (Minutes)</label>
+          </div>
+          <div id="playtime-slider-wrapper" class="{% if not request.args.get('playtime_enabled') %}hidden{% endif %}">
+            <div class="flex items-center gap-3">
+              <input
+                id="playtime-slider"
+                type="range"
+                name="playtime"
+                min="15"
+                max="300"
+                step="15"
+                value="{{ request.args.get('playtime', 30) }}"
+                class="w-full accent-red-600"
+              />
+              <span id="playtime-value" class="text-sm text-stone-700 w-8 text-right">{{ request.args.get('playtime', 30) }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <div class="flex items-center gap-2 mb-1">
+            <input type="checkbox" id="min-rating-filter-toggle" name="min_rating_enabled" {% if request.args.get('min_rating_enabled') %}checked{% endif %} class="rounded border-stone-300">
+            <label for="min-rating-filter-toggle" class="text-sm font-medium text-stone-700">Minimum Rating</label>
+          </div>
+          <div id="min-rating-slider-wrapper" class="{% if not request.args.get('min_rating_enabled') %}hidden{% endif %}">
+            <div class="flex items-center gap-3">
+              <input
+                id="min-rating-slider"
+                type="range"
+                name="min_rating"
+                min="0"
+                max="10"
+                step="1"
+                value="{{ request.args.get('min_rating', 0) }}"
+                class="w-full accent-red-600"
+              />
+              <span id="min-rating-value" class="text-sm text-stone-700 w-4 text-right">{{ request.args.get('min_rating', 0) }}</span>
+            </div>
+          </div>
+        </div>
       </div>
-    </div>
 
-    <div class="form-group">
-      <input type="checkbox" id="playtime-filter-toggle" name="playtime_enabled" {% if request.args.get('playtime_enabled') %}checked{% endif %}>
-      <label for="playtime-slider">Playtime (Minutes)</label>
-      <div id="playtime-slider-wrapper" class="{% if not request.args.get('playtime_enabled') %}is-hidden{% endif %}">
-        <input
-          id="playtime-slider"
-          type="range"
-          name="playtime"
-          min="15"
-          max="300"
-          step="15"
-          value="{{ request.args.get('playtime', 30) }}"
-        />
-        <span id="playtime-value">{{ request.args.get('playtime', 30) }}</span>
+      <div class="flex gap-3">
+        <button type="submit" class="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 transition-colors">Apply Filters</button>
+        <a href="{{ url_for('games.games_index') }}" class="inline-flex items-center rounded-lg border border-stone-300 px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50 transition-colors">Reset Filters</a>
       </div>
-    </div>
+    </form>
+  </div>
+</details>
 
-    <div class="form-group">
-      <input type="checkbox" id="min-rating-filter-toggle" name="min_rating_enabled" {% if request.args.get('min_rating_enabled') %}checked{% endif %}>
-      <label for="min-rating-slider">Minimum Rating</label>
-      <div id="min-rating-slider-wrapper" class="{% if not request.args.get('min_rating_enabled') %}is-hidden{% endif %}">
-        <input
-          id="min-rating-slider"
-          type="range"
-          name="min_rating"
-          min="0"
-          max="10"
-          step="1"
-          value="{{ request.args.get('min_rating', 0) }}"
-        />
-        <span id="min-rating-value">{{ request.args.get('min_rating', 0) }}</span>
-      </div>
-    </div>
-
-    <div class="filter-actions">
-      <button type="submit" class="btn">Apply Filters</button>
-      <a href="{{ url_for('games.games_index') }}" class="btn">Reset Filters</a>
-    </div>
-  </form>
-</div>
-
-<!-- Games List -->
-<ul class="game-list">
+<!-- Games Grid -->
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
   {% for item in games %}
     {% set game = item.game %}
-    <li class="game-list__item">
-      <div class="game-list__info">
-        <a href="{{ url_for('games.view_game', game_id=game.game_id) }}">
-          <img src="{{ game.image_url }}" alt="{{ game.game_name }}" class="game-list__thumbnail" />
-        </a>
-        <div class="game-list__info-content">
-          <strong class="game-list__title">{{ game.game_name }}</strong>
-          <p class="game-list__description">Min Players: {{ game.min_players or 'N/A' }}</p>
-          <p class="game-list__description">Max Players: {{ game.max_players or 'N/A' }}</p>
-          <p class="game-list__description">Playtime: {{ game.playtime or 'N/A' }} minutes</p>
-          <p class="game-list__description">
-            Your Rating: {{ item.user_rating if item.user_rating is not none else 'Not Rated' }}
-          </p>
-
-          {% if not item.user_owns_game %}
-            <form action="{{ url_for('games.claim_game', game_id=game.game_id) }}" method="POST">
-              <button class="btn btn--success" type="submit">I Own This Game</button>
-            </form>
-          {% else %}
-            <form action="{{ url_for('games.remove_ownership', game_id=game.game_id) }}" method="POST">
-              <button class="btn btn--danger" type="submit">I Don't Own This Game</button>
-            </form>
+    <div class="bg-white rounded-xl border border-stone-200 shadow-sm p-5 flex flex-col gap-3">
+      <a href="{{ url_for('games.view_game', game_id=game.game_id) }}" class="block">
+        <img src="{{ game.image_url }}" alt="{{ game.game_name }}" class="w-full h-36 object-contain rounded-lg mb-2" />
+      </a>
+      <div class="flex-1">
+        <a href="{{ url_for('games.view_game', game_id=game.game_id) }}" class="text-base font-semibold text-stone-800 hover:text-red-600 transition-colors">{{ game.game_name }}</a>
+        <div class="mt-2 space-y-0.5 text-sm text-stone-500">
+          <p>Players: {{ game.min_players or 'N/A' }}–{{ game.max_players or 'N/A' }}</p>
+          <p>Playtime: {{ game.playtime or 'N/A' }} min</p>
+          <p>Your Rating: {{ item.user_rating if item.user_rating is not none else 'Not Rated' }}</p>
+          {% if game.owner_names %}
+            <p class="text-xs text-stone-400">Owned by {{ game.owner_names }}</p>
           {% endif %}
-
-          {% if not item.user_owns_game %}
-            <form action="{{ url_for('games.toggle_wishlist', game_id=game.game_id) }}" method="POST" class="wishlist-form">
-              <button type="submit" class="btn btn--success">
-                {% if item.in_wishlist %}Remove from Wishlist{% else %}Add to Wishlist{% endif %}
-              </button>
-            </form>
+          {% if play_stats.get(game.game_id) %}
+            <p>Played: {{ play_stats[game.game_id].play_count }} time{{ 's' if play_stats[game.game_id].play_count != 1 }}</p>
+          {% endif %}
+        </div>
+        <div class="flex flex-wrap gap-1 mt-2">
+          {% if item.user_owns_game %}
+            <span class="inline-block rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">Owned</span>
+          {% endif %}
+          {% set stat = play_stats.get(game.game_id) %}
+          {% if stat and stat.last_played and (today - stat.last_played).days <= 30 %}
+            <span class="inline-block rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">Recently Played</span>
           {% endif %}
         </div>
       </div>
-    </li>
-  {% else %}
-    <li class="empty-state">No games found.</li>
-  {% endfor %}
-</ul>
+      <div class="flex flex-wrap gap-2 pt-1">
+        {% if not item.user_owns_game %}
+          <form action="{{ url_for('games.claim_game', game_id=game.game_id) }}" method="POST">
+            <button class="inline-flex items-center rounded-lg bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700 transition-colors" type="submit">I Own This</button>
+          </form>
+        {% else %}
+          <form action="{{ url_for('games.remove_ownership', game_id=game.game_id) }}" method="POST">
+            <button class="inline-flex items-center rounded-lg border border-stone-300 px-3 py-1.5 text-xs font-medium text-stone-700 hover:bg-stone-50 transition-colors" type="submit">Remove Ownership</button>
+          </form>
+        {% endif %}
 
-<!-- Back to Home Button -->
-<div class="text-center mt-1">
-  <a href="{{ url_for('main.index') }}" class="btn btn--primary">Back to Home</a>
+        {% if not item.user_owns_game %}
+          <form action="{{ url_for('games.toggle_wishlist', game_id=game.game_id) }}" method="POST">
+            <button type="submit" class="inline-flex items-center rounded-lg border border-stone-300 px-3 py-1.5 text-xs font-medium text-stone-700 hover:bg-stone-50 transition-colors">
+              {% if item.in_wishlist %}Remove from Wishlist{% else %}Add to Wishlist{% endif %}
+            </button>
+          </form>
+        {% endif %}
+      </div>
+    </div>
+  {% else %}
+    <div class="col-span-full text-center py-12 text-stone-500 text-sm">No games found.</div>
+  {% endfor %}
 </div>
 
+<!-- Recently Played Section -->
+{% if recently_played %}
+<div class="mt-8">
+  <h2 class="text-lg font-semibold text-stone-800 mb-4">Recently Played</h2>
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+    {% for game in recently_played %}
+    <div class="bg-white rounded-xl border border-stone-200 shadow-sm p-4 flex items-center gap-4">
+      <img src="{{ game.image_url }}" alt="{{ game.name }}" class="w-16 h-16 object-contain rounded-lg flex-shrink-0" />
+      <div>
+        <a href="{{ url_for('games.view_game', game_id=game.id) }}" class="text-sm font-semibold text-stone-800 hover:text-red-600">{{ game.name }}</a>
+        <p class="text-xs text-stone-500 mt-0.5">Played: {{ game.play_count }} time{{ 's' if game.play_count != 1 }}</p>
+        <p class="text-xs text-stone-400">Last: {{ game.last_played.strftime('%b %-d, %Y') }}</p>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<!-- Always Nominated Section -->
+{% if bridesmaid_games %}
+<div class="mt-8">
+  <h2 class="text-lg font-semibold text-stone-800 mb-4">Always Nominated</h2>
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+    {% for game in bridesmaid_games %}
+    <div class="bg-white rounded-xl border border-stone-200 shadow-sm p-4 flex items-center gap-4">
+      <img src="{{ game.image_url }}" alt="{{ game.name }}" class="w-16 h-16 object-contain rounded-lg flex-shrink-0" />
+      <div>
+        <a href="{{ url_for('games.view_game', game_id=game.id) }}" class="text-sm font-semibold text-stone-800 hover:text-red-600">{{ game.name }}</a>
+        <p class="text-xs text-stone-500 mt-0.5">Nominated {{ game.nomination_count }} time{{ 's' if game.nomination_count != 1 }}, never played</p>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
 <script>
-  document.addEventListener("DOMContentLoaded", () => {
-    document.getElementById("filter-toggle").addEventListener("click", () => {
-      document.getElementById("filter-section").classList.toggle("active");
+  const setupSliderToggle = (checkboxId, wrapperId, sliderId, valueId) => {
+    const toggle = document.getElementById(checkboxId);
+    const wrapper = document.getElementById(wrapperId);
+    const slider = document.getElementById(sliderId);
+    const value = document.getElementById(valueId);
+
+    toggle.addEventListener("change", () => {
+      wrapper.classList.toggle("hidden", !toggle.checked);
     });
 
-    const setupSliderToggle = (checkboxId, wrapperId, sliderId, valueId) => {
-      const toggle = document.getElementById(checkboxId);
-      const wrapper = document.getElementById(wrapperId);
-      const slider = document.getElementById(sliderId);
-      const value = document.getElementById(valueId);
+    slider.addEventListener("input", () => {
+      value.textContent = slider.value;
+    });
+  };
 
-      toggle.addEventListener("change", () => {
-        wrapper.classList.toggle("is-hidden", !toggle.checked);
-      });
-
-      slider.addEventListener("input", () => {
-        value.textContent = slider.value;
-      });
-    };
-
+  document.addEventListener("DOMContentLoaded", () => {
     setupSliderToggle("players-filter-toggle", "players-slider-wrapper", "players-slider", "players-value");
     setupSliderToggle("playtime-filter-toggle", "playtime-slider-wrapper", "playtime-slider", "playtime-value");
     setupSliderToggle("min-rating-filter-toggle", "min-rating-slider-wrapper", "min-rating-slider", "min-rating-value");

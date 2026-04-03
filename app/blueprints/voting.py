@@ -1,7 +1,8 @@
-from flask import Blueprint, redirect, url_for, flash, request, render_template
-from flask_login import login_required, current_user
+from flask import Blueprint, flash, redirect, render_template, request, url_for
+from flask_login import current_user, login_required
+
 from app.services import voting_services
-from app.utils import game_night_access_required, flash_if_no_action
+from app.utils import flash_if_no_action, game_night_access_required
 
 voting_bp = Blueprint("voting", __name__)
 
@@ -10,9 +11,11 @@ voting_bp = Blueprint("voting", __name__)
 @login_required
 @game_night_access_required
 def nominate_game(game_night_id):
-    success, message = voting_services.nominate_game(game_night_id, current_user.id, request.form.get("game_id"))
+    success, message = voting_services.nominate_game(
+        game_night_id, current_user.id, request.form.get("game_id")
+    )
     flash(message, "success" if success else "error")
-    
+
     context = {"game_night_id": game_night_id}
     return redirect(url_for("game_night.view_game_night", **context))
 
@@ -42,10 +45,9 @@ def vote_game(game_night_id):
                     continue
             else:
                 votes_dict[game_id] = None
-    
+
     success, message = voting_services.vote_game(game_night_id, current_user.id, votes_dict)
     flash(message, "success" if success else "error")
-    
+
     context = {"game_night_id": game_night_id}
     return redirect(url_for("game_night.view_game_night", **context))
-

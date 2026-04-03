@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-stone-50">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{{ poll.title }} — Game Night</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/htmx.org@1.9.12" defer></script>
+</head>
+<body class="min-h-full bg-stone-50 py-12 px-4">
+  <div class="max-w-md mx-auto">
+    {% if current_user.is_authenticated %}
+    <div class="mb-6">
+      <a href="{{ url_for('main.index') }}" class="text-sm text-stone-500 hover:text-red-600 transition-colors">&larr; Back to Game Night</a>
+    </div>
+    {% endif %}
+    <div class="text-center mb-8">
+      <h1 class="text-2xl font-bold text-stone-800">{{ poll.title }}</h1>
+      {% if poll.description %}
+      <p class="text-stone-500 mt-2">{{ poll.description }}</p>
+      {% endif %}
+    </div>
+
+    <div id="poll-body">
+      {% if not active %}
+        <div class="bg-white rounded-xl border border-stone-200 p-6 text-center">
+          <p class="text-stone-500">This poll is closed.{% if results %} See results below.{% endif %}</p>
+        </div>
+        {% if results %}{% include "_poll_results.html" %}{% endif %}
+
+      {% elif already_responded %}
+        <div class="bg-green-50 rounded-xl border border-green-200 p-6 text-center mb-4">
+          <p class="text-green-800 font-medium">You've already responded — thanks!</p>
+        </div>
+        {% if results %}{% include "_poll_results.html" %}{% endif %}
+
+      {% else %}
+        <form hx-post="{{ url_for('polls.poll_submit', token=poll.token) }}"
+              hx-target="#poll-body"
+              hx-swap="innerHTML">
+          <div class="bg-white rounded-xl border border-stone-200 shadow-sm p-6 space-y-4">
+
+            <div class="space-y-2">
+              {% for option in poll.options %}
+              <label class="flex items-center gap-3 p-3 rounded-lg border border-stone-200 cursor-pointer hover:bg-stone-50 transition-colors">
+                <input type="{{ 'checkbox' if poll.multi_select else 'radio' }}"
+                       name="option_ids" value="{{ option.id }}"
+                       class="text-red-600 focus:ring-red-500" />
+                <span class="text-sm font-medium text-stone-700">{{ option.label }}</span>
+              </label>
+              {% endfor %}
+            </div>
+
+            {% if not current_user.is_authenticated %}
+            <div>
+              <label class="block text-sm font-medium text-stone-700 mb-1">Your name <span class="text-red-600">*</span></label>
+              <input type="text" name="respondent_name" placeholder="First name is fine"
+                     class="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent" />
+            </div>
+            {% endif %}
+
+            <button type="submit"
+                    class="w-full rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 transition-colors">
+              Submit
+            </button>
+          </div>
+        </form>
+      {% endif %}
+    </div>
+  </div>
+</body>
+</html>

@@ -1,55 +1,45 @@
-<div style="font-family: Arial, sans-serif; color: #333; line-height: 1.6; font-size: 14px;">
-    <p>Hi {{ user.first_name }} {{ user.last_name }},</p>
+<div style="font-family: Arial, sans-serif; color: #333333; line-height: 1.6; font-size: 14px;">
 
-    <p>
-        This is a reminder that there is a Game Night scheduled for 
-        <strong style="color: #000;">{{ game_night.date.strftime('%B %d, %Y') }}</strong>.
+  <p>Hi {{ user.first_name }} {{ user.last_name }},</p>
+
+  <p>
+    This is a reminder that there is a Game Night scheduled for
+    <strong style="color: #000000;">{{ game_night.date.strftime('%B %d, %Y') }}</strong>.
+  </p>
+
+  {% if not has_nominated %}
+  <p style="color: #cc0000; font-weight: bold;">
+    You haven't nominated a game yet. Please make your nomination!
+  </p>
+  {% endif %}
+
+  {% if not has_voted %}
+  <p style="color: #cc0000; font-weight: bold;">
+    You haven't voted for the games yet. Please submit your votes!
+  </p>
+  {% endif %}
+
+  {% if leader %}
+  <div style="margin-top: 20px; border: 1px solid #dddddd; padding: 10px; border-radius: 5px; text-align: center; background-color: #f9f9f9;">
+    <p style="margin: 0 0 10px; font-weight: bold;">
+      Current Leader: <span style="color: #000000;">{{ leader.game.name }}</span>
+      with <span style="color: #000000;">{{ leader.weighted_score }}</span> vote(s).
     </p>
-
-    {% if not has_nominated %}
-        <p style="color: red; font-weight: bold;">
-            You haven't nominated a game yet. Please make your nomination!
-        </p>
+    {% if leader.game.image_url %}
+    <img src="{{ leader.game.image_url }}" alt="{{ leader.game.name }}"
+         style="max-width: 100px; border-radius: 5px; margin: 10px auto 0; display: block;">
     {% endif %}
+  </div>
+  {% else %}
+  <p style="margin-top: 20px; font-weight: bold;">
+    Current Leader: <span style="color: #555555;">No votes have been cast yet.</span>
+  </p>
+  {% endif %}
 
-    {% if not has_voted %}
-        <p style="color: red; font-weight: bold;">
-            You haven't voted for the games yet. Please submit your votes!
-        </p>
-    {% endif %}
+  <p style="margin-top: 20px;">
+    See you at the Game Night!
+  </p>
 
-    {% if leader %}
-        <div style="
-            margin-top: 20px; 
-            border: 1px solid #ddd; 
-            padding: 10px; 
-            border-radius: 5px; 
-            text-align: center; 
-            background-color: #f9f9f9;">
-            <p style="margin: 0 0 10px; font-weight: bold;">
-                Current Leader: <span style="color: #000;">{{ leader.game.name }}</span> 
-                with <span style="color: #000;">{{ leader.weighted_score }}</span> vote(s).
-            </p>
-            {% if leader.game.image_url %}
-                <img src="{{ leader.game.image_url }}" alt="{{ leader.game.name }}" 
-                     style="
-                        max-width: 100px; 
-                        border-radius: 5px; 
-                        margin-top: 10px; 
-                        display: block; 
-                        margin-left: auto; 
-                        margin-right: auto;">
-            {% endif %}
-        </div>
-    {% else %}
-        <p style="margin-top: 20px; font-weight: bold;">
-            Current Leader: <span style="color: #555;">No votes have been cast yet.</span>
-        </p>
-    {% endif %}
+  {% include 'email_templates/email_signature.html' %}
 
-    <p style="margin-top: 20px;">
-        See you at the Game Night!
-    </p>
-
-    {% include 'email_templates/email_signature.html' %}
 </div>

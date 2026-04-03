@@ -1,0 +1,37 @@
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
+ignore = ["E501"]
+
+[tool.ruff.lint.isort]
+known-third-party = ["flask_session"]
+
+[tool.ruff.lint.per-file-ignores]
+"app/extensions.py" = ["I001"]
+
+[tool.mypy]
+python_version = "3.11"
+ignore_missing_imports = true
+disable_error_code = ["import-untyped"]
+
+[[tool.mypy.overrides]]
+module = "app.models"
+ignore_errors = true
+
+[[tool.mypy.overrides]]
+module = "app.extensions"
+ignore_errors = true
+
+[tool.bandit]
+exclude_dirs = ["tests"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+timeout = 30
+timeout_method = "thread"

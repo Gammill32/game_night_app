@@ -1,62 +1,62 @@
 {% extends "base.html" %} {% block title %}Edit Game Night{% endblock %} {%
 block content %}
-<h1>Edit Game Night</h1>
+<h1 class="text-2xl font-bold text-stone-800 mb-6">Edit Game Night</h1>
 
 <form
   action="{{ url_for('game_night.edit_game_night', game_night_id=game_night.id) }}"
   method="POST"
   id="editGameNightForm"
 >
-  <div class="form-group">
-    <label for="date">Date:</label>
+  <div class="space-y-1 mb-4">
+    <label for="date" class="block text-sm font-medium text-stone-700 mb-1">Date:</label>
     <input
       type="date"
       name="date"
       id="date"
-      class="form-control"
+      class="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
       value="{{ game_night.date.strftime('%Y-%m-%d') }}"
       required
     />
   </div>
 
-  <div class="form-group">
-    <label for="notes">Notes:</label>
-    <textarea name="notes" id="notes" rows="4" class="form-control">
+  <div class="space-y-1 mb-4">
+    <label for="notes" class="block text-sm font-medium text-stone-700 mb-1">Notes:</label>
+    <textarea name="notes" id="notes" rows="4" class="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent">
 {{ game_night.notes }}</textarea
     >
   </div>
 
-  <div class="attendee-form-section">
-    <h3>Attendees:</h3>
+  <div class="space-y-1 mb-4">
+    <h3 class="block text-sm font-medium text-stone-700 mb-1">Attendees:</h3>
     <input
       type="text"
       id="searchBox"
-      class="form-control"
+      class="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
       placeholder="Search for a name..."
       autocomplete="off"
     />
 
-    <div id="attendeesContainer" class="attendees-container"></div>
+    <div id="attendeesContainer" class="space-y-2 mt-3"></div>
 
-    <div id="pagination" class="pagination-controls">
-      <button type="button" id="prevPage" class="pagination-button">
+    <div id="pagination" class="flex items-center justify-center gap-4 mt-4">
+      <button type="button" id="prevPage" class="inline-flex items-center rounded-lg border border-stone-300 px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50 transition-colors">
         Previous
       </button>
-      <span id="pageInfo" class="pagination-info"></span>
-      <button type="button" id="nextPage" class="pagination-button">
+      <span id="pageInfo" class="text-sm text-stone-600"></span>
+      <button type="button" id="nextPage" class="inline-flex items-center rounded-lg border border-stone-300 px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50 transition-colors">
         Next
       </button>
     </div>
 
-    <div id="selectedCount" class="selected-count">0 Attendees Selected</div>
+    <div id="selectedCount" class="text-sm text-stone-600 mt-4">0 Attendees Selected</div>
   </div>
 
-  <div class="form-actions">
-    <button type="submit" class="btn btn--success">Save Changes</button>
+  <div class="flex flex-wrap gap-3">
+    <button type="submit" class="inline-flex items-center rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 transition-colors">Save Changes</button>
 
     <button
       type="submit"
-      class="btn btn--danger"
+      class="inline-flex items-center rounded-lg border border-stone-300 px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50 transition-colors"
       formaction="{{ url_for('game_night.delete_game_night', game_night_id=game_night.id) }}"
       formmethod="POST"
       formnovalidate
@@ -67,7 +67,7 @@ block content %}
 
     <a
       href="{{ url_for('game_night.view_game_night', game_night_id=game_night.id) }}"
-      class="btn btn--primary"
+      class="inline-flex items-center rounded-lg border border-stone-300 px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50 transition-colors"
     >Back to Game Night</a>
   </div>
 </form>
@@ -116,18 +116,18 @@ block content %}
 
       pagePeople.forEach((person, index) => {
         const label = document.createElement('label');
-        label.className = 'attendee__label';
+        label.className = 'flex items-center gap-2 p-2 rounded-lg hover:bg-stone-50 transition-colors cursor-pointer';
         label.dataset.index = index;
 
         const checkbox = document.createElement('input');
         checkbox.type = 'checkbox';
         checkbox.name = 'attendees';
         checkbox.value = person.id;
-        checkbox.className = 'attendee__checkbox';
+        checkbox.className = 'rounded border-stone-300';
 
         if (selectedPeople.has(person.id)) {
           checkbox.checked = true;
-          label.classList.add('attendee__label--selected');
+          label.classList.add('bg-red-50');
         }
 
         checkbox.addEventListener('change', () => {
@@ -162,13 +162,13 @@ block content %}
       const labels = attendeesContainer.querySelectorAll('label');
       labels.forEach(label => {
         const value = Number(label.querySelector('input').value);
-        label.classList.toggle('attendee__label--selected', selectedPeople.has(value));
-        label.classList.remove('attendee__label--highlighted');
+        label.classList.toggle('bg-red-50', selectedPeople.has(value));
+        label.classList.remove('ring-2 ring-red-500');
       });
 
       if (labels.length > 0 && labels[highlightedIndex]) {
         labels[highlightedIndex].scrollIntoView({ block: "nearest" });
-        labels[highlightedIndex].classList.add('attendee__label--highlighted');
+        labels[highlightedIndex].classList.add('ring-2 ring-red-500');
       }
     }
 

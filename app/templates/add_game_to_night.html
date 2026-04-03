@@ -3,8 +3,8 @@
 <h1>Add a Game to {{ game_night.date.strftime('%B %d, %Y') }}</h1>
 
 <!-- Filters -->
-<button id="filter-toggle" class="btn">Filters</button>
-<div id="filter-section" class="filters">
+<button id="filter-toggle" class="inline-flex items-center rounded-lg border border-stone-300 px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50 transition-colors">Filters</button>
+<div id="filter-section" class="bg-white rounded-xl border border-stone-200 p-4 mb-4">
   <form method="GET">
     <label for="name">Game Name:</label>
     <input type="text" name="name" value="{{ filters.name }}" />
@@ -33,7 +33,7 @@
     />
     <span id="playtime-value">{{ filters.playtime or 30 }}</span>
 
-    <button type="submit" class="btn">Apply Filters</button>
+    <button type="submit" class="inline-flex items-center rounded-lg border border-stone-300 px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50 transition-colors">Apply Filters</button>
   </form>
 </div>
 
@@ -41,25 +41,25 @@
 
 <!-- Games List -->
 <form method="POST" id="game-selection-form">
-  <ul class="game-list">
+  <ul class="space-y-3">
     {% for item in games %} {% set game = item.game %}
-    <li class="game-list__item" data-game-id="{{ game.id }}">
-      <div class="game-list__info">
-        <img
-          src="{{ game.image_url }}"
-          alt="{{ game.name }}"
-          class="game-list__thumbnail"
-        />
-        <div class="game-list__info-content">
-          <a href="#" class="game-list__title">{{ game.name }}</a>
-          <p class="game-list__description">
+    <li class="flex items-center gap-4 bg-white rounded-xl border border-stone-200 p-4 shadow-sm game-list-item" data-game-id="{{ game.id }}">
+      <img
+        src="{{ game.image_url }}"
+        alt="{{ game.name }}"
+        class="h-16 w-16 rounded-lg object-cover flex-shrink-0 bg-stone-100"
+      />
+      <div class="flex-1 min-w-0">
+        <div class="flex flex-col gap-1">
+          <a href="#" class="font-semibold text-stone-800">{{ game.name }}</a>
+          <p class="text-sm text-stone-500">
             Playtime: {{ game.playtime or 'N/A' }} minutes
           </p>
-          <p class="game-list__description">
+          <p class="text-sm text-stone-500">
             Players: {{ game.min_players or '?' }} - {{ game.max_players or '?'
             }}
           </p>
-          <p class="game-list__description">Owned by:</p>
+          <p class="text-sm text-stone-500">Owned by:</p>
           <ul>
             {% for owner in game.owners %}
             <li>{{ owner.person.first_name }} {{ owner.person.last_name }}</li>
@@ -79,17 +79,17 @@
   <input type="hidden" name="game_id" id="selected-game-id" />
 
   <!-- Sticky Footer -->
-  <div class="add-game-to-night-footer">
-    <div class="footer-round">
+  <div class="fixed bottom-0 left-0 right-0 md:left-16 bg-white border-t border-stone-200 p-4">
+    <div class="max-w-5xl mx-auto flex justify-end">
       <label for="round">Round:</label>
       <input type="number" name="round" min="1" value="{{ next_round }}" />
     </div>
-    
-    <button type="submit" class="btn">Add Game</button>
+
+    <button type="submit" class="inline-flex items-center rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 transition-colors">Add Game</button>
 
     <a
       href="{{ url_for('game_night.view_game_night', game_night_id=game_night.id) }}"
-      class="btn"
+      class="inline-flex items-center rounded-lg border border-stone-300 px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50 transition-colors"
     >
       Back
     </a>
@@ -114,10 +114,10 @@
       playtimeValue.textContent = playtimeSlider.value;
     });
 
-    document.querySelectorAll(".game-list__item").forEach((item) => {
+    document.querySelectorAll(".game-list-item").forEach((item) => {
       item.addEventListener("click", () => {
         document
-          .querySelectorAll(".game-list__item")
+          .querySelectorAll(".game-list-item")
           .forEach((i) => i.classList.remove("is-selected"));
         item.classList.add("is-selected");
         document.getElementById("selected-game-id").value =

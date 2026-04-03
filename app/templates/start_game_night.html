@@ -1,67 +1,78 @@
 {% extends "base.html" %} {% block title %}Start Game Night{% endblock %} {%
 block content %}
-<h1>Start a New Game Night</h1>
+<div class="max-w-xl mx-auto">
+  <h1 class="text-2xl font-bold text-stone-800 mb-6">Start a New Game Night</h1>
 
-<form
-  action="{{ url_for('game_night.start_game_night') }}"
-  method="POST"
-  id="startGameNightForm"
->
-  <div class="form-group">
-    <label for="dateInput">Date:</label>
-    <input
-      type="date"
-      name="date"
-      id="dateInput"
-      class="form-control"
-      required
-    />
-  </div>
+  <form
+    action="{{ url_for('game_night.start_game_night') }}"
+    method="POST"
+    id="startGameNightForm"
+  >
+    <div class="bg-white rounded-xl border border-stone-200 shadow-sm p-5 mb-5 space-y-4">
+      <div>
+        <label for="dateInput" class="block text-sm font-medium text-stone-700 mb-1">Date:</label>
+        <input
+          type="date"
+          name="date"
+          id="dateInput"
+          class="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+          required
+        />
+      </div>
 
-  <div class="form-group">
-    <label for="notesInput">Notes:</label>
-    <textarea
-      name="notes"
-      id="notesInput"
-      rows="4"
-      class="form-control"
-    ></textarea>
-  </div>
-
-  <div class="attendee-form-section">
-    <h3>Attendees:</h3>
-    <input
-      type="text"
-      id="searchBox"
-      class="form-control"
-      placeholder="Search for a name..."
-      autocomplete="off"
-    />
-
-    <div id="attendeesContainer" class="attendees-container">
-      <!-- JavaScript will inject attendee checkboxes -->
+      <div>
+        <label for="notesInput" class="block text-sm font-medium text-stone-700 mb-1">Notes:</label>
+        <textarea
+          name="notes"
+          id="notesInput"
+          rows="4"
+          class="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+        ></textarea>
+      </div>
     </div>
 
-    <div id="pagination" class="pagination-controls">
-      <button type="button" id="prevPage" class="pagination-button">
-        Previous
-      </button>
-      <span id="pageInfo" class="pagination-info"></span>
-      <button type="button" id="nextPage" class="pagination-button">
-        Next
-      </button>
+    <div class="bg-white rounded-xl border border-stone-200 shadow-sm p-5 mb-5">
+      <h2 class="text-lg font-semibold text-stone-800 mb-3">Attendees</h2>
+
+      <input
+        type="text"
+        id="searchBox"
+        class="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent mb-3"
+        placeholder="Search for a name..."
+        autocomplete="off"
+      />
+
+      <div id="attendeesContainer" class="attendees-container space-y-1 min-h-[2rem]">
+        <!-- JavaScript will inject attendee checkboxes -->
+      </div>
+
+      <div id="pagination" class="flex items-center gap-3 mt-3">
+        <button type="button" id="prevPage"
+                class="inline-flex items-center rounded-lg border border-stone-300 px-3 py-1.5 text-xs font-medium text-stone-700 hover:bg-stone-50 transition-colors">
+          Previous
+        </button>
+        <span id="pageInfo" class="text-xs text-stone-500"></span>
+        <button type="button" id="nextPage"
+                class="inline-flex items-center rounded-lg border border-stone-300 px-3 py-1.5 text-xs font-medium text-stone-700 hover:bg-stone-50 transition-colors">
+          Next
+        </button>
+      </div>
+
+      <div id="selectedCount" class="mt-3 text-sm font-medium text-stone-700">0 Attendees Selected</div>
     </div>
 
-    <div id="selectedCount" class="selected-count">0 Attendees Selected</div>
-  </div>
-
-  <div class="form-actions">
-    <button type="submit" class="btn btn--success">Start Game Night</button>
-    <a href="{{ url_for('main.index') }}" class="btn btn--primary"
-      >Back to Home</a
-    >
-  </div>
-</form>
+    <div class="flex flex-wrap gap-3">
+      <button type="submit"
+              class="inline-flex items-center rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 transition-colors">
+        Start Game Night
+      </button>
+      <a href="{{ url_for('main.index') }}"
+         class="inline-flex items-center rounded-lg border border-stone-300 px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50 transition-colors">
+        Back to Home
+      </a>
+    </div>
+  </form>
+</div>
 
 <script>
   const people = [

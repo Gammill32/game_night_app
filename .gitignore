@@ -1,0 +1,46 @@
+# Worktrees
+.worktrees/
+
+# Superpowers / Claude-specific docs
+.superpowers/
+docs/superpowers/
+
+# Claude Code
+.claude/
+
+# Serena MCP
+.serena/
+
+# Dev scripts
+seed_user.py
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Flask
+flask_session/
+instance/
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db

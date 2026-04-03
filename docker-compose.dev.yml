@@ -1,0 +1,28 @@
+services:
+
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: gamenight
+      POSTGRES_PASSWORD: gamenight
+      POSTGRES_DB: gamenight
+    ports:
+      - "5432:5432"
+    volumes:
+      - gamenight_dev_db:/var/lib/postgresql/data
+
+  app:
+    build: .
+    ports:
+      - "5000:8000"
+    environment:
+      DATABASE_URL: postgresql://gamenight:gamenight@db:5432/gamenight
+      SECRET_KEY: dev-local-preview-key
+      FLASK_DEBUG: "1"
+      SESSION_TYPE: filesystem
+      BGG_API_TOKEN: ${BGG_API_TOKEN:-}
+    depends_on:
+      - db
+
+volumes:
+  gamenight_dev_db:

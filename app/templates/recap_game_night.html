@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+
+{% block title %}Game Night Recap — {{ game_night.date.strftime('%B %d, %Y') }}{% endblock %}
+
+{% block head %}<meta name="robots" content="noindex">{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto space-y-6">
+
+  <!-- Header -->
+  <div>
+    {% if current_user.is_authenticated %}
+    <a href="{{ url_for('game_night.view_game_night', game_night_id=game_night.id) }}"
+       class="text-sm text-stone-500 hover:text-red-600 inline-block mb-3">&larr; Back to Game Night</a>
+    {% endif %}
+    <h1 class="text-2xl font-bold text-stone-800 mb-1">Game Night Recap</h1>
+    <p class="text-stone-500 text-sm">{{ game_night.date.strftime('%B %d, %Y') }}</p>
+    {% if game_night.notes %}
+    <p class="text-stone-600 text-sm mt-1">{{ game_night.notes }}</p>
+    {% endif %}
+  </div>
+
+  <!-- Attendees -->
+  <div class="bg-white rounded-xl border border-stone-200 shadow-sm p-5">
+    <h2 class="text-lg font-semibold text-stone-800 mb-3">Attendees</h2>
+    <ul class="flex flex-wrap gap-2">
+      {% for player in players %}
+        <li class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-stone-100 text-stone-700">
+          {{ player.person.first_name }} {{ player.person.last_name }}
+        </li>
+      {% else %}
+        <li class="text-sm text-stone-500">No attendees recorded.</li>
+      {% endfor %}
+    </ul>
+  </div>
+
+  <!-- Top Places -->
+  {% if top_places %}
+  <div class="bg-white rounded-xl border border-stone-200 shadow-sm p-5">
+    <h2 class="text-lg font-semibold text-stone-800 mb-4">Top Places</h2>
+    <div class="flex flex-wrap gap-4">
+      {% for place, player_ids in top_places %}
+      {% if player_ids %}
+      <div class="flex-1 min-w-[120px] text-center p-4 rounded-xl border border-stone-200 bg-stone-50">
+        {% if place == 1 %}<div class="text-2xl mb-1">👑</div>{% endif %}
+        <h3 class="text-sm font-semibold text-stone-800 mb-2">
+          {{ place }}{{ 'st' if place == 1 else 'nd' if place == 2 else 'rd' if place == 3 else 'th' }} Place
+        </h3>
+        <ul class="space-y-0.5">
+          {% for player_id in player_ids %}
+          {% set player = players | selectattr("id", "equalto", player_id) | first %}
+          {% if player and player.person %}
+          <li class="text-xs text-stone-700">{{ player.person.first_name }} {{ player.person.last_name }}</li>
+          {% endif %}
+          {% endfor %}
+        </ul>
+      </div>
+      {% endif %}
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Badges Earned Tonight -->
+  {% if badges_earned %}
+  <div class="mb-8">
+    <h2 class="text-xl font-semibold text-gray-800 mb-4">🏅 Badges Earned Tonight</h2>
+    <div class="space-y-2">
+      {% for b in badges_earned %}
+      <div class="flex items-center gap-3 bg-white rounded-lg shadow px-4 py-3">
+        <span class="text-2xl">{{ b.badge_icon }}</span>
+        <div>
+          <span class="font-semibold text-gray-800">{{ b.person_name }}</span>
+          <span class="text-gray-500 text-sm ml-1">earned</span>
+          <span class="font-semibold text-gray-800 text-sm">{{ b.badge_name }}</span>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Games Played -->
+  {% if game_night_games %}
+  <div class="bg-white rounded-xl border border-stone-200 shadow-sm p-5">
+    <h2 class="text-lg font-semibold text-stone-800 mb-4">Games Played</h2>
+    <ul class="space-y-6">
+      {% for gng in game_night_games %}
+      <li class="border-b border-stone-100 last:border-0 pb-6 last:pb-0">
+        <div class="flex gap-4">
+          {% if gng.game_image_url %}
+          <img src="{{ gng.game_image_url }}" alt="{{ gng.game_name }}"
+               class="h-16 w-16 rounded-lg object-cover border border-stone-200 flex-shrink-0">
+          {% endif %}
+          <div class="flex-1 min-w-0">
+            <div class="flex items-start justify-between gap-2 mb-3">
+              <strong class="text-sm font-semibold text-stone-800">{{ gng.game_name }}</strong>
+              <span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-stone-100 text-stone-600 whitespace-nowrap">Round {{ gng.round }}</span>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm">
+                <thead>
+                  <tr class="border-b border-stone-200">
+                    <th class="text-left py-1.5 pr-4 text-xs font-medium text-stone-500">Player</th>
+                    <th class="text-left py-1.5 pr-4 text-xs font-medium text-stone-500">Place</th>
+                    <th class="text-left py-1.5 text-xs font-medium text-stone-500">Score</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for result in gng.results %}
+                  <tr class="border-b border-stone-100 last:border-0">
+                    <td class="py-1.5 pr-4 text-sm text-stone-700">{{ result.first_name }} {{ result.last_name }}</td>
+                    <td class="py-1.5 pr-4 text-sm text-stone-700">{% if result.position is not none %}{{ result.position }}{% else %}-{% endif %}</td>
+                    <td class="py-1.5 text-sm text-stone-700">{% if result.score is not none %}{{ result.score }}{% else %}-{% endif %}</td>
+                  </tr>
+                  {% else %}
+                  <tr>
+                    <td colspan="3" class="py-2 text-sm text-stone-500">No results logged.</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}

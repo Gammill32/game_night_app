@@ -37,9 +37,12 @@ services:
       - FLASK_APP
       - BGG_API_TOKEN
     restart: always
-    volumes:
-      - /home/sgammill/projects/game_night_app/app/templates:/app/templates
-      - /home/sgammill/projects/game_night_app/app/static:/app/static
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
     networks:
       - web_network
     labels:

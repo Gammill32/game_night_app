@@ -1,21 +1,19 @@
-# game_night_app/Dockerfile
+FROM python:3.11-slim
 
-FROM python:3.10-slim
-
-# Set the working directory
 WORKDIR /app
 
-# Copy project files into the container
-COPY . /app
-
-# Install Python dependencies
+# Install dependencies first (cached unless requirements.txt changes)
+COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Expose Flask app port
+# Copy application code
+COPY . .
+
+RUN chmod +x scripts/entrypoint.sh
+
+# Required so entrypoint.sh can run `flask db upgrade` without FLASK_APP set at runtime
+ENV FLASK_APP=app
+
 EXPOSE 8000
 
-# Set default environment variable
-ENV FLASK_APP=app:app
-
-# Start Flask app with Gunicorn
-CMD ["gunicorn", "-w", "4", "-b", "0.0.0.0:8000", "app:create_app()"]
+ENTRYPOINT ["scripts/entrypoint.sh"]

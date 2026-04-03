@@ -1,12 +1,13 @@
 # blueprints/auth.py
 
-from flask import Blueprint, render_template, request, redirect, url_for, flash
-from flask_login import login_user, logout_user, login_required, current_user
-from app.models import Result, GameNightGame, Game, Player
+from flask import Blueprint, flash, redirect, render_template, request, url_for
+from flask_login import current_user, login_required, login_user, logout_user
+from sqlalchemy import func
+
+from app.extensions import db
+from app.models import Game, GameNightGame, Player, Result
 from app.services import auth_services
 from app.utils import flash_if_no_action
-from sqlalchemy import func
-from app.extensions import db
 
 auth_bp = Blueprint("auth", __name__)
 
@@ -16,18 +17,21 @@ def login():
     if request.method == "POST":
         email = request.form.get("email", "").strip().lower()
         password = request.form.get("password")
-        
+
         success, message, user = auth_services.login(email, password)
-        
+
         if success:
             login_user(user)
             if user.temp_pass:
                 flash("Please update your password.", "warning")
                 return redirect(url_for("auth.update_password"))
-            return redirect(request.args.get("next") or url_for("main.index"))
+            next_url = request.args.get("next") or ""
+            if next_url and (not next_url.startswith("/") or next_url.startswith("//")):
+                next_url = ""
+            return redirect(next_url or url_for("main.index"))
         else:
             flash(message, "error")
-    
+
     context = {}
     return render_template("login.html", **context)
 
@@ -48,13 +52,13 @@ def signup():
         last_name = request.form.get("last_name")
         email = request.form.get("email", "").strip().lower()
         password = request.form.get("password")
-        
+
         success, message = auth_services.signup(first_name, last_name, email, password)
         flash(message, "success" if success else "error")
-        
+
         if success:
             return redirect(url_for("auth.login"))
-    
+
     context = {}
     return render_template("signup.html", **context)
 
@@ -66,10 +70,10 @@ def forgot_password():
         email = request.form.get("email", "").strip().lower()
         success, message = auth_services.forgot_password(email)
         flash(message, "success" if success else "error")
-        
+
         if success:
             return redirect(url_for("auth.login"))
-    
+
     context = {}
     return render_template("forgot_password.html", **context)
 
@@ -81,13 +85,15 @@ def update_password():
         current_password = request.form.get("current_password")
         new_password = request.form.get("new_password")
         confirm_password = request.form.get("confirm_password")
-        
-        success, message = auth_services.update_password(current_user, current_password, new_password, confirm_password)
+
+        success, message = auth_services.update_password(
+            current_user, current_password, new_password, confirm_password
+        )
         flash(message, "success" if success else "error")
-        
+
         if success:
             return redirect(url_for("main.index"))
-    
+
     context = {}
     return render_template("update_password.html", **context)
 
@@ -103,7 +109,8 @@ def manage_user():
         .join(GameNightGame, Result.game_night_game_id == GameNightGame.id)
         .join(Player, Result.player_id == Player.id)
         .filter(Player.people_id == user.id)
-        .scalar() or 0
+        .scalar()
+        or 0
     )
 
     total_wins = (
@@ -111,7 +118,8 @@ def manage_user():
         .join(GameNightGame, Result.game_night_game_id == GameNightGame.id)
         .join(Player, Result.player_id == Player.id)
         .filter(Player.people_id == user.id, Result.position == 1)
-        .scalar() or 0
+        .scalar()
+        or 0
     )
 
     win_percentage = round((total_wins / games_played * 100) if games_played > 0 else 0, 2)
@@ -122,7 +130,9 @@ def manage_user():
             db.session.query(func.count(Result.id))
             .join(GameNightGame, Result.game_night_game_id == GameNightGame.id)
             .join(Player, Result.player_id == Player.id)
-            .filter(Player.people_id == user.id, GameNightGame.game_id == game_id, Result.position == 1)
+            .filter(
+                Player.people_id == user.id, GameNightGame.game_id == game_id, Result.position == 1
+            )
             .scalar()
         )
         total_played = (
@@ -180,11 +190,8 @@ def manage_user():
         "most_played_game": most_played_game,
         "most_played_stats": most_played_stats,
         "most_wins_game": most_wins_game,
-        "most_wins_stats": most_wins_stats
+        "most_wins_stats": most_wins_stats,
     }
 
-    context = {
-        "person": user,
-        "stats": stats
-    }
+    context = {"person": user, "stats": stats}
     return render_template("manage_user.html", **context)

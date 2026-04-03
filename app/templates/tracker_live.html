@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+
+{% block title %}Live Tracker — {{ session.game_night_game.game.name }}{% endblock %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto">
+
+  {# Global fields bar — only shown if global fields exist #}
+  {% if global_fields %}
+  <div class="bg-stone-900 border-b border-stone-700 px-4 py-3 flex flex-wrap gap-6 items-center">
+    <span class="text-stone-500 text-xs uppercase tracking-wide font-medium">Global</span>
+    {% for field in global_fields %}
+      {% set tv = value_map.get((field.id, None, None)) %}
+      {% if tv %}
+        <div class="flex items-center gap-2">
+          <span class="text-stone-300 text-sm">{{ field.label }}</span>
+          {% set entity_type = "global" %}
+          {% set entity_id = None %}
+          {% include "_tracker_cell.html" %}
+        </div>
+      {% endif %}
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {# Player / Team grid #}
+  <div class="overflow-x-auto bg-stone-950">
+    <table class="w-full border-collapse">
+      <thead class="bg-stone-900">
+        <tr>
+          <th class="text-left px-4 py-3 text-stone-400 text-xs uppercase tracking-wide w-36">
+            {% if session.mode == 'teams' %}Team{% else %}Player{% endif %}
+          </th>
+          {% for field in player_fields %}
+          <th class="px-4 py-3 text-xs uppercase tracking-wide text-center
+                     {% if field.is_score_field %}text-yellow-400{% else %}text-stone-400{% endif %}">
+            {{ field.label }}{% if field.is_score_field %} ★{% endif %}
+          </th>
+          {% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% set entities = teams if session.mode == 'teams' else players %}
+        {% for entity in entities %}
+        <tr class="border-t border-stone-800 {% if loop.index is odd %}bg-stone-950{% else %}bg-stone-900{% endif %}">
+          <td class="px-4 py-3 font-semibold text-stone-100 text-sm">
+            {% if session.mode == 'teams' %}
+              {{ entity.name }}
+            {% else %}
+              {{ entity.person.first_name }} {{ entity.person.last_name }}
+            {% endif %}
+          </td>
+          {% for field in player_fields %}
+            {% if session.mode == 'teams' %}
+              {% set tv = value_map.get((field.id, None, entity.id)) %}
+              {% set entity_type = "team" %}
+              {% set entity_id = entity.id %}
+            {% else %}
+              {% set tv = value_map.get((field.id, entity.id, None)) %}
+              {% set entity_type = "player" %}
+              {% set entity_id = entity.id %}
+            {% endif %}
+            <td class="px-4 py-3 text-center">
+              {% if tv %}{% include "_tracker_cell.html" %}{% endif %}
+            </td>
+          {% endfor %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {# Footer #}
+  <div class="bg-stone-900 border-t border-stone-700 px-4 py-3 flex justify-between items-center">
+    <span class="text-stone-500 text-sm">
+      {{ entities | length }} {{ 'team' if session.mode == 'teams' else 'player' }}s &middot;
+      {{ session.mode | capitalize }} &middot;
+      Score: {{ player_fields | selectattr('is_score_field') | map(attribute='label') | first | default('—') }}
+    </span>
+    <div class="flex gap-3">
+      <form action="{{ url_for('tracker.discard_tracker', session_id=session.id) }}" method="POST"
+            onsubmit="return confirm('Discard this tracker session? All tracked data will be permanently lost.')">
+        <button class="text-stone-500 hover:text-stone-300 text-sm px-3 py-1.5">Discard</button>
+      </form>
+      <a href="{{ url_for('tracker.end_game', session_id=session.id) }}"
+         class="bg-red-600 text-white font-semibold px-5 py-1.5 rounded-lg hover:bg-red-700 text-sm">
+        End Game &rarr;
+      </a>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

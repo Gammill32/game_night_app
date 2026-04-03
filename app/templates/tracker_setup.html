@@ -1,0 +1,157 @@
+{% extends "base.html" %}
+
+{% block title %}Set Up Tracker — {{ gng.game.name }}{% endblock %}
+
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto space-y-6">
+  <div>
+    <a href="{{ url_for('game_night.view_game_night', game_night_id=gn.id) }}"
+       class="text-sm text-stone-500 hover:text-red-600 inline-block mb-3">&larr; Back to Game Night</a>
+    <h1 class="text-2xl font-bold text-stone-800">Set Up Tracker</h1>
+    <p class="text-stone-500 text-sm mt-1">{{ gng.game.name }} &mdash; {{ gn.date.strftime('%B %d, %Y') }}</p>
+  </div>
+
+  <!-- Mode -->
+  <div class="bg-white rounded-xl shadow-sm border border-stone-200 p-5">
+    <h2 class="font-semibold text-stone-700 mb-3">Play Mode</h2>
+    <div class="flex gap-4">
+      <label class="flex items-center gap-2 cursor-pointer">
+        <input type="radio" name="mode_choice" value="individual" checked
+               onchange="document.getElementById('teams-section').classList.add('hidden')"
+               class="accent-red-600"> Individual
+      </label>
+      <label class="flex items-center gap-2 cursor-pointer">
+        <input type="radio" name="mode_choice" value="teams"
+               onchange="document.getElementById('teams-section').classList.remove('hidden')"
+               class="accent-red-600"> Teams
+      </label>
+    </div>
+  </div>
+
+  <!-- Tracking Fields -->
+  <div class="bg-white rounded-xl shadow-sm border border-stone-200 p-5">
+    <h2 class="font-semibold text-stone-700 mb-1">Tracking Fields</h2>
+    <p class="text-xs text-stone-500 mb-4">Add the stats you want to track. Drag to reorder. At least one Counter must be marked as the Score field.</p>
+
+    <ul id="fields-list" class="space-y-2 mb-4">
+      {% for field in fields %}
+        {% include "_tracker_field_row.html" %}
+      {% endfor %}
+    </ul>
+
+    <!-- Add Field Form (HTMX) -->
+    <div class="border border-dashed border-stone-300 rounded-lg p-4">
+      <div class="grid grid-cols-2 gap-3 mb-3">
+        <div>
+          <label class="text-xs font-medium text-stone-600 block mb-1">Type</label>
+          <select id="new-field-type" class="w-full border border-stone-300 rounded px-3 py-1.5 text-sm">
+            <option value="counter">Counter (per player)</option>
+            <option value="checkbox">Checkbox (per player)</option>
+            <option value="player_notes">Notes (per player)</option>
+            <option value="global_counter">Counter (global)</option>
+            <option value="global_notes">Notes (global)</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-xs font-medium text-stone-600 block mb-1">Label</label>
+          <input id="new-field-label" type="text" placeholder="e.g. Victory Points"
+                 class="w-full border border-stone-300 rounded px-3 py-1.5 text-sm">
+        </div>
+        <div id="starting-value-div">
+          <label class="text-xs font-medium text-stone-600 block mb-1">Starting Value</label>
+          <input id="new-field-start" type="number" value="0"
+                 class="w-full border border-stone-300 rounded px-3 py-1.5 text-sm">
+        </div>
+        <div class="flex items-end">
+          <label class="flex items-center gap-2 text-sm cursor-pointer">
+            <input id="new-field-score" type="checkbox" class="accent-red-600"> Score field (used for ranking)
+          </label>
+        </div>
+      </div>
+      <button
+        hx-post="{{ url_for('tracker.add_field', session_id=session.id) }}"
+        hx-target="#fields-list"
+        hx-swap="beforeend"
+        hx-vals='js:{
+          "type": document.getElementById("new-field-type").value,
+          "label": document.getElementById("new-field-label").value,
+          "starting_value": document.getElementById("new-field-start").value,
+          "is_score_field": document.getElementById("new-field-score").checked ? "true" : "false"
+        }'
+        class="bg-stone-800 text-white text-sm px-4 py-1.5 rounded hover:bg-stone-700">
+        + Add Field
+      </button>
+    </div>
+  </div>
+
+  <!-- Teams section (hidden by default) -->
+  <div id="teams-section" class="hidden bg-white rounded-xl shadow-sm border border-stone-200 p-5">
+    <h2 class="font-semibold text-stone-700 mb-3">Teams</h2>
+    <p class="text-xs text-stone-500 mb-4">Assign each player to a team.</p>
+    <div id="teams-list" class="space-y-4">
+      <div class="border border-stone-200 rounded-lg p-3">
+        <input type="text" name="team_names" placeholder="Team name"
+               class="border border-stone-300 rounded px-3 py-1 text-sm mb-2 w-full">
+        {% for player in players %}
+        <label class="flex items-center gap-2 text-sm">
+          <input type="checkbox" name="team_0_player_ids" value="{{ player.id }}" class="accent-red-600">
+          {{ player.person.first_name }} {{ player.person.last_name }}
+        </label>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Launch Form -->
+  <form action="{{ url_for('tracker.launch_tracker', gng_id=gng.id) }}" method="POST">
+    <input type="hidden" name="session_id" value="{{ session.id }}">
+    <input type="hidden" id="launch-mode" name="mode" value="individual">
+    {% for player in players %}
+    <input type="hidden" name="player_ids" value="{{ player.id }}">
+    {% endfor %}
+    <!-- Hidden field order for sort_order -->
+    <input type="hidden" id="field-order" name="field_order" value="">
+    <div class="flex gap-3">
+      <button type="submit"
+              class="bg-red-600 text-white font-semibold px-6 py-2 rounded-lg hover:bg-red-700">
+        Launch Tracker &rarr;
+      </button>
+    </div>
+  </form>
+  <form action="{{ url_for('tracker.discard_tracker', session_id=session.id) }}" method="POST" class="inline">
+    <button type="submit" class="text-stone-500 hover:text-stone-700 px-4 py-2 text-sm">Discard</button>
+  </form>
+</div>
+
+<script>
+  // Keep mode hidden input in sync with radio
+  document.querySelectorAll('[name="mode_choice"]').forEach(r => {
+    r.addEventListener('change', () => {
+      document.getElementById('launch-mode').value = r.value;
+    });
+  });
+  // Hide/show Starting Value based on field type
+  (function () {
+    const typeSelect = document.getElementById('new-field-type');
+    const startDiv = document.getElementById('starting-value-div');
+    function syncStartVisibility() {
+      const counterTypes = ['counter', 'global_counter'];
+      startDiv.style.display = counterTypes.includes(typeSelect.value) ? '' : 'none';
+    }
+    typeSelect.addEventListener('change', syncStartVisibility);
+    syncStartVisibility();
+  })();
+  // SortableJS for field reordering
+  new Sortable(document.getElementById('fields-list'), {
+    animation: 150,
+    onEnd: function() {
+      const ids = [...document.querySelectorAll('#fields-list [data-field-id]')].map(el => el.dataset.fieldId);
+      document.getElementById('field-order').value = ids.join(',');
+    }
+  });
+</script>
+{% endblock %}

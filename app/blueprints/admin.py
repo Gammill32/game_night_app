@@ -1,5 +1,6 @@
-from flask import Blueprint, render_template, redirect, url_for, flash, request
-from flask_login import login_required, current_user
+from flask import Blueprint, flash, redirect, render_template, request, url_for
+from flask_login import current_user, login_required
+
 from app.services import admin_services
 from app.utils import admin_required, flash_if_no_action
 
@@ -12,10 +13,8 @@ admin_bp = Blueprint("admin", __name__)
 def admin_page():
     """Displays the admin panel with a list of users."""
     people = admin_services.get_all_people()
-    
-    context = {
-        "people": people
-    }
+
+    context = {"people": people}
     return render_template("admin_page.html", **context)
 
 
@@ -48,10 +47,10 @@ def add_person():
     if request.method == "POST":
         first_name = request.form.get("first_name", "").strip()
         last_name = request.form.get("last_name", "").strip()
-        
+
         success, message = admin_services.add_person(first_name, last_name)
         flash(message, "success" if success else "error")
         return redirect(url_for("admin.add_person"))
-    
+
     context = {}
     return render_template("add_person.html", **context)

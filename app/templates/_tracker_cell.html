@@ -1,0 +1,36 @@
+{# Partial: single tracker cell. Rendered by POST /tracker/<session_id>/value #}
+{# Variables: tv, field, session, entity_type, entity_id #}
+<div id="cell-{{ field.id }}-{{ entity_type }}-{{ entity_id or 'global' }}"
+     class="flex items-center justify-center">
+  {% if field.type in ('counter', 'global_counter') %}
+    <button
+      hx-post="{{ url_for('tracker.update_value', session_id=session.id) }}"
+      hx-target="#cell-{{ field.id }}-{{ entity_type }}-{{ entity_id or 'global' }}"
+      hx-swap="outerHTML"
+      hx-vals='{"field_id": "{{ field.id }}", "entity_type": "{{ entity_type }}", "entity_id": "{{ entity_id or '' }}", "delta": "-1"}'
+      class="bg-stone-700 text-stone-200 border border-stone-600 rounded w-7 h-7 text-sm hover:bg-stone-600">−</button>
+    <span class="font-bold text-lg min-w-[2.5rem] text-center text-stone-100">{{ tv.value }}</span>
+    <button
+      hx-post="{{ url_for('tracker.update_value', session_id=session.id) }}"
+      hx-target="#cell-{{ field.id }}-{{ entity_type }}-{{ entity_id or 'global' }}"
+      hx-swap="outerHTML"
+      hx-vals='{"field_id": "{{ field.id }}", "entity_type": "{{ entity_type }}", "entity_id": "{{ entity_id or '' }}", "delta": "1"}'
+      class="bg-stone-700 text-stone-200 border border-stone-600 rounded w-7 h-7 text-sm hover:bg-stone-600">+</button>
+  {% elif field.type == 'checkbox' %}
+    <input type="checkbox" {% if tv.value == 'true' %}checked{% endif %}
+           class="w-5 h-5 accent-blue-500 cursor-pointer"
+           hx-post="{{ url_for('tracker.update_value', session_id=session.id) }}"
+           hx-target="#cell-{{ field.id }}-{{ entity_type }}-{{ entity_id or 'global' }}"
+           hx-swap="outerHTML"
+           hx-vals='js:{"field_id": "{{ field.id }}", "entity_type": "{{ entity_type }}", "entity_id": "{{ entity_id or '' }}", "value": this.checked ? "true" : "false"}'>
+  {% else %}
+    {# player_notes or global_notes #}
+    <input type="text" value="{{ tv.value }}"
+           class="bg-stone-800 border border-stone-600 rounded px-2 py-1 text-sm text-stone-300 w-full"
+           hx-post="{{ url_for('tracker.update_value', session_id=session.id) }}"
+           hx-target="#cell-{{ field.id }}-{{ entity_type }}-{{ entity_id or 'global' }}"
+           hx-swap="outerHTML"
+           hx-trigger="change"
+           hx-vals='js:{"field_id": "{{ field.id }}", "entity_type": "{{ entity_type }}", "entity_id": "{{ entity_id or '' }}", "value": this.value}'>
+  {% endif %}
+</div>

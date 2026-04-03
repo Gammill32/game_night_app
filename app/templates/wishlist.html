@@ -1,105 +1,51 @@
 {% extends "base.html" %}
-{% block title %}My Wishlist{% endblock %}
+{% block title %}Group Wishlist{% endblock %}
 
 {% block content %}
-<h1>My Wishlist</h1>
-
-<!-- Add to Wishlist Link -->
-<a href="{{ url_for('games.add_to_wishlist') }}" class="btn btn--success">Add a Game to Wishlist</a>
-
-<!-- Filters -->
-<button id="filter-toggle" class="btn">Filters</button>
-<div id="filter-section" class="filters">
-  <form method="GET" action="{{ url_for('games.wishlist') }}">
-    <div class="form-group">
-      <label for="name">Game Name:</label>
-      <input type="text" id="name" name="name" class="form-control" value="{{ request.args.get('name', '') }}" />
-    </div>
-
-    <div class="form-group">
-      <input type="checkbox" id="players-filter-toggle" name="players_enabled" {% if request.args.get('players_enabled') %}checked{% endif %}>
-      <label for="players-slider">Players</label>
-      <div id="players-slider-wrapper" class="{% if not request.args.get('players_enabled') %}is-hidden{% endif %}">
-        <input id="players-slider" type="range" name="players" min="1" max="20" step="1" value="{{ request.args.get('players', 4) }}" />
-        <span id="players-value">{{ request.args.get('players', 4) }}</span>
-      </div>
-    </div>
-
-    <div class="form-group">
-      <input type="checkbox" id="playtime-filter-toggle" name="playtime_enabled" {% if request.args.get('playtime_enabled') %}checked{% endif %}>
-      <label for="playtime-slider">Playtime (Minutes)</label>
-      <div id="playtime-slider-wrapper" class="{% if not request.args.get('playtime_enabled') %}is-hidden{% endif %}">
-        <input id="playtime-slider" type="range" name="playtime" min="15" max="300" step="15" value="{{ request.args.get('playtime', 30) }}" />
-        <span id="playtime-value">{{ request.args.get('playtime', 30) }}</span>
-      </div>
-    </div>
-
-    <div class="filter-actions">
-      <button type="submit" class="btn">Apply Filters</button>
-      <a href="{{ url_for('games.wishlist') }}" class="btn">Reset Filters</a>
-    </div>
-  </form>
+<div class="flex items-center justify-between mb-6">
+  <div>
+    <a href="{{ url_for('games.my_wishlist') }}" class="text-sm text-stone-500 hover:text-red-600 block mb-1">My Wishlist →</a>
+    <h1 class="text-2xl font-bold text-stone-800">Group Wishlist</h1>
+  </div>
+  <a href="{{ url_for('games.add_to_wishlist') }}"
+     class="inline-flex items-center rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 transition-colors">
+    Add a Game
+  </a>
 </div>
 
-<hr />
-
-<!-- Wishlist Games List -->
-<ul class="game-list">
-  {% for game in games %}
-  <li class="game-list__item">
-    <div class="game-list__info">
-      <a href="{{ url_for('games.view_game', game_id=game.id) }}">
-        <img src="{{ game.image_url }}" alt="{{ game.name }}" class="game-list__thumbnail" />
-      </a>
-      <div class="game-list__info-content">
-        <strong class="game-list__title">{{ game.name }}</strong>
-        <p class="game-list__description">Min Players: {{ game.min_players or 'N/A' }}</p>
-        <p class="game-list__description">Max Players: {{ game.max_players or 'N/A' }}</p>
-        <p class="game-list__description">Playtime: {{ game.playtime or 'N/A' }} minutes</p>
-
-        <form action="{{ url_for('games.remove_from_wishlist', game_id=game.id) }}" method="POST">
-          <button class="btn btn--danger" type="submit">Remove from Wishlist</button>
-        </form>
-
-        <form action="{{ url_for('games.claim_game', game_id=game.id) }}" method="POST">
-          <button class="btn btn--success" type="submit">I Own This Game</button>
-        </form>
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+  {% for item in items %}
+  {% set game = item.game %}
+  <div class="bg-white rounded-xl border border-stone-200 shadow-sm p-5 flex flex-col gap-3">
+    <a href="{{ url_for('games.view_game', game_id=game.id) }}" class="block">
+      <img src="{{ game.image_url }}" alt="{{ game.name }}" class="w-full h-36 object-contain rounded-lg mb-2" />
+    </a>
+    <div class="flex-1">
+      <a href="{{ url_for('games.view_game', game_id=game.id) }}"
+         class="text-base font-semibold text-stone-800 hover:text-red-600 transition-colors">{{ game.name }}</a>
+      <div class="mt-2 space-y-0.5 text-sm text-stone-500">
+        <p>{{ game.min_players or 'N/A' }}–{{ game.max_players or 'N/A' }} players · {{ game.playtime or 'N/A' }} min</p>
+        <p class="font-medium text-stone-700">{{ item.total_want }} want{{ 's' if item.total_want != 1 }}</p>
       </div>
     </div>
-  </li>
+    <div class="flex flex-wrap gap-2 pt-1">
+      {% if item.user_wishlisted %}
+        <span class="inline-flex items-center rounded-lg border border-stone-300 px-3 py-1.5 text-xs font-medium text-stone-500">On your wishlist</span>
+      {% else %}
+        <form action="{{ url_for('games.vote_wishlist', game_id=game.id) }}" method="POST">
+          {% if item.user_voted %}
+            <button class="inline-flex items-center rounded-lg border border-red-300 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50 transition-colors"
+                    type="submit">Remove Vote</button>
+          {% else %}
+            <button class="inline-flex items-center rounded-lg bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700 transition-colors"
+                    type="submit">I Want This</button>
+          {% endif %}
+        </form>
+      {% endif %}
+    </div>
+  </div>
   {% else %}
-  <li class="empty-state">No games found in your wishlist.</li>
+  <div class="col-span-full text-center py-12 text-stone-500 text-sm">No games on the group wishlist yet.</div>
   {% endfor %}
-</ul>
-
-<!-- Back to Home Button -->
-<div class="text-center mt-1">
-  <a href="{{ url_for('main.index') }}" class="btn btn--primary">Back to Home</a>
 </div>
-
-<script>
-  document.addEventListener("DOMContentLoaded", () => {
-    document.getElementById("filter-toggle").addEventListener("click", () => {
-      document.getElementById("filter-section").classList.toggle("active");
-    });
-
-    const setupSliderToggle = (checkboxId, wrapperId, sliderId, valueId) => {
-      const toggle = document.getElementById(checkboxId);
-      const wrapper = document.getElementById(wrapperId);
-      const slider = document.getElementById(sliderId);
-      const value = document.getElementById(valueId);
-
-      toggle.addEventListener("change", () => {
-        wrapper.classList.toggle("is-hidden", !toggle.checked);
-      });
-
-      slider.addEventListener("input", () => {
-        value.textContent = slider.value;
-      });
-    };
-
-    setupSliderToggle("players-filter-toggle", "players-slider-wrapper", "players-slider", "players-value");
-    setupSliderToggle("playtime-filter-toggle", "playtime-slider-wrapper", "playtime-slider", "playtime-value");
-  });
-</script>
 {% endblock %}
