@@ -36,6 +36,7 @@ class Person(db.Model, UserMixin):
     password = db.Column(db.String, nullable=True)
     created_at = db.Column(db.DateTime, server_default=func.now())
     temp_pass = db.Column(db.Boolean, default=False)
+    temp_pass_expires_at = db.Column(db.DateTime, nullable=True)
     admin = db.Column(db.Boolean, default=False, nullable=False)
     owner = db.Column(db.Boolean, default=False, nullable=False)
 
@@ -204,7 +205,7 @@ class WishlistVote(db.Model):
 
 class GamesIndex(db.Model):  # SQL View
     __tablename__ = "games_index"
-    __table_args__ = {"extend_existing": True}  # Ensures no conflicts
+    __table_args__ = {"extend_existing": True}
 
     game_id = db.Column(db.Integer, primary_key=True)
     game_name = db.Column(db.String, nullable=False)
@@ -212,9 +213,9 @@ class GamesIndex(db.Model):  # SQL View
     min_players = db.Column(db.Integer, nullable=False)
     max_players = db.Column(db.Integer, nullable=False)
     playtime = db.Column(db.Integer, nullable=True)
-    owner_id = db.Column(db.Integer, nullable=True)
+    owner_ids = db.Column(db.ARRAY(db.Integer), nullable=True)  # all owner person_ids
+    owner_names = db.Column(db.String, nullable=True)  # "Alice Smith, Bob Jones"
     player_owner = db.Column(db.Boolean, nullable=True)
-    user_owns_game = db.Column(db.Boolean, nullable=False)  # Precomputed boolean
 
 
 class UserRecentFutureGameNight(db.Model):  # SQL View

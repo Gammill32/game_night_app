@@ -113,6 +113,9 @@
           <p>Players: {{ game.min_players or 'N/A' }}–{{ game.max_players or 'N/A' }}</p>
           <p>Playtime: {{ game.playtime or 'N/A' }} min</p>
           <p>Your Rating: {{ item.user_rating if item.user_rating is not none else 'Not Rated' }}</p>
+          {% if game.owner_names %}
+            <p class="text-xs text-stone-400">Owned by {{ game.owner_names }}</p>
+          {% endif %}
           {% if play_stats.get(game.game_id) %}
             <p>Played: {{ play_stats[game.game_id].play_count }} time{{ 's' if play_stats[game.game_id].play_count != 1 }}</p>
           {% endif %}

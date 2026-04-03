@@ -1,4 +1,5 @@
 import secrets
+from datetime import datetime, timedelta
 
 from sqlalchemy import func
 
@@ -11,6 +12,12 @@ def login(email, password):
     """Authenticate user and return success status, message, and user instance."""
     user = Person.query.filter(func.lower(Person.email) == email).first()
     if user and bcrypt.check_password_hash(user.password, password):
+        if (
+            user.temp_pass
+            and user.temp_pass_expires_at
+            and datetime.utcnow() > user.temp_pass_expires_at
+        ):
+            return False, "Your temporary password has expired. Please request a new one.", None
         return True, "Login successful.", user
     return False, "Invalid email or password.", None
 
@@ -59,6 +66,7 @@ def forgot_password(email):
     temp_password = secrets.token_urlsafe(8)
     user.password = bcrypt.generate_password_hash(temp_password).decode("utf-8")
     user.temp_pass = True
+    user.temp_pass_expires_at = datetime.utcnow() + timedelta(hours=24)
     db.session.commit()
 
     subject = "Password Reset for Game Night App"
@@ -82,6 +90,7 @@ def update_password(user, current_password, new_password, confirm_password):
 
     user.password = bcrypt.generate_password_hash(new_password).decode("utf-8")
     user.temp_pass = False
+    user.temp_pass_expires_at = None
     db.session.commit()
 
     return True, "Password updated successfully."

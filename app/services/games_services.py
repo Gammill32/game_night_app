@@ -96,10 +96,13 @@ def get_filtered_games(
     # Base query
     query = GamesIndex.query
 
-    # If not admin/owner, limit scope
+    # If not admin/owner, limit scope to games owned by the user or a site owner
     if not user.is_admin_or_owner:
         query = query.filter(
-            db.or_(GamesIndex.owner_id == user_id, GamesIndex.player_owner.is_(True))
+            db.or_(
+                GamesIndex.owner_ids.contains([user_id]),
+                GamesIndex.player_owner.is_(True),
+            )
         )
 
     # Apply filters
