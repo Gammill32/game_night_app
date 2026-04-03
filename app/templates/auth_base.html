@@ -6,6 +6,7 @@
   <title>{% block title %}Game Night{% endblock %}</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="icon" href="{{ url_for('static', filename='images/favicon.svg') }}" type="image/svg+xml" />
+  <meta name="csrf-token" content="{{ csrf_token() }}">
 </head>
 <body class="h-full flex items-center justify-center bg-stone-50">
   <div class="w-full max-w-sm px-6">
@@ -29,5 +30,21 @@
       {% block content %}{% endblock %}
     </div>
   </div>
+<script>
+  (function () {
+    const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
+    document.addEventListener('DOMContentLoaded', function () {
+      document.querySelectorAll('form').forEach(function (form) {
+        if (!form.querySelector('input[name="csrf_token"]')) {
+          const input = document.createElement('input');
+          input.type = 'hidden';
+          input.name = 'csrf_token';
+          input.value = csrfToken;
+          form.appendChild(input);
+        }
+      });
+    });
+  })();
+</script>
 </body>
 </html>
