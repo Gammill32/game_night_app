@@ -165,11 +165,15 @@ def bridesmaid_setup(app, db):
         )
         _db.session.add(nominations[-1])
 
-    # Nominate and play played_game in first night
+    # Nominate and play played_game in first night — use Bob (people[1]) to avoid
+    # violating uq_game_nominations_night_player (one nomination per player per night)
+    bob_player = Player(game_night_id=game_nights[0].id, people_id=people[1].id)
+    _db.session.add(bob_player)
+    _db.session.flush()
     nominations.append(
         GameNominations(
             game_night_id=game_nights[0].id,
-            player_id=players_map[game_nights[0].id].id,
+            player_id=bob_player.id,
             game_id=played_game.id,
         )
     )
@@ -187,6 +191,7 @@ def bridesmaid_setup(app, db):
     ).delete()
     Result.query.filter_by(game_night_game_id=gng.id).delete()
     _db.session.delete(gng)
+    _db.session.delete(bob_player)
     for pl in players_map.values():
         _db.session.delete(pl)
     for gn in game_nights:

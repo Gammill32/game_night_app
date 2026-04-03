@@ -2,6 +2,7 @@
 
 from flask_login import UserMixin
 from sqlalchemy import ForeignKey, func
+from sqlalchemy.dialects.postgresql import ARRAY as PG_ARRAY
 from sqlalchemy.orm import relationship
 
 from app.extensions import db
@@ -213,7 +214,7 @@ class GamesIndex(db.Model):  # SQL View
     min_players = db.Column(db.Integer, nullable=False)
     max_players = db.Column(db.Integer, nullable=False)
     playtime = db.Column(db.Integer, nullable=True)
-    owner_ids = db.Column(db.ARRAY(db.Integer), nullable=True)  # all owner person_ids
+    owner_ids = db.Column(PG_ARRAY(db.Integer), nullable=True)  # all owner person_ids
     owner_names = db.Column(db.String, nullable=True)  # "Alice Smith, Bob Jones"
     player_owner = db.Column(db.Boolean, nullable=True)
 
