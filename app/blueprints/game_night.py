@@ -170,6 +170,8 @@ def add_game_to_night(game_night_id):
     ]
     next_round = max(existing_rounds, default=0) + 1
 
+    attending_person_ids = {player.people_id for player in game_night.players}
+
     context = {
         "game_night": game_night,
         "games": games,
@@ -179,6 +181,7 @@ def add_game_to_night(game_night_id):
             "playtime": playtime_filter,
         },
         "next_round": next_round,
+        "attending_person_ids": attending_person_ids,
     }
     return render_template("add_game_to_night.html", **context)
 

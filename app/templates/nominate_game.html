@@ -5,64 +5,66 @@
 <h1 class="text-2xl font-bold text-stone-800 mb-6">Nominate a Game for {{ game_night.date.strftime('%B %d, %Y') }}</h1>
 
 <!-- Filters -->
-<button id="filter-toggle" class="inline-flex items-center rounded-lg border border-stone-300 px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50 transition-colors">Filters</button>
-<div id="filter-section" class="filters">
-  <form method="GET">
-    <div class="space-y-1 mb-4">
-      <label for="name" class="block text-sm font-medium text-stone-700 mb-1">Game Name:</label>
-      <input
-        type="text"
-        id="name"
-        name="name"
-        class="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
-        value="{{ filters.name or '' }}"
-      />
-    </div>
-
-    <div class="space-y-1 mb-4">
-      <div class="flex items-center gap-2">
-        <input type="checkbox" id="players-filter-toggle" name="players_enabled" {% if filters.players is not none %}checked{% endif %}>
-        <label for="players-slider" class="block text-sm font-medium text-stone-700">Players</label>
-      </div>
-      <div id="players-slider-wrapper" class="{% if filters.players is none %}hidden{% endif %}">
+<details class="mb-4 bg-white rounded-xl border border-stone-200 shadow-sm" {% if filters.name or filters.players is not none or filters.playtime is not none %}open{% endif %}>
+  <summary class="px-5 py-3 text-sm font-medium text-stone-700 cursor-pointer select-none">Filters</summary>
+  <div class="px-5 pb-5 pt-2">
+    <form method="GET">
+      <div class="space-y-1 mb-4">
+        <label for="name" class="block text-sm font-medium text-stone-700 mb-1">Game Name:</label>
         <input
-          id="players-slider"
-          type="range"
-          name="players"
-          min="1"
-          max="20"
-          step="1"
-          value="{{ filters.players or 4 }}"
+          type="text"
+          id="name"
+          name="name"
+          class="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+          value="{{ filters.name or '' }}"
         />
-        <span id="players-value">{{ filters.players or 4 }}</span>
       </div>
-    </div>
 
-    <div class="space-y-1 mb-4">
-      <div class="flex items-center gap-2">
-        <input type="checkbox" id="playtime-filter-toggle" name="playtime_enabled" {% if filters.playtime is not none %}checked{% endif %}>
-        <label for="playtime-slider" class="block text-sm font-medium text-stone-700">Playtime (Minutes)</label>
+      <div class="space-y-1 mb-4">
+        <div class="flex items-center gap-2">
+          <input type="checkbox" id="players-filter-toggle" name="players_enabled" {% if filters.players is not none %}checked{% endif %}>
+          <label for="players-slider" class="block text-sm font-medium text-stone-700">Players</label>
+        </div>
+        <div id="players-slider-wrapper" class="{% if filters.players is none %}hidden{% endif %}">
+          <input
+            id="players-slider"
+            type="range"
+            name="players"
+            min="1"
+            max="20"
+            step="1"
+            value="{{ filters.players or 4 }}"
+          />
+          <span id="players-value">{{ filters.players or 4 }}</span>
+        </div>
       </div>
-      <div id="playtime-slider-wrapper" class="{% if filters.playtime is none %}hidden{% endif %}">
-        <input
-          id="playtime-slider"
-          type="range"
-          name="playtime"
-          min="15"
-          max="300"
-          step="15"
-          value="{{ filters.playtime or 300 }}"
-        />
-        <span id="playtime-value">{{ filters.playtime or 300 }}</span>
-      </div>
-    </div>
 
-    <div class="flex flex-wrap gap-3">
-      <button type="submit" class="inline-flex items-center rounded-lg border border-stone-300 px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50 transition-colors">Apply Filters</button>
-      <a href="{{ url_for('voting.nominate_game_page', game_night_id=game_night.id) }}" class="inline-flex items-center rounded-lg border border-stone-300 px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50 transition-colors">Reset Filters</a>
-    </div>
-  </form>
-</div>
+      <div class="space-y-1 mb-4">
+        <div class="flex items-center gap-2">
+          <input type="checkbox" id="playtime-filter-toggle" name="playtime_enabled" {% if filters.playtime is not none %}checked{% endif %}>
+          <label for="playtime-slider" class="block text-sm font-medium text-stone-700">Playtime (Minutes)</label>
+        </div>
+        <div id="playtime-slider-wrapper" class="{% if filters.playtime is none %}hidden{% endif %}">
+          <input
+            id="playtime-slider"
+            type="range"
+            name="playtime"
+            min="15"
+            max="300"
+            step="15"
+            value="{{ filters.playtime or 300 }}"
+          />
+          <span id="playtime-value">{{ filters.playtime or 300 }}</span>
+        </div>
+      </div>
+
+      <div class="flex flex-wrap gap-3">
+        <button type="submit" class="inline-flex items-center rounded-lg border border-stone-300 px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50 transition-colors">Apply Filters</button>
+        <a href="{{ url_for('voting.nominate_game_page', game_night_id=game_night.id) }}" class="inline-flex items-center rounded-lg border border-stone-300 px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50 transition-colors">Reset Filters</a>
+      </div>
+    </form>
+  </div>
+</details>
 
 <hr class="my-6 border-stone-200" />
 
@@ -72,7 +74,7 @@
   action="{{ url_for('voting.nominate_game', game_night_id=game_night.id) }}"
   id="nominate-game-form"
 >
-  <ul class="space-y-3">
+  <ul class="space-y-3 pb-36">
     {% for item in eligible_games %}
       {% set game = item.game %}
       <li class="p-4 rounded-lg border border-stone-200 hover:border-red-300 hover:bg-red-50 transition-colors cursor-pointer{% if user_nomination_id == game.id %} bg-red-50 border-red-300{% endif %}" data-game-id="{{ game.id }}">
@@ -108,7 +110,7 @@
   <input type="hidden" name="game_id" id="selected-game-id" />
 
   <!-- Sticky Footer -->
-  <div class="fixed bottom-0 left-0 right-0 bg-white border-t border-stone-200 p-4">
+  <div class="fixed bottom-16 md:bottom-0 left-0 right-0 bg-white border-t border-stone-200 p-4">
     <div class="max-w-4xl mx-auto flex flex-wrap gap-3">
       <button type="submit" class="inline-flex items-center rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 transition-colors">Nominate Selected Game</button>
       <a href="{{ url_for('game_night.view_game_night', game_night_id=game_night.id) }}" class="inline-flex items-center rounded-lg border border-stone-300 px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50 transition-colors">Back</a>
@@ -119,10 +121,6 @@
 <!-- JavaScript -->
 <script>
   document.addEventListener("DOMContentLoaded", () => {
-    document.getElementById("filter-toggle").addEventListener("click", () => {
-      document.getElementById("filter-section").classList.toggle("active");
-    });
-
     const playersToggle = document.getElementById("players-filter-toggle");
     const playersWrapper = document.getElementById("players-slider-wrapper");
     playersToggle.addEventListener("change", () => {

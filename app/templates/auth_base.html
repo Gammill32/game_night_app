@@ -30,23 +30,21 @@
       {% block content %}{% endblock %}
     </div>
   </div>
-  <script>
-        (function () {
-          const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
-          document.addEventListener('DOMContentLoaded', function ()
-          {
-            document.querySelectorAll('form').forEach(function (form
-          ) {
-              if (!form.querySelector('input[name="csrf_token"]')) {
-                const input = document.createElement('input');
-                input.type = 'hidden';
-                input.name = 'csrf_token';
-                input.value = csrfToken;
-                form.appendChild(input);
-              }
-            });
-          });
-        })();
-      </script>
+<script>
+  (function () {
+    const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
+    document.addEventListener('DOMContentLoaded', function () {
+      document.querySelectorAll('form').forEach(function (form) {
+        if (!form.querySelector('input[name="csrf_token"]')) {
+          const input = document.createElement('input');
+          input.type = 'hidden';
+          input.name = 'csrf_token';
+          input.value = csrfToken;
+          form.appendChild(input);
+        }
+      });
+    });
+  })();
+</script>
 </body>
 </html>

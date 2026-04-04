@@ -38,6 +38,7 @@
         <form hx-post="{{ url_for('polls.poll_submit', token=poll.token) }}"
               hx-target="#poll-body"
               hx-swap="innerHTML">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
           <div class="bg-white rounded-xl border border-stone-200 shadow-sm p-6 space-y-4">
 
             <div class="space-y-2">

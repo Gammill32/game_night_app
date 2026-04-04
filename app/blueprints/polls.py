@@ -1,5 +1,6 @@
 from flask import Blueprint, abort, flash, redirect, render_template, request, session, url_for
 from flask_login import current_user, login_required
+from sqlalchemy.orm import selectinload
 
 from app.services.poll_services import (
     create_poll,
@@ -7,6 +8,7 @@ from app.services.poll_services import (
     get_results,
     poll_is_active,
     submit_response,
+    update_poll,
 )
 from app.utils import admin_required
 
@@ -15,12 +17,29 @@ polls_bp = Blueprint("polls", __name__)
 
 @polls_bp.app_context_processor
 def inject_active_polls():
-    """Make active poll count and list available in all templates."""
+    """Make active poll count and list available in all templates.
+
+    Private polls are only visible to their invitees and to admins/owners.
+    """
     from app.models import Poll
 
     try:
-        all_open = Poll.query.filter_by(closed=False).all()
-        active = [p for p in all_open if poll_is_active(p)]
+        all_open = Poll.query.filter_by(closed=False).options(selectinload(Poll.invitees)).all()
+        active_all = [p for p in all_open if poll_is_active(p)]
+
+        is_admin = current_user.is_authenticated and (current_user.admin or current_user.owner)
+        user_id = current_user.id if current_user.is_authenticated else None
+
+        def _visible(poll: Poll) -> bool:
+            if not poll.private:
+                return True
+            if is_admin:
+                return True
+            if user_id is None:
+                return False
+            return any(inv.person_id == user_id for inv in poll.invitees)  # type: ignore[attr-defined]
+
+        active = [p for p in active_all if _visible(p)]
         return {"active_polls_count": len(active), "active_polls": active}
     except Exception:
         return {"active_polls_count": 0, "active_polls": []}
@@ -43,6 +62,10 @@ def poll_list():
 @login_required
 @admin_required
 def poll_create():
+    from app.models import Person
+
+    people = Person.query.order_by(Person.first_name).all()
+
     if request.method == "POST":
         title = request.form.get("title", "").strip()
         description = request.form.get("description", "").strip() or None
@@ -50,16 +73,89 @@ def poll_create():
             label.strip() for label in request.form.getlist("option_labels") if label.strip()
         ]
         multi_select = request.form.get("multi_select") == "true"
+        private = request.form.get("private") == "true"
+        invitee_ids = [int(i) for i in request.form.getlist("invitee_ids") if i.isdigit()]
 
         if not title or len(option_labels) < 2:
             return render_template(
-                "poll_create.html", error="A title and at least two options are required."
+                "poll_create.html",
+                people=people,
+                error="A title and at least two options are required.",
             )
 
-        create_poll(title, description, option_labels, current_user.id, multi_select)
+        create_poll(
+            title,
+            description,
+            option_labels,
+            current_user.id,
+            multi_select,
+            private=private,
+            invitee_ids=invitee_ids if private else None,
+        )
         return redirect(url_for("polls.poll_list"))
 
-    return render_template("poll_create.html")
+    return render_template("poll_create.html", people=people)
+
+
+@polls_bp.route("/polls/<int:poll_id>/edit", methods=["GET", "POST"])
+@login_required
+@admin_required
+def poll_edit(poll_id: int):
+    from app.models import Person, Poll
+
+    poll = Poll.query.get_or_404(poll_id)
+    people = Person.query.order_by(Person.first_name).all()
+
+    if request.method == "POST":
+        from datetime import datetime
+
+        title = request.form.get("title", "").strip()
+        description = request.form.get("description", "").strip() or None
+        multi_select = request.form.get("multi_select") == "true"
+        private = request.form.get("private") == "true"
+        invitee_ids = [int(i) for i in request.form.getlist("invitee_ids") if i.isdigit()]
+
+        closes_at_str = request.form.get("closes_at", "").strip()
+        closes_at = None
+        if closes_at_str:
+            try:
+                closes_at = datetime.fromisoformat(closes_at_str)
+            except ValueError:
+                return render_template(
+                    "poll_edit.html",
+                    poll=poll,
+                    people=people,
+                    error="Invalid close date format. Please use the date picker.",
+                )
+
+        option_updates: dict[int, str] = {}
+        for key, val in request.form.items():
+            if key.startswith("option_label_"):
+                try:
+                    opt_id = int(key.removeprefix("option_label_"))
+                    option_updates[opt_id] = val
+                except ValueError:
+                    pass
+
+        if not title:
+            return render_template(
+                "poll_edit.html", poll=poll, people=people, error="Title is required."
+            )
+
+        update_poll(
+            poll,
+            title=title,
+            description=description,
+            closes_at=closes_at,
+            multi_select=multi_select,
+            private=private,
+            invitee_ids=invitee_ids if private else None,
+            option_updates=option_updates,
+        )
+        flash("Poll updated.", "success")
+        return redirect(url_for("polls.poll_list"))
+
+    return render_template("poll_edit.html", poll=poll, people=people)
 
 
 @polls_bp.route("/polls/<int:poll_id>/close", methods=["POST"])

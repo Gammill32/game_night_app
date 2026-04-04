@@ -76,7 +76,10 @@
 
     fetch("{{ url_for('game_night.log_results', game_night_id=game_night_id, game_night_game_id=game_night_game.id) }}", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRFToken": document.querySelector('meta[name="csrf-token"]').content
+      },
       body: JSON.stringify(formData)
     })
     .then(response => {

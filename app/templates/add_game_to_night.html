@@ -1,138 +1,180 @@
-{% extends "base.html" %} {% block title %}Add Game to Game Night{% endblock %}
+{% extends "base.html" %}
+{% block title %}Add Game to Game Night{% endblock %}
 {% block content %}
-<h1>Add a Game to {{ game_night.date.strftime('%B %d, %Y') }}</h1>
 
-<!-- Filters -->
-<button id="filter-toggle" class="inline-flex items-center rounded-lg border border-stone-300 px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50 transition-colors">Filters</button>
-<div id="filter-section" class="bg-white rounded-xl border border-stone-200 p-4 mb-4">
-  <form method="GET">
-    <label for="name">Game Name:</label>
-    <input type="text" name="name" value="{{ filters.name }}" />
+<div class="max-w-3xl mx-auto">
+  <h1 class="text-2xl font-bold text-stone-800 mb-6">Add a Game — {{ game_night.date.strftime('%B %d, %Y') }}</h1>
 
-    <label for="players">Number of Players:</label>
-    <input
-      id="players-slider"
-      type="range"
-      name="players"
-      min="1"
-      max="20"
-      step="1"
-      value="{{ filters.players or 4 }}"
-    />
-    <span id="players-value">{{ filters.players or 4 }}</span>
+  <!-- Filters -->
+  <details class="mb-4 bg-white rounded-xl border border-stone-200 shadow-sm" {% if filters.name or filters.players or filters.playtime %}open{% endif %}>
+    <summary class="px-5 py-3 text-sm font-medium text-stone-700 cursor-pointer select-none">Filters</summary>
+    <div class="px-5 pb-5 pt-2">
+      <form method="GET">
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+          <div>
+            <label for="name" class="block text-sm font-medium text-stone-700 mb-1">Game Name</label>
+            <input
+              type="text"
+              id="name"
+              name="name"
+              value="{{ filters.name }}"
+              class="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+            />
+          </div>
 
-    <label for="playtime">Maximum Playtime (minutes):</label>
-    <input
-      id="playtime-slider"
-      type="range"
-      name="playtime"
-      min="15"
-      max="300"
-      step="15"
-      value="{{ filters.playtime or 30 }}"
-    />
-    <span id="playtime-value">{{ filters.playtime or 30 }}</span>
+          <div>
+            <div class="flex items-center gap-2 mb-1">
+              <input type="checkbox" id="players-toggle" name="players_enabled"
+                     {% if filters.players %}checked{% endif %}
+                     class="rounded border-stone-300">
+              <label for="players-toggle" class="text-sm font-medium text-stone-700">Players</label>
+            </div>
+            <div id="players-wrapper" class="{% if not filters.players %}hidden{% endif %}">
+              <div class="flex items-center gap-2">
+                <input id="players-slider" type="range" name="players"
+                       min="1" max="20" step="1"
+                       value="{{ filters.players or 4 }}"
+                       class="w-full accent-red-600" />
+                <span id="players-value" class="text-sm text-stone-700 w-8 text-right shrink-0">{{ filters.players or 4 }}</span>
+              </div>
+            </div>
+          </div>
 
-    <button type="submit" class="inline-flex items-center rounded-lg border border-stone-300 px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50 transition-colors">Apply Filters</button>
+          <div>
+            <div class="flex items-center gap-2 mb-1">
+              <input type="checkbox" id="playtime-toggle" name="playtime_enabled"
+                     {% if filters.playtime %}checked{% endif %}
+                     class="rounded border-stone-300">
+              <label for="playtime-toggle" class="text-sm font-medium text-stone-700">Max Playtime (min)</label>
+            </div>
+            <div id="playtime-wrapper" class="{% if not filters.playtime %}hidden{% endif %}">
+              <div class="flex items-center gap-2">
+                <input id="playtime-slider" type="range" name="playtime"
+                       min="15" max="300" step="15"
+                       value="{{ filters.playtime or 60 }}"
+                       class="w-full accent-red-600" />
+                <span id="playtime-value" class="text-sm text-stone-700 w-10 text-right shrink-0">{{ filters.playtime or 60 }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="flex gap-3">
+          <button type="submit"
+                  class="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 transition-colors">
+            Apply Filters
+          </button>
+          <a href="{{ url_for('game_night.add_game_to_night', game_night_id=game_night.id) }}"
+             class="inline-flex items-center rounded-lg border border-stone-300 px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50 transition-colors">
+            Reset
+          </a>
+        </div>
+      </form>
+    </div>
+  </details>
+
+  <!-- Games List -->
+  <form method="POST" id="game-selection-form">
+    <ul class="space-y-3 pb-36">
+      {% for item in games %}
+        {% set game = item.game %}
+        {% set attending_owners = game.owners | selectattr('person_id', 'in', attending_person_ids) | list %}
+        <li class="flex items-center gap-4 bg-white rounded-xl border border-stone-200 p-4 shadow-sm cursor-pointer
+                   hover:border-red-300 hover:bg-red-50 transition-colors game-list-item"
+            data-game-id="{{ game.id }}"
+            data-game-name="{{ game.name }}">
+          <img
+            src="{{ game.image_url }}"
+            alt="{{ game.name }}"
+            class="h-16 w-16 rounded-lg object-cover flex-shrink-0 bg-stone-100"
+          />
+          <div class="flex-1 min-w-0">
+            <p class="font-semibold text-stone-800 mb-0.5">{{ game.name }}</p>
+            <p class="text-sm text-stone-500">{{ game.playtime or 'N/A' }} min &middot; {{ game.min_players or '?' }}–{{ game.max_players or '?' }} players</p>
+            {% if attending_owners %}
+              <p class="text-xs text-stone-400 mt-0.5">
+                Owned by {{ attending_owners | map(attribute='person') | map(attribute='first_name') | join(', ') }}
+              </p>
+            {% endif %}
+            {% if item.in_wishlist %}
+              <span class="inline-block mt-1 rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">In wishlist</span>
+            {% endif %}
+          </div>
+          <div class="flex-shrink-0 text-red-600 opacity-0 selected-check">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+            </svg>
+          </div>
+        </li>
+      {% else %}
+        <li class="text-center py-12 text-stone-500 text-sm">No games found.</li>
+      {% endfor %}
+    </ul>
+
+    <input type="hidden" name="game_id" id="selected-game-id" />
+
+    <!-- Sticky Footer -->
+    <div class="fixed bottom-16 md:bottom-0 left-0 right-0 md:left-16 bg-white border-t border-stone-200 shadow-lg z-20">
+      <div class="max-w-3xl mx-auto px-4 py-3 flex items-center gap-3">
+        <div class="flex-1 min-w-0">
+          <p id="selected-game-label" class="text-sm text-stone-500 truncate">No game selected</p>
+        </div>
+        <div class="flex items-center gap-2 shrink-0">
+          <label for="round" class="text-sm font-medium text-stone-700">Round</label>
+          <input type="number" name="round" id="round" min="1" value="{{ next_round }}"
+                 class="w-16 rounded-lg border border-stone-300 px-2 py-1.5 text-sm text-center focus:outline-none focus:ring-2 focus:ring-red-500" />
+          <button type="submit"
+                  class="inline-flex items-center rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 transition-colors">
+            Add Game
+          </button>
+          <a href="{{ url_for('game_night.view_game_night', game_night_id=game_night.id) }}"
+             class="inline-flex items-center rounded-lg border border-stone-300 px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50 transition-colors">
+            Back
+          </a>
+        </div>
+      </div>
+    </div>
   </form>
 </div>
 
-<hr />
-
-<!-- Games List -->
-<form method="POST" id="game-selection-form">
-  <ul class="space-y-3">
-    {% for item in games %} {% set game = item.game %}
-    <li class="flex items-center gap-4 bg-white rounded-xl border border-stone-200 p-4 shadow-sm game-list-item" data-game-id="{{ game.id }}">
-      <img
-        src="{{ game.image_url }}"
-        alt="{{ game.name }}"
-        class="h-16 w-16 rounded-lg object-cover flex-shrink-0 bg-stone-100"
-      />
-      <div class="flex-1 min-w-0">
-        <div class="flex flex-col gap-1">
-          <a href="#" class="font-semibold text-stone-800">{{ game.name }}</a>
-          <p class="text-sm text-stone-500">
-            Playtime: {{ game.playtime or 'N/A' }} minutes
-          </p>
-          <p class="text-sm text-stone-500">
-            Players: {{ game.min_players or '?' }} - {{ game.max_players or '?'
-            }}
-          </p>
-          <p class="text-sm text-stone-500">Owned by:</p>
-          <ul>
-            {% for owner in game.owners %}
-            <li>{{ owner.person.first_name }} {{ owner.person.last_name }}</li>
-            {% endfor %}
-          </ul>
-          {% if item.in_wishlist %}
-          <p class="wishlist-status">In your wishlist</p>
-          {% endif %}
-        </div>
-      </div>
-    </li>
-    {% else %}
-    <li>No games found.</li>
-    {% endfor %}
-  </ul>
-
-  <input type="hidden" name="game_id" id="selected-game-id" />
-
-  <!-- Sticky Footer -->
-  <div class="fixed bottom-0 left-0 right-0 md:left-16 bg-white border-t border-stone-200 p-4">
-    <div class="max-w-5xl mx-auto flex justify-end">
-      <label for="round">Round:</label>
-      <input type="number" name="round" min="1" value="{{ next_round }}" />
-    </div>
-
-    <button type="submit" class="inline-flex items-center rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 transition-colors">Add Game</button>
-
-    <a
-      href="{{ url_for('game_night.view_game_night', game_night_id=game_night.id) }}"
-      class="inline-flex items-center rounded-lg border border-stone-300 px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50 transition-colors"
-    >
-      Back
-    </a>
-  </div>
-</form>
-
 <script>
   document.addEventListener("DOMContentLoaded", () => {
-    document.getElementById("filter-toggle").addEventListener("click", () => {
-      document.getElementById("filter-section").classList.toggle("active");
-    });
+    // Slider toggles
+    const setupSlider = (checkboxId, wrapperId, sliderId, valueId) => {
+      const checkbox = document.getElementById(checkboxId);
+      const wrapper = document.getElementById(wrapperId);
+      const slider = document.getElementById(sliderId);
+      const value = document.getElementById(valueId);
+      checkbox.addEventListener("change", () => wrapper.classList.toggle("hidden", !checkbox.checked));
+      slider.addEventListener("input", () => { value.textContent = slider.value; });
+    };
+    setupSlider("players-toggle", "players-wrapper", "players-slider", "players-value");
+    setupSlider("playtime-toggle", "playtime-wrapper", "playtime-slider", "playtime-value");
 
-    const playersSlider = document.getElementById("players-slider");
-    const playersValue = document.getElementById("players-value");
-    playersSlider.addEventListener("input", () => {
-      playersValue.textContent = playersSlider.value;
-    });
-
-    const playtimeSlider = document.getElementById("playtime-slider");
-    const playtimeValue = document.getElementById("playtime-value");
-    playtimeSlider.addEventListener("input", () => {
-      playtimeValue.textContent = playtimeSlider.value;
-    });
-
+    // Game selection
+    const label = document.getElementById("selected-game-label");
     document.querySelectorAll(".game-list-item").forEach((item) => {
       item.addEventListener("click", () => {
-        document
-          .querySelectorAll(".game-list-item")
-          .forEach((i) => i.classList.remove("is-selected"));
-        item.classList.add("is-selected");
-        document.getElementById("selected-game-id").value =
-          item.getAttribute("data-game-id");
+        document.querySelectorAll(".game-list-item").forEach((i) => {
+          i.classList.remove("border-red-400", "bg-red-50", "ring-2", "ring-red-300");
+          i.querySelector(".selected-check").classList.add("opacity-0");
+        });
+        item.classList.add("border-red-400", "ring-2", "ring-red-300");
+        item.querySelector(".selected-check").classList.remove("opacity-0");
+        document.getElementById("selected-game-id").value = item.dataset.gameId;
+        label.textContent = item.dataset.gameName;
+        label.classList.remove("text-stone-500");
+        label.classList.add("text-stone-800", "font-medium");
       });
     });
 
-    document
-      .getElementById("game-selection-form")
-      .addEventListener("submit", (e) => {
-        if (!document.getElementById("selected-game-id").value) {
-          e.preventDefault();
-          alert("Please select a game before submitting.");
-        }
-      });
+    // Prevent submit without selection
+    document.getElementById("game-selection-form").addEventListener("submit", (e) => {
+      if (!document.getElementById("selected-game-id").value) {
+        e.preventDefault();
+        alert("Please select a game first.");
+      }
+    });
   });
 </script>
 {% endblock %}

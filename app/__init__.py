@@ -1,9 +1,19 @@
+import html
 import logging
+import re
 
 from flask import Flask
 
 from app.config import Config
 from app.extensions import bcrypt, csrf, db, login_manager, mail, migrate, sess
+
+
+def _strip_html(text: str) -> str:
+    """Strip HTML tags and unescape HTML entities from BGG descriptions."""
+    if not text:
+        return ""
+    unescaped = html.unescape(text)
+    return re.sub(r"<[^>]+>", "", unescaped)
 
 
 def init_extensions(app):
@@ -84,6 +94,8 @@ def create_app(config_class=None):
     register_user_loader(app)
     register_blueprints(app)
     start_schedulers(app)
+
+    app.jinja_env.filters["strip_html"] = _strip_html
 
     @app.after_request
     def set_security_headers(response):

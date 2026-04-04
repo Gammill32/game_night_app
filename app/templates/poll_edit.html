@@ -1,58 +1,57 @@
 {% extends "base.html" %}
-{% block title %}New Poll — Game Night{% endblock %}
+{% block title %}Edit Poll — Game Night{% endblock %}
 {% block content %}
 <div class="max-w-lg">
-  <h1 class="text-2xl font-bold text-stone-800 mb-6">Create Poll</h1>
+  <div class="flex items-center gap-3 mb-6">
+    <a href="{{ url_for('polls.poll_list') }}"
+       class="text-sm text-stone-500 hover:text-red-600 transition-colors">&larr; Polls</a>
+    <h1 class="text-2xl font-bold text-stone-800">Edit Poll</h1>
+  </div>
 
   {% if error %}
   <div class="mb-4 rounded-lg px-4 py-3 text-sm bg-red-50 text-red-800 border border-red-200">{{ error }}</div>
   {% endif %}
 
-  <form method="POST" action="{{ url_for('polls.poll_create') }}">
+  <form method="POST" action="{{ url_for('polls.poll_edit', poll_id=poll.id) }}">
     <div class="bg-white rounded-xl border border-stone-200 shadow-sm p-6 space-y-5">
 
       <div>
         <label class="block text-sm font-medium text-stone-700 mb-1">Title <span class="text-red-600">*</span></label>
-        <input type="text" name="title" required
+        <input type="text" name="title" value="{{ poll.title }}" required
                class="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent" />
       </div>
 
       <div>
         <label class="block text-sm font-medium text-stone-700 mb-1">Description</label>
         <textarea name="description" rows="2"
-                  class="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"></textarea>
+                  class="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent">{{ poll.description or '' }}</textarea>
       </div>
 
       <div>
-        <label class="block text-sm font-medium text-stone-700 mb-2">Options <span class="text-red-600">*</span></label>
-        <div id="options-list" class="space-y-2">
-          <div class="flex gap-2">
-            <input type="text" name="option_labels" placeholder="Option 1"
+        <label class="block text-sm font-medium text-stone-700 mb-2">Options</label>
+        <div class="space-y-2">
+          {% for option in poll.options %}
+          <div class="flex items-center gap-2">
+            <input type="text" name="option_label_{{ option.id }}" value="{{ option.label }}"
                    class="flex-1 rounded-lg border border-stone-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent" />
+            <span class="text-xs text-stone-400 shrink-0">{{ poll.responses | selectattr('option_id', 'equalto', option.id) | list | length }} response{{ 's' if (poll.responses | selectattr('option_id', 'equalto', option.id) | list | length) != 1 }}</span>
           </div>
-          <div class="flex gap-2">
-            <input type="text" name="option_labels" placeholder="Option 2"
-                   class="flex-1 rounded-lg border border-stone-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent" />
-          </div>
+          {% endfor %}
         </div>
-        <button type="button"
-                hx-get="{{ url_for('polls.poll_option_row') }}"
-                hx-target="#options-list"
-                hx-swap="beforeend"
-                class="mt-2 text-sm text-red-600 hover:text-red-700 underline">
-          + Add option
-        </button>
+        <p class="text-xs text-stone-400 mt-2">Option labels can be edited. Adding or removing options requires deleting and recreating the poll.</p>
       </div>
 
       <div class="flex items-center gap-3">
         <label class="text-sm font-medium text-stone-700">Allow multiple selections</label>
         <input type="checkbox" name="multi_select" value="true"
+               {% if poll.multi_select %}checked{% endif %}
                class="rounded border-stone-300 text-red-600 focus:ring-red-500" />
       </div>
 
       <div class="flex items-center gap-3">
         <label class="block text-sm font-medium text-stone-700">Close date (optional)</label>
         <input type="datetime-local" name="closes_at"
+               value="{{ poll.closes_at.strftime('%Y-%m-%dT%H:%M') if poll.closes_at else '' }}"
                class="rounded-lg border border-stone-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent" />
       </div>
 
@@ -60,17 +59,20 @@
       <div class="border-t border-stone-100 pt-4 space-y-3">
         <div class="flex items-center gap-3">
           <input type="checkbox" id="private-toggle" name="private" value="true"
+                 {% if poll.private %}checked{% endif %}
                  class="rounded border-stone-300 text-red-600 focus:ring-red-500" />
           <label for="private-toggle" class="text-sm font-medium text-stone-700">Private poll</label>
           <span class="text-xs text-stone-400">Only invited people see this on the home page</span>
         </div>
 
-        <div id="invitee-section" class="hidden space-y-2">
+        <div id="invitee-section" class="{% if not poll.private %}hidden{% endif %} space-y-2">
           <label class="block text-sm font-medium text-stone-700">Invite people</label>
+          {% set invitee_ids = poll.invitees | map(attribute='person_id') | list %}
           <div class="max-h-48 overflow-y-auto border border-stone-200 rounded-lg divide-y divide-stone-100">
             {% for person in people %}
             <label class="flex items-center gap-2 px-3 py-2 hover:bg-stone-50 cursor-pointer text-sm text-stone-700">
               <input type="checkbox" name="invitee_ids" value="{{ person.id }}"
+                     {% if person.id in invitee_ids %}checked{% endif %}
                      class="rounded border-stone-300 accent-red-600" />
               {{ person.first_name }} {{ person.last_name }}
             </label>
@@ -79,10 +81,16 @@
         </div>
       </div>
 
-      <button type="submit"
-              class="w-full rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 transition-colors">
-        Create Poll
-      </button>
+      <div class="flex gap-3 pt-2">
+        <button type="submit"
+                class="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 transition-colors">
+          Save Changes
+        </button>
+        <a href="{{ url_for('polls.poll_list') }}"
+           class="inline-flex items-center rounded-lg border border-stone-300 px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50 transition-colors">
+          Cancel
+        </a>
+      </div>
     </div>
   </form>
 </div>

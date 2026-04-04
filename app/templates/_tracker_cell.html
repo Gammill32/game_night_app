@@ -20,17 +20,15 @@
     <input type="checkbox" {% if tv.value == 'true' %}checked{% endif %}
            class="w-5 h-5 accent-blue-500 cursor-pointer"
            hx-post="{{ url_for('tracker.update_value', session_id=session.id) }}"
-           hx-target="#cell-{{ field.id }}-{{ entity_type }}-{{ entity_id or 'global' }}"
-           hx-swap="outerHTML"
+           hx-swap="none"
            hx-vals='js:{"field_id": "{{ field.id }}", "entity_type": "{{ entity_type }}", "entity_id": "{{ entity_id or '' }}", "value": this.checked ? "true" : "false"}'>
   {% else %}
     {# player_notes or global_notes #}
     <input type="text" value="{{ tv.value }}"
            class="bg-stone-800 border border-stone-600 rounded px-2 py-1 text-sm text-stone-300 w-full"
            hx-post="{{ url_for('tracker.update_value', session_id=session.id) }}"
-           hx-target="#cell-{{ field.id }}-{{ entity_type }}-{{ entity_id or 'global' }}"
-           hx-swap="outerHTML"
-           hx-trigger="change"
+           hx-swap="none"
+           hx-trigger="blur"
            hx-vals='js:{"field_id": "{{ field.id }}", "entity_type": "{{ entity_type }}", "entity_id": "{{ entity_id or '' }}", "value": this.value}'>
   {% endif %}
 </div>

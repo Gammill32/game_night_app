@@ -313,6 +313,7 @@ class Poll(db.Model):
     closed = db.Column(db.Boolean, default=False, nullable=False)
     token = db.Column(db.Text, unique=True, nullable=False)
     multi_select = db.Column(db.Boolean, default=False, nullable=False)
+    private = db.Column(db.Boolean, default=False, nullable=False)
     game_night_id = db.Column(db.Integer, db.ForeignKey("gamenights.id"), nullable=True)
 
     creator = db.relationship("Person", foreign_keys=[created_by])
@@ -324,6 +325,7 @@ class Poll(db.Model):
         order_by="PollOption.display_order",
     )
     responses = db.relationship("PollResponse", back_populates="poll", cascade="all, delete-orphan")
+    invitees = db.relationship("PollInvitee", back_populates="poll", cascade="all, delete-orphan")
 
     @staticmethod
     def generate_token() -> str:
@@ -356,6 +358,20 @@ class PollResponse(db.Model):
 
     poll = db.relationship("Poll", back_populates="responses")
     option = db.relationship("PollOption", back_populates="responses")
+    person = db.relationship("Person")
+
+
+class PollInvitee(db.Model):
+    __tablename__ = "poll_invitees"
+    __table_args__ = (db.UniqueConstraint("poll_id", "person_id", name="uq_poll_invitees"),)
+
+    id = db.Column(db.Integer, primary_key=True)
+    poll_id = db.Column(db.Integer, db.ForeignKey("polls.id", ondelete="CASCADE"), nullable=False)
+    person_id = db.Column(
+        db.Integer, db.ForeignKey("people.id", ondelete="CASCADE"), nullable=False
+    )
+
+    poll = db.relationship("Poll", back_populates="invitees")
     person = db.relationship("Person")
 
 

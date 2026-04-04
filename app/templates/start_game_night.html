@@ -111,18 +111,20 @@ block content %}
 
     pagePeople.forEach((person, index) => {
       const label = document.createElement('label');
-      label.className = 'attendee__label';
       label.dataset.index = index;
+      label.className = 'flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer text-sm transition-colors';
 
       const checkbox = document.createElement('input');
       checkbox.type = 'checkbox';
       checkbox.name = 'attendees';
       checkbox.value = person.id;
-      checkbox.className = 'attendee__checkbox';
+      checkbox.className = 'rounded border-stone-300 accent-red-600';
 
       if (selectedPeople.has(person.id)) {
         checkbox.checked = true;
-        label.classList.add('attendee__label--selected');
+        label.classList.add('bg-red-50', 'text-red-800', 'font-medium');
+      } else {
+        label.classList.add('text-stone-700', 'hover:bg-stone-50');
       }
 
       checkbox.addEventListener('change', () => {
@@ -151,14 +153,19 @@ block content %}
   }
 
   function highlightTopMatch() {
-    const labels = attendeesContainer.querySelectorAll('.attendee__label');
+    const labels = attendeesContainer.querySelectorAll('label');
     labels.forEach(label => {
-      label.classList.toggle('attendee__label--selected', selectedPeople.has(+label.querySelector('input').value));
-      label.classList.remove('attendee__label--highlighted');
+      const isSelected = selectedPeople.has(+label.querySelector('input').value);
+      label.classList.toggle('bg-red-50', isSelected);
+      label.classList.toggle('text-red-800', isSelected);
+      label.classList.toggle('font-medium', isSelected);
+      label.classList.toggle('text-stone-700', !isSelected);
+      label.classList.toggle('hover:bg-stone-50', !isSelected);
+      label.classList.remove('outline', 'outline-2', 'outline-red-400');
     });
     if (labels[highlightedIndex]) {
       labels[highlightedIndex].scrollIntoView({ block: "nearest" });
-      labels[highlightedIndex].classList.add('attendee__label--highlighted');
+      labels[highlightedIndex].classList.add('outline', 'outline-2', 'outline-red-400');
     }
   }
 

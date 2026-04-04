@@ -23,11 +23,14 @@
           <span>{{ poll.options | length }} options</span>
           {% if poll.closes_at %}<span>Closes {{ poll.closes_at.strftime('%b %-d') }}</span>{% endif %}
           {% if poll.closed %}<span class="text-amber-600 font-medium">Closed</span>{% endif %}
+          {% if poll.private %}<span class="text-purple-600 font-medium">Private</span>{% endif %}
         </div>
       </div>
       <div class="flex gap-2 ml-4">
         <a href="{{ url_for('polls.poll_respond', token=poll.token) }}"
            class="text-xs text-stone-500 hover:text-red-600 underline">View</a>
+        <a href="{{ url_for('polls.poll_edit', poll_id=poll.id) }}"
+           class="text-xs text-stone-500 hover:text-red-600 underline">Edit</a>
         <a href="{{ url_for('polls.poll_share', poll_id=poll.id) }}"
            class="text-xs text-stone-500 hover:text-red-600 underline">Share</a>
         {% if not poll.closed %}

@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from app.extensions import db
-from app.models import Poll, PollOption, PollResponse
+from app.models import Poll, PollInvitee, PollOption, PollResponse
 
 
 def poll_is_active(poll: Poll) -> bool:
@@ -20,6 +20,8 @@ def create_poll(
     created_by_id: int | None,
     multi_select: bool,
     closes_at: datetime | None = None,
+    private: bool = False,
+    invitee_ids: list[int] | None = None,
 ) -> Poll:
     """Create a new poll with options. Returns the saved Poll."""
     for _attempt in range(3):
@@ -36,6 +38,7 @@ def create_poll(
         multi_select=multi_select,
         closes_at=closes_at,
         token=token,
+        private=private,
     )
     db.session.add(poll)
     db.session.flush()
@@ -43,8 +46,42 @@ def create_poll(
     for i, label in enumerate(option_labels):
         db.session.add(PollOption(poll_id=poll.id, label=label.strip(), display_order=i))
 
+    if private and invitee_ids:
+        for person_id in invitee_ids:
+            db.session.add(PollInvitee(poll_id=poll.id, person_id=person_id))
+
     db.session.commit()
     return poll
+
+
+def update_poll(
+    poll: Poll,
+    title: str,
+    description: str | None,
+    closes_at: datetime | None,
+    multi_select: bool,
+    private: bool,
+    invitee_ids: list[int] | None,
+    option_updates: dict[int, str],
+) -> None:
+    """Update poll metadata, option labels, and invitees."""
+    poll.title = title
+    poll.description = description
+    poll.closes_at = closes_at
+    poll.multi_select = multi_select
+    poll.private = private
+
+    for option in poll.options:  # type: ignore[attr-defined]
+        if option.id in option_updates and option_updates[option.id].strip():
+            option.label = option_updates[option.id].strip()
+
+    # Replace invitees
+    PollInvitee.query.filter_by(poll_id=poll.id).delete()
+    if private and invitee_ids:
+        for person_id in invitee_ids:
+            db.session.add(PollInvitee(poll_id=poll.id, person_id=person_id))
+
+    db.session.commit()
 
 
 def create_availability_poll(game_night_id: int, user_id: int) -> Poll:

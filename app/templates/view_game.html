@@ -34,8 +34,7 @@
     <!-- Description -->
     <div class="bg-white rounded-xl border border-stone-200 shadow-sm p-5">
       <h2 class="text-base font-semibold text-stone-800 mb-3">Description</h2>
-      <!-- BGG descriptions may contain HTML markup; | safe removed to prevent stored XSS -->
-      <p class="text-sm text-stone-600 whitespace-pre-wrap">{{ game.description }}</p>
+      <p class="text-sm text-stone-600 whitespace-pre-wrap">{{ game.description | strip_html }}</p>
     </div>
 
     <!-- Owners -->
