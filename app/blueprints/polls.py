@@ -37,7 +37,7 @@ def inject_active_polls():
                 return True
             if user_id is None:
                 return False
-            return any(inv.person_id == user_id for inv in poll.invitees)
+            return any(inv.person_id == user_id for inv in poll.invitees)  # type: ignore[attr-defined]
 
         active = [p for p in active_all if _visible(p)]
         return {"active_polls_count": len(active), "active_polls": active}

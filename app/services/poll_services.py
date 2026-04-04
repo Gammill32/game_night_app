@@ -71,7 +71,7 @@ def update_poll(
     poll.multi_select = multi_select
     poll.private = private
 
-    for option in poll.options:
+    for option in poll.options:  # type: ignore[attr-defined]
         if option.id in option_updates and option_updates[option.id].strip():
             option.label = option_updates[option.id].strip()
 
