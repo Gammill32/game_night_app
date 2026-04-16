@@ -181,7 +181,7 @@ def get_detailed_results(poll: Poll) -> list[dict]:
     results = []
     for option in poll.options:  # type: ignore[attr-defined]
         responses = (
-            PollResponse.query.options(joinedload(PollResponse.person))
+            PollResponse.query.options(joinedload(PollResponse.person))  # type: ignore[arg-type]
             .filter_by(poll_id=poll.id, option_id=option.id)
             .all()
         )
