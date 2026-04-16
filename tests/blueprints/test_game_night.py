@@ -158,3 +158,42 @@ def test_toggle_invalid_field_is_rejected(admin_client, app, db):
     GameNight.query.filter_by(id=gn_id).delete()
     Person.query.filter_by(id=person_id).delete()
     _db.session.commit()
+
+
+def test_toggle_closed_auto_closes_availability_poll(admin_client, app, db):
+    """Closing voting on a game night should auto-close its availability poll."""
+    import datetime
+    import uuid
+
+    from app.extensions import db as _db
+    from app.models import GameNight, Person
+    from app.services.poll_services import create_availability_poll
+
+    person = Person(
+        first_name="P", last_name="Q", email=f"avclose_{uuid.uuid4().hex[:6]}@test.invalid"
+    )
+    _db.session.add(person)
+    _db.session.flush()
+    gn = GameNight(date=datetime.date.today(), closed=False, final=False)
+    _db.session.add(gn)
+    _db.session.commit()
+    poll = create_availability_poll(gn.id, person.id)
+    gn_id, person_id, poll_id = gn.id, person.id, poll.id
+    assert poll.closed is False
+
+    resp = admin_client.post(f"/game_night/{gn_id}/toggle/closed")
+    assert resp.status_code in (200, 302)
+
+    from app.models import Poll
+
+    refreshed = Poll.query.get(poll_id)
+    assert refreshed.closed is True, "Availability poll must auto-close when voting closes"
+
+    from app.models import PollOption, PollResponse
+
+    PollResponse.query.filter_by(poll_id=poll_id).delete()
+    PollOption.query.filter_by(poll_id=poll_id).delete()
+    Poll.query.filter_by(id=poll_id).delete()
+    GameNight.query.filter_by(id=gn_id).delete()
+    Person.query.filter_by(id=person_id).delete()
+    _db.session.commit()

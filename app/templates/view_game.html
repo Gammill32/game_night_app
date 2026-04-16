@@ -40,13 +40,41 @@
     <!-- Owners -->
     <div class="bg-white rounded-xl border border-stone-200 shadow-sm p-5">
       <h2 class="text-base font-semibold text-stone-800 mb-3">Owners</h2>
+      {% set is_admin = current_user.admin or current_user.owner %}
       <ul class="space-y-1 text-sm text-stone-700">
         {% for owner in game.owners %}
-        <li>{{ owner.person.first_name }} {{ owner.person.last_name }}</li>
+        <li class="flex items-center justify-between gap-2">
+          <span>{{ owner.person.first_name }} {{ owner.person.last_name }}</span>
+          {% if is_admin %}
+          <form action="{{ url_for('games.admin_modify_ownership', game_id=game.id) }}" method="POST">
+            <input type="hidden" name="person_id" value="{{ owner.person.id }}" />
+            <input type="hidden" name="action" value="remove" />
+            <button type="submit"
+                    class="text-xs text-stone-400 hover:text-red-600 transition-colors">Remove</button>
+          </form>
+          {% endif %}
+        </li>
         {% else %}
         <li class="text-stone-400">No owners listed.</li>
         {% endfor %}
       </ul>
+      {% if is_admin and assignable_owners %}
+      <form action="{{ url_for('games.admin_modify_ownership', game_id=game.id) }}" method="POST"
+            class="mt-4 flex items-center gap-2">
+        <input type="hidden" name="action" value="add" />
+        <select name="person_id" required
+                class="flex-1 rounded-lg border border-stone-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent">
+          <option value="">Add an owner…</option>
+          {% for person in assignable_owners %}
+          <option value="{{ person.id }}">{{ person.first_name }} {{ person.last_name }}</option>
+          {% endfor %}
+        </select>
+        <button type="submit"
+                class="inline-flex items-center rounded-lg bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700 transition-colors">
+          Add
+        </button>
+      </form>
+      {% endif %}
     </div>
 
     <!-- Rating form -->

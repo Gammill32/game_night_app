@@ -1,5 +1,4 @@
 import datetime as dt
-from collections import OrderedDict
 from datetime import datetime
 
 from sqlalchemy import case, distinct, func
@@ -90,7 +89,12 @@ def get_or_create_game(game_name, bgg_id=None):
 
 
 def get_filtered_games(
-    user_id, name_filter=None, players_filter=None, playtime_filter=None, min_rating_filter=None
+    user_id,
+    name_filter=None,
+    players_filter=None,
+    playtime_filter=None,
+    min_rating_filter=None,
+    scope="all",
 ):
     user = Person.query.get(user_id)
 
@@ -105,6 +109,11 @@ def get_filtered_games(
                 GamesIndex.player_owner.is_(True),
             )
         )
+
+    if scope == "mine":
+        query = query.filter(GamesIndex.owner_ids.contains([user_id]))
+    elif scope == "group":
+        query = query.filter(db.func.cardinality(GamesIndex.owner_ids) > 0)
 
     # Apply filters
     if name_filter:
@@ -199,25 +208,30 @@ def modify_wishlist(user_id, game_id, add=False, remove=False):
     return False, "Game not found in your wishlist."
 
 
-def modify_ownership(user_id, game_id, add=True):
-    """Modify ownership of a game."""
+def modify_ownership(person_id, game_id, add=True, *, actor_is_self=True):
+    """Modify ownership of a game for the given person.
+
+    `actor_is_self=False` indicates an admin acting on someone else's behalf,
+    which only changes message wording.
+    """
     game = Game.query.get_or_404(game_id)
-    ownership = OwnedBy.query.filter_by(game_id=game.id, person_id=user_id).first()
+    ownership = OwnedBy.query.filter_by(game_id=game.id, person_id=person_id).first()
+    subject = "You" if actor_is_self else "Owner"
 
     if add:
         if not ownership:
-            db.session.add(OwnedBy(game_id=game.id, person_id=user_id))
-            modify_wishlist(user_id, game.id, remove=True)  # Remove from wishlist if it exists
+            db.session.add(OwnedBy(game_id=game.id, person_id=person_id))
+            modify_wishlist(person_id, game.id, remove=True)
             db.session.commit()
-            return True, f'You now own "{game.name}".'
-        return False, f'You already own "{game.name}".'
+            return True, f'{subject} now own "{game.name}".'
+        return False, f'{subject} already own "{game.name}".'
 
     if ownership:
         db.session.delete(ownership)
         db.session.commit()
-        return True, "Game ownership removed."
+        return True, "Ownership removed."
 
-    return False, "You do not own this game."
+    return False, f"{subject} do not own this game."
 
 
 def get_game_details(game_id, user_id):
@@ -356,51 +370,6 @@ def get_group_wishlist(user_id):
         }
         for game, wl_count, vote_count in rows
     ]
-
-
-def get_group_collection() -> list[dict]:
-    """Return all games that have at least one owner, with owner names.
-
-    Single query joins Game -> OwnedBy -> Person and aggregates owner info
-    in Python to avoid N+1 queries.
-    """
-    rows = (
-        db.session.query(Game, Person)
-        .join(OwnedBy, Game.id == OwnedBy.game_id)
-        .join(Person, Person.id == OwnedBy.person_id)
-        .order_by(Game.name, Person.first_name)
-        .all()
-    )
-
-    games: OrderedDict[int, dict] = OrderedDict()
-    for game, person in rows:
-        if game.id not in games:
-            games[game.id] = {
-                "game": game,
-                "owners": [],
-                "owner_ids": set(),
-            }
-        games[game.id]["owners"].append(f"{person.first_name} {person.last_name}")
-        games[game.id]["owner_ids"].add(person.id)
-
-    return [
-        {
-            "game": entry["game"],
-            "owner_names": ", ".join(entry["owners"]),
-            "owner_ids": entry["owner_ids"],
-        }
-        for entry in games.values()
-    ]
-
-
-def get_my_collection(person_id: int) -> list[Game]:
-    """Return games owned by a specific person, ordered by name."""
-    return (
-        Game.query.join(OwnedBy, Game.id == OwnedBy.game_id)
-        .filter(OwnedBy.person_id == person_id)
-        .order_by(Game.name)
-        .all()
-    )
 
 
 def toggle_wishlist_vote(user_id, game_id):

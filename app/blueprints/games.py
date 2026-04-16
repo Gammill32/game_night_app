@@ -27,9 +27,17 @@ def games_index():
     min_rating_filter = (
         request.args.get("min_rating", type=int) if request.args.get("min_rating_enabled") else None
     )
+    scope = request.args.get("scope", "all")
+    if scope not in ("all", "mine", "group"):
+        scope = "all"
 
     games_with_ownership = games_services.get_filtered_games(
-        current_user.id, name_filter, players_filter, playtime_filter, min_rating_filter
+        current_user.id,
+        name_filter,
+        players_filter,
+        playtime_filter,
+        min_rating_filter,
+        scope=scope,
     )
     play_stats = games_services.get_play_stats()
     bridesmaid_games = games_services.get_bridesmaid_games()
@@ -41,6 +49,7 @@ def games_index():
         "bridesmaid_games": bridesmaid_games,
         "recently_played": recently_played,
         "today": date.today(),
+        "scope": scope,
     }
     return render_template("games_index.html", **context)
 
@@ -64,11 +73,22 @@ def add_game():
 @games_bp.route("/game/<int:game_id>")
 @login_required
 def view_game(game_id):
+    from app.models import Person
+
     game, leaderboard, game_nights, user_rating = games_services.get_game_details(
         game_id, current_user.id
     )
     play_stats = games_services.get_play_stats()
     game_stat = play_stats.get(game_id)
+
+    assignable_owners = []
+    if current_user.admin or current_user.owner:
+        owned_ids = {ob.person_id for ob in game.owners}
+        assignable_owners = [
+            p
+            for p in Person.query.order_by(Person.first_name, Person.last_name).all()
+            if p.id not in owned_ids
+        ]
 
     context = {
         "game": game,
@@ -77,6 +97,7 @@ def view_game(game_id):
         "user_rating": user_rating,
         "game_stat": game_stat,
         "today": date.today(),
+        "assignable_owners": assignable_owners,
     }
     return render_template("view_game.html", **context)
 
@@ -97,19 +118,20 @@ def remove_ownership(game_id):
     return redirect(request.referrer or url_for("games.games_index"))
 
 
-@games_bp.route("/collection", methods=["GET"])
+@games_bp.route("/game/<int:game_id>/admin_ownership", methods=["POST"])
 @login_required
-def collection():
-    items = games_services.get_group_collection()
-    user_owned = {item["game"].id for item in items if current_user.id in item["owner_ids"]}
-    return render_template("collection.html", items=items, user_owned=user_owned)
-
-
-@games_bp.route("/collection/mine", methods=["GET"])
-@login_required
-def my_collection():
-    games = games_services.get_my_collection(current_user.id)
-    return render_template("my_collection.html", games=games)
+@admin_required
+def admin_modify_ownership(game_id):
+    person_id = request.form.get("person_id", type=int)
+    action = request.form.get("action", "add")
+    if person_id is None:
+        flash("Select a person.", "error")
+        return redirect(url_for("games.view_game", game_id=game_id))
+    success, message = games_services.modify_ownership(
+        person_id, game_id, add=(action == "add"), actor_is_self=False
+    )
+    flash(message, "success" if success else "error")
+    return redirect(url_for("games.view_game", game_id=game_id))
 
 
 @games_bp.route("/wishlist", methods=["GET"])

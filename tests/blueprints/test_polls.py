@@ -216,6 +216,25 @@ def test_multi_select_allows_revote(auth_client, app, db, poll_author):
     assert b'name="option_ids"' in resp.data
 
 
+def test_multi_select_revote_pre_checks_previous_selections(auth_client, app, db, poll_author):
+    """Multi-select revote form should pre-check previously selected options."""
+    multi_poll = create_poll("Pick many", None, ["A", "B", "C"], poll_author.id, True)
+    from app.models import Person
+
+    user = Person.query.filter_by(email="test@example.com").first()
+    chosen = [multi_poll.options[0].id, multi_poll.options[2].id]
+    submit_response(multi_poll, chosen, user.id, None)
+
+    resp = auth_client.get(f"/poll/{multi_poll.token}")
+    assert resp.status_code == 200
+    # Collapse whitespace so attribute order/indentation does not matter
+    body = " ".join(resp.data.decode().split())
+    for oid in chosen:
+        assert f'value="{oid}" checked' in body
+    unchosen = multi_poll.options[1].id
+    assert f'value="{unchosen}" checked' not in body
+
+
 def test_logged_in_user_sees_own_vote_highlighted(auth_client, app, db, open_poll):
     """After voting, logged-in user sees their choice marked exactly once."""
     from app.models import Person
