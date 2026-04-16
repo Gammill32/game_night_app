@@ -134,7 +134,7 @@
           <td class="py-2 px-2 text-stone-700">{{ row.game_name }}</td>
           <td class="py-2 px-2 text-stone-700">{{ row.games_played }}</td>
           <td class="py-2 px-2 text-stone-700">{{ row.wins }}</td>
-          <td class="py-2 px-2 text-stone-700">{{ "%.1f"|format(row.win_pct or 0) }}%</td>
+          <td class="py-2 px-2 text-stone-700">{{ "%.0f"|format(row.win_pct or 0) }}%</td>
           <td class="py-2 px-2 text-stone-700">{{ "%.2f"|format(row.average_position or 0) }}</td>
           <td class="py-2 px-2 text-stone-700">
             {{ row.last_played.strftime('%b %e, %Y') if row.last_played else '' }}

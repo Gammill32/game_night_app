@@ -187,11 +187,13 @@ def toggle_game_night_field(game_night_id, field):
 
     db.session.commit()
 
-    if field == "final" and getattr(game_night, field) is True:
-        # Auto-close linked availability poll
+    closes_availability_poll = field in ("final", "closed") and getattr(game_night, field) is True
+    if closes_availability_poll:
         if game_night.availability_poll and not game_night.availability_poll.closed:
             game_night.availability_poll.closed = True
             db.session.commit()
+
+    if field == "final" and getattr(game_night, field) is True:
         try:
             from app.services.badge_services import evaluate_badges_for_night
 
