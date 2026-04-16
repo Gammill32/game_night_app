@@ -4,7 +4,12 @@ import pytest
 
 from app.extensions import db as _db
 from app.models import Person, Poll
-from app.services.poll_services import create_poll, get_detailed_results, submit_response
+from app.services.poll_services import (
+    create_poll,
+    get_detailed_results,
+    get_user_responses,
+    submit_response,
+)
 
 
 @pytest.fixture()
@@ -140,3 +145,18 @@ def test_get_detailed_results_returns_voters(app, db, open_poll, poll_author):
     assert second_opt["count"] == 1
     assert second_opt["voters"][0]["name"] == "Alice"
     assert second_opt["voters"][0]["person_id"] is None
+
+
+def test_get_user_responses_returns_option_ids(app, db, open_poll, poll_author):
+    """Returns set of option IDs the user voted for."""
+    option_id = open_poll.options[0].id
+    submit_response(open_poll, [option_id], poll_author.id, None)
+
+    result = get_user_responses(open_poll, poll_author.id)
+    assert result == {option_id}
+
+
+def test_get_user_responses_empty_when_not_voted(app, db, open_poll, poll_author):
+    """Returns empty set when user has not voted."""
+    result = get_user_responses(open_poll, poll_author.id)
+    assert result == set()

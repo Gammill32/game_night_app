@@ -170,6 +170,12 @@ def get_results(poll: Poll) -> list[dict]:
     return results
 
 
+def get_user_responses(poll: Poll, person_id: int) -> set[int]:
+    """Return the set of option IDs a logged-in user voted for."""
+    responses = PollResponse.query.filter_by(poll_id=poll.id, person_id=person_id).all()
+    return {r.option_id for r in responses}
+
+
 def get_detailed_results(poll: Poll) -> list[dict]:
     """Return response counts per option with voter details."""
     results = []
