@@ -217,7 +217,7 @@ def test_multi_select_allows_revote(auth_client, app, db, poll_author):
 
 
 def test_logged_in_user_sees_own_vote_highlighted(auth_client, app, db, open_poll):
-    """After voting, logged-in user sees their choice marked."""
+    """After voting, logged-in user sees their choice marked exactly once."""
     from app.models import Person
 
     user = Person.query.filter_by(email="test@example.com").first()
@@ -226,12 +226,14 @@ def test_logged_in_user_sees_own_vote_highlighted(auth_client, app, db, open_pol
 
     resp = auth_client.get(f"/poll/{open_poll.token}")
     assert resp.status_code == 200
-    # The voted option should have the "your-vote" marker
-    assert b"your-vote" in resp.data
+    # The voted option should have the "your-vote" marker (appears once in class)
+    assert resp.data.count(b'class="your-vote') == 1
+    # The "Your vote" human-readable label should also appear once
+    assert resp.data.count(b"Your vote") == 1
 
 
 def test_anonymous_vote_stored_in_session(client, open_poll):
-    """Anonymous user's vote is stored in session for highlighting."""
+    """Anonymous user's vote is stored in session AND renders as highlighted."""
     option_id = open_poll.options[0].id
     client.post(
         f"/poll/{open_poll.token}/respond",
@@ -239,3 +241,8 @@ def test_anonymous_vote_stored_in_session(client, open_poll):
     )
     with client.session_transaction() as sess:
         assert sess.get(f"poll_{open_poll.token}_votes") == [option_id]
+
+    # Subsequent GET should render the highlight from session data
+    resp = client.get(f"/poll/{open_poll.token}")
+    assert resp.status_code == 200
+    assert b"your-vote" in resp.data

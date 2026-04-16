@@ -7,7 +7,7 @@
     <div class="{{ 'your-vote border-l-4 border-red-500 pl-3' if voted else '' }}">
       <div class="flex justify-between text-sm mb-0.5">
         <span class="text-stone-700{{ ' font-semibold' if voted else '' }}">
-          {{ row.label }}{% if voted %} <span class="text-red-600 text-xs ml-1">&#10003; Your vote</span>{% endif %}
+          {{ row.label }}{% if voted %} <span class="text-red-600 text-xs ml-1"><span aria-hidden="true">&#10003;</span> Your vote</span>{% endif %}
         </span>
         <span class="text-stone-500 font-medium">{{ row.count }}</span>
       </div>
