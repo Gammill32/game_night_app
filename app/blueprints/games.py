@@ -101,7 +101,7 @@ def remove_ownership(game_id):
 @login_required
 def collection():
     items = games_services.get_group_collection()
-    user_owned = {o.game_id for o in OwnedBy.query.filter_by(person_id=current_user.id).all()}
+    user_owned = {item["game"].id for item in items if current_user.id in item["owner_ids"]}
     return render_template("collection.html", items=items, user_owned=user_owned)
 
 
@@ -161,7 +161,7 @@ def vote_wishlist(game_id):
 @games_bp.route("/wishlist/toggle/<int:game_id>", methods=["POST"])
 @login_required
 def toggle_wishlist(game_id):
-    from app.models import OwnedBy, Wishlist
+    from app.models import Wishlist
 
     # If already owned, prevent wishlisting
     owns_game = OwnedBy.query.filter_by(game_id=game_id, person_id=current_user.id).first()
