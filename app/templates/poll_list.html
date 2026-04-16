@@ -33,13 +33,17 @@
            class="text-xs text-stone-500 hover:text-red-600 underline">Edit</a>
         <a href="{{ url_for('polls.poll_share', poll_id=poll.id) }}"
            class="text-xs text-stone-500 hover:text-red-600 underline">Share</a>
+        <a href="{{ url_for('polls.poll_results', poll_id=poll.id) }}"
+           class="text-xs text-stone-500 hover:text-red-600 underline">Results</a>
         {% if not poll.closed %}
         <form method="POST" action="{{ url_for('polls.poll_close', poll_id=poll.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
           <button type="submit" class="text-xs text-stone-500 hover:text-red-600 underline">Close</button>
         </form>
         {% endif %}
         <form method="POST" action="{{ url_for('polls.poll_delete', poll_id=poll.id) }}"
               onsubmit="return confirm('Delete this poll and all responses?')">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
           <button type="submit" class="text-xs text-stone-500 hover:text-red-600 underline">Delete</button>
         </form>
       </div>

@@ -160,3 +160,22 @@ def test_get_user_responses_empty_when_not_voted(app, db, open_poll, poll_author
     """Returns empty set when user has not voted."""
     result = get_user_responses(open_poll, poll_author.id)
     assert result == set()
+
+
+def test_admin_results_route_shows_voters(admin_client, open_poll, poll_author):
+    """Admin can see who voted for each option."""
+    submit_response(open_poll, [open_poll.options[0].id], poll_author.id, None)
+    submit_response(open_poll, [open_poll.options[1].id], None, "Guest")
+
+    resp = admin_client.get(f"/polls/{open_poll.id}/results")
+    assert resp.status_code == 200
+    assert b"Poll Author" in resp.data
+    assert b"Guest" in resp.data
+    assert b"Friday" in resp.data
+    assert b"Saturday" in resp.data
+
+
+def test_admin_results_route_requires_admin(auth_client, open_poll):
+    """Non-admin cannot access detailed results."""
+    resp = auth_client.get(f"/polls/{open_poll.id}/results")
+    assert resp.status_code in (302, 403)

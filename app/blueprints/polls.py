@@ -4,6 +4,7 @@ from sqlalchemy.orm import selectinload
 
 from app.services.poll_services import (
     create_poll,
+    get_detailed_results,
     get_poll_by_token,
     get_results,
     poll_is_active,
@@ -56,6 +57,18 @@ def poll_list():
 
     polls = Poll.query.order_by(Poll.created_at.desc()).all()
     return render_template("poll_list.html", polls=polls)
+
+
+@polls_bp.route("/polls/<int:poll_id>/results")
+@login_required
+@admin_required
+def poll_results(poll_id: int):
+    from app.models import Poll
+
+    poll = Poll.query.get_or_404(poll_id)
+    results = get_detailed_results(poll)
+    total = sum(r["count"] for r in results)
+    return render_template("poll_results_detail.html", poll=poll, results=results, total=total)
 
 
 @polls_bp.route("/polls/create", methods=["GET", "POST"])
