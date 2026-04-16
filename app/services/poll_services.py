@@ -1,5 +1,6 @@
 from datetime import datetime
 
+from sqlalchemy import func
 from sqlalchemy.orm import joinedload
 
 from app.extensions import db
@@ -163,11 +164,22 @@ def submit_response(
 
 def get_results(poll: Poll) -> list[dict]:
     """Return response counts per option, sorted by display_order."""
-    results = []
-    for option in poll.options:  # type: ignore[attr-defined]
-        count = PollResponse.query.filter_by(poll_id=poll.id, option_id=option.id).count()
-        results.append({"option_id": option.id, "label": option.label, "count": count})
-    return results
+    # Single GROUP BY query fetches all counts at once
+    count_rows = (
+        db.session.query(
+            PollResponse.option_id,
+            func.count(PollResponse.id).label("count"),
+        )
+        .filter(PollResponse.poll_id == poll.id)
+        .group_by(PollResponse.option_id)
+        .all()
+    )
+    counts = {row.option_id: row.count for row in count_rows}
+
+    return [
+        {"option_id": option.id, "label": option.label, "count": counts.get(option.id, 0)}
+        for option in poll.options  # type: ignore[attr-defined]
+    ]
 
 
 def get_user_responses(poll: Poll, person_id: int) -> set[int]:
