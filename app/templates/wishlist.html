@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_game_card.html" import game_card %}
 {% block title %}Group Wishlist{% endblock %}
 
 {% block content %}
@@ -16,35 +17,22 @@
 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
   {% for item in items %}
   {% set game = item.game %}
-  <div class="bg-white rounded-xl border border-stone-200 shadow-sm p-5 flex flex-col gap-3">
-    <a href="{{ url_for('games.view_game', game_id=game.id) }}" class="block">
-      <img src="{{ game.image_url }}" alt="{{ game.name }}" class="w-full h-36 object-contain rounded-lg mb-2" />
-    </a>
-    <div class="flex-1">
-      <a href="{{ url_for('games.view_game', game_id=game.id) }}"
-         class="text-base font-semibold text-stone-800 hover:text-red-600 transition-colors">{{ game.name }}</a>
-      <div class="mt-2 space-y-0.5 text-sm text-stone-500">
-        <p>{{ game.min_players or 'N/A' }}–{{ game.max_players or 'N/A' }} players · {{ game.playtime or 'N/A' }} min</p>
-        <p class="font-medium text-stone-700">{{ item.total_want }} want{{ 's' if item.total_want != 1 }}</p>
-      </div>
-    </div>
-    <div class="flex flex-wrap gap-2 pt-1">
-      {% if item.user_wishlisted %}
-        <span class="inline-flex items-center rounded-lg border border-stone-300 px-3 py-1.5 text-xs font-medium text-stone-500">On your wishlist</span>
-      {% else %}
-        <form action="{{ url_for('games.vote_wishlist', game_id=game.id) }}" method="POST">
-          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
-          {% if item.user_voted %}
-            <button class="inline-flex items-center rounded-lg border border-red-300 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50 transition-colors"
-                    type="submit">Remove Vote</button>
-          {% else %}
-            <button class="inline-flex items-center rounded-lg bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700 transition-colors"
-                    type="submit">I Want This</button>
-          {% endif %}
-        </form>
-      {% endif %}
-    </div>
-  </div>
+  {% call game_card(game, extra_meta=(item.total_want|string) ~ " want" ~ ("s" if item.total_want != 1 else "")) %}
+    {% if item.user_wishlisted %}
+      <span class="inline-flex items-center rounded-lg border border-stone-300 px-3 py-1.5 text-xs font-medium text-stone-500">On your wishlist</span>
+    {% else %}
+      <form action="{{ url_for('games.vote_wishlist', game_id=game.id) }}" method="POST">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+        {% if item.user_voted %}
+          <button class="inline-flex items-center rounded-lg border border-red-300 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50 transition-colors"
+                  type="submit">Remove Vote</button>
+        {% else %}
+          <button class="inline-flex items-center rounded-lg bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700 transition-colors"
+                  type="submit">I Want This</button>
+        {% endif %}
+      </form>
+    {% endif %}
+  {% endcall %}
   {% else %}
   <div class="col-span-full text-center py-12 text-stone-500 text-sm">No games on the group wishlist yet.</div>
   {% endfor %}

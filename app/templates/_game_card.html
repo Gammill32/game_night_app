@@ -1,0 +1,30 @@
+{#
+  game_card — renders a game card with image, title, metadata.
+  Call via: {% call game_card(game, extra_meta="Owned by Alice, Bob") %}...actions markup...{% endcall %}
+
+  extra_meta: optional string shown below player/playtime line (e.g., owner names, want count)
+#}
+{% macro game_card(game, extra_meta=None) %}
+<div class="bg-white rounded-xl border border-stone-200 shadow-sm p-5 flex flex-col gap-3">
+  <a href="{{ url_for('games.view_game', game_id=game.id) }}" class="block">
+    {% if game.image_url %}
+    <img src="{{ game.image_url }}" alt="{{ game.name }}" class="w-full h-36 object-contain rounded-lg mb-2" />
+    {% else %}
+    <div class="w-full h-36 bg-stone-100 rounded-lg mb-2 flex items-center justify-center text-stone-400 text-xs">No image</div>
+    {% endif %}
+  </a>
+  <div class="flex-1">
+    <a href="{{ url_for('games.view_game', game_id=game.id) }}"
+       class="text-base font-semibold text-stone-800 hover:text-red-600 transition-colors">{{ game.name }}</a>
+    <div class="mt-2 space-y-0.5 text-sm text-stone-500">
+      <p>{{ game.min_players or 'N/A' }}&ndash;{{ game.max_players or 'N/A' }} players &middot; {{ game.playtime or 'N/A' }} min</p>
+      {% if extra_meta %}
+      <p class="text-xs text-stone-400">{{ extra_meta }}</p>
+      {% endif %}
+    </div>
+  </div>
+  <div class="flex flex-wrap gap-2 pt-1">
+    {{ caller() }}
+  </div>
+</div>
+{% endmacro %}
