@@ -17,6 +17,10 @@ def collection_user(app, db):
     _db.session.add(person)
     _db.session.commit()
     yield person
+    # Teardown: delete ownership rows first, then person
+    OwnedBy.query.filter_by(person_id=person.id).delete()
+    _db.session.delete(person)
+    _db.session.commit()
 
 
 @pytest.fixture()
@@ -27,6 +31,10 @@ def collection_game(app, db, collection_user):
     _db.session.add(OwnedBy(game_id=game.id, person_id=collection_user.id))
     _db.session.commit()
     yield game
+    # Teardown: delete ownership rows, then game
+    OwnedBy.query.filter_by(game_id=game.id).delete()
+    _db.session.delete(game)
+    _db.session.commit()
 
 
 def test_get_group_collection_returns_owned_games(app, db, collection_game, collection_user):
@@ -45,5 +53,16 @@ def test_get_my_collection_returns_only_my_games(app, db, collection_game, colle
 
 def test_get_my_collection_excludes_others_games(app, db, collection_game):
     """My collection does not include games owned by other users."""
-    results = get_my_collection(999999)
-    assert not any(g.id == collection_game.id for g in results)
+    other = Person(
+        first_name="Other",
+        last_name="User",
+        email=f"other_{uuid.uuid4().hex[:8]}@test.invalid",
+    )
+    _db.session.add(other)
+    _db.session.commit()
+    try:
+        results = get_my_collection(other.id)
+        assert not any(g.id == collection_game.id for g in results)
+    finally:
+        _db.session.delete(other)
+        _db.session.commit()
