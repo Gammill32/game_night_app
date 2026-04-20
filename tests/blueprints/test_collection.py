@@ -4,7 +4,6 @@ import pytest
 
 from app.extensions import db as _db
 from app.models import Game, OwnedBy, Person
-from app.services.games_services import get_group_collection, get_my_collection
 
 
 @pytest.fixture()
@@ -19,7 +18,6 @@ def collection_user(app, db):
     try:
         yield person
     finally:
-        # Rollback any aborted state from the test body before cleanup
         _db.session.rollback()
         OwnedBy.query.filter_by(person_id=person.id).delete()
         _db.session.delete(person)
@@ -42,82 +40,109 @@ def collection_game(app, db, collection_user):
         _db.session.commit()
 
 
-def test_get_group_collection_returns_owned_games(app, db, collection_game, collection_user):
-    """Group collection includes games with owners and their names."""
-    results = get_group_collection()
-    game_entry = next((r for r in results if r["game"].id == collection_game.id), None)
-    assert game_entry is not None
-    assert "Collector One" in game_entry["owner_names"]
+def test_games_scope_mine_filters_to_user_owned(admin_client, db, collection_game):
+    """scope=mine on games index returns only games the current user owns."""
+    user = Person.query.filter_by(email="admin@example.com").first()
+    other_only = Game(name=f"OtherOnly {uuid.uuid4().hex[:6]}", bgg_id=None)
+    _db.session.add(other_only)
+    _db.session.flush()
+    other_only_id = other_only.id
+    _db.session.commit()
 
+    resp = admin_client.get("/games?scope=mine")
+    assert resp.status_code == 200
+    # Game owned by collection_user (not admin) must NOT appear
+    assert b"Settlers of Catan" not in resp.data
 
-def test_get_my_collection_returns_only_my_games(app, db, collection_game, collection_user):
-    """My collection returns only games owned by the specified user."""
-    results = get_my_collection(collection_user.id)
-    assert any(g.id == collection_game.id for g in results)
-
-
-def test_get_my_collection_excludes_others_games(app, db, collection_game):
-    """My collection does not include games owned by other users."""
-    other = Person(
-        first_name="Other",
-        last_name="User",
-        email=f"other_{uuid.uuid4().hex[:8]}@test.invalid",
-    )
-    _db.session.add(other)
+    # Now claim it for admin and refetch
+    _db.session.add(OwnedBy(game_id=collection_game.id, person_id=user.id))
     _db.session.commit()
     try:
-        results = get_my_collection(other.id)
-        assert not any(g.id == collection_game.id for g in results)
+        resp = admin_client.get("/games?scope=mine")
+        assert b"Settlers of Catan" in resp.data
     finally:
-        _db.session.delete(other)
+        OwnedBy.query.filter_by(game_id=collection_game.id, person_id=user.id).delete()
+        Game.query.filter_by(id=other_only_id).delete()
         _db.session.commit()
 
 
-def test_group_collection_page_loads(auth_client, collection_game, collection_user):
-    """Group collection page renders with owned games."""
-    resp = auth_client.get("/collection")
+def test_games_scope_group_excludes_unowned(admin_client, db):
+    """scope=group on games index excludes games with zero owners."""
+    orphan = Game(name=f"Orphan {uuid.uuid4().hex[:6]}", bgg_id=None)
+    _db.session.add(orphan)
+    _db.session.commit()
+    orphan_id, orphan_name = orphan.id, orphan.name
+    try:
+        resp = admin_client.get("/games?scope=group")
+        assert resp.status_code == 200
+        assert orphan_name.encode() not in resp.data
+    finally:
+        Game.query.filter_by(id=orphan_id).delete()
+        _db.session.commit()
+
+
+def test_games_scope_toggle_renders(admin_client, db):
+    """Scope toggle UI is present on games index page."""
+    resp = admin_client.get("/games")
     assert resp.status_code == 200
-    assert b"Settlers of Catan" in resp.data
-    assert b"Collector One" in resp.data
+    assert b"scope=all" in resp.data
+    assert b"scope=mine" in resp.data
+    assert b"scope=group" in resp.data
 
 
-def test_my_collection_page_loads(auth_client, db, collection_game):
-    """My collection page renders for logged-in user."""
-    from app.models import Person
-
-    # Give the auth_client user ownership of the game
-    user = Person.query.filter_by(email="test@example.com").first()
-    if not OwnedBy.query.filter_by(game_id=collection_game.id, person_id=user.id).first():
-        _db.session.add(OwnedBy(game_id=collection_game.id, person_id=user.id))
-        _db.session.commit()
-
-    resp = auth_client.get("/collection/mine")
-    assert resp.status_code == 200
-    assert b"Settlers of Catan" in resp.data
+def test_old_collection_routes_removed(client):
+    """Legacy /collection and /collection/mine endpoints no longer exist."""
+    assert client.get("/collection").status_code == 404
+    assert client.get("/collection/mine").status_code == 404
 
 
-def test_collection_requires_login(client):
-    """Collection pages redirect to login when not authenticated."""
-    resp = client.get("/collection")
-    assert resp.status_code == 302
-    resp = client.get("/collection/mine")
-    assert resp.status_code == 302
+def test_admin_can_assign_ownership_to_other_person(admin_client, app, db):
+    """Admin posts a person_id on a game and that person becomes an owner."""
+    game = Game(name=f"AssignGame {uuid.uuid4().hex[:6]}", bgg_id=None)
+    target = Person(
+        first_name="Tar", last_name="Get", email=f"target_{uuid.uuid4().hex[:6]}@test.invalid"
+    )
+    _db.session.add_all([game, target])
+    _db.session.commit()
+    game_id, target_id = game.id, target.id
+
+    resp = admin_client.post(
+        f"/game/{game_id}/admin_ownership",
+        data={"person_id": target_id, "action": "add"},
+    )
+    assert resp.status_code in (200, 302)
+    owns = OwnedBy.query.filter_by(game_id=game_id, person_id=target_id).first()
+    assert owns is not None, "Admin add must create OwnedBy row"
+
+    resp = admin_client.post(
+        f"/game/{game_id}/admin_ownership",
+        data={"person_id": target_id, "action": "remove"},
+    )
+    assert resp.status_code in (200, 302)
+    assert OwnedBy.query.filter_by(game_id=game_id, person_id=target_id).first() is None
+
+    Person.query.filter_by(id=target_id).delete()
+    Game.query.filter_by(id=game_id).delete()
+    _db.session.commit()
 
 
-def test_collection_claim_form_has_csrf_token(auth_client, collection_game):
-    """Group collection claim form includes CSRF hidden input."""
-    resp = auth_client.get("/collection")
-    assert b'name="csrf_token"' in resp.data
+def test_non_admin_cannot_assign_ownership(auth_client, app, db):
+    """Non-admin POST to admin endpoint must be rejected."""
+    game = Game(name=f"NoAssign {uuid.uuid4().hex[:6]}", bgg_id=None)
+    target = Person(
+        first_name="N", last_name="A", email=f"noassign_{uuid.uuid4().hex[:6]}@test.invalid"
+    )
+    _db.session.add_all([game, target])
+    _db.session.commit()
+    game_id, target_id = game.id, target.id
 
+    resp = auth_client.post(
+        f"/game/{game_id}/admin_ownership",
+        data={"person_id": target_id, "action": "add"},
+    )
+    assert resp.status_code in (302, 403)
+    assert OwnedBy.query.filter_by(game_id=game_id, person_id=target_id).first() is None
 
-def test_my_collection_remove_form_has_csrf_token(auth_client, db, collection_game):
-    """My collection remove form includes CSRF hidden input."""
-    from app.models import Person
-
-    user = Person.query.filter_by(email="test@example.com").first()
-    if not OwnedBy.query.filter_by(game_id=collection_game.id, person_id=user.id).first():
-        _db.session.add(OwnedBy(game_id=collection_game.id, person_id=user.id))
-        _db.session.commit()
-
-    resp = auth_client.get("/collection/mine")
-    assert b'name="csrf_token"' in resp.data
+    Person.query.filter_by(id=target_id).delete()
+    Game.query.filter_by(id=game_id).delete()
+    _db.session.commit()
