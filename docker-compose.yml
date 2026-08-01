@@ -47,6 +47,7 @@ services:
     networks:
       - web_network
     labels:
+      - "com.centurylinklabs.watchtower.enable=false"
       - "traefik.enable=true"
 
       # Router for game night app
