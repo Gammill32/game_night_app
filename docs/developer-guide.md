@@ -132,6 +132,10 @@ cp .env.example .env
 | `MAIL_PASSWORD` | No | — | SMTP password (use an App Password for Gmail) |
 | `MAIL_DEFAULT_SENDER` | No | — | "From" address on outbound emails |
 | `BGG_API_TOKEN` | No | — | BoardGameGeek API bearer token (optional, used by search) |
+| `APP_BASE_URL` | No | `https://gamenight.sgammill.com` | Public URL used for links in emails sent by the scheduler (no request to take it from) |
+| `MEDIA_DIR` | No | `/app/media` | Where night photos are stored; bind-mount a persistent volume here, writable by uid 1000 |
+| `MAX_UPLOAD_MB` | No | `20` | Largest photo upload accepted |
+| `ENABLE_SCHEDULER` | No | `true` | Set `false` to skip the reminder scheduler (dev tooling and tests do) |
 
 ---
 
@@ -237,6 +241,16 @@ Always review the auto-generated migration before applying it — Alembic someti
                                      └─ g4h5i6j7k8l9  add_fk_indexes
                                           └─ h5i6j7k8l9m0  fix_view_date_timezone
                                                └─ i6j7k8l9m0n1  temp_pass_expiry_and_games_index
+                                                    └─ j7k8l9m0n1o2  add_poll_private_invitees
+                                                         └─ k8l9m0n1o2p3  poll_availability_flag
+                                                              └─ l9m0n1o2p3q4  payment_handles
+                                                                   └─ m0n1o2p3q4r5  game_night_photos
+                                                                        └─ n1o2p3q4r5s6  food
+                                                                             └─ o2p3q4r5s6t7  people_active
+                                                                                  └─ p3q4r5s6t7u8  date_polls
+                                                                                       └─ q4r5s6t7u8v9  remove_votes_for_unnominated_games
+                                                                                            └─ r5s6t7u8v9w0  night_hosts
+                                                                                                 └─ s6t7u8v9w0x1  night_address
 ```
 
 ### Existing Production Database (Brownfield Setup)
@@ -267,9 +281,24 @@ The app uses **invite-only signup**. A new user cannot register themselves — a
 4. The system creates a `Person` record with a temporary password
 5. Send the person the app URL — they sign up using their name to claim the account
 
-### Admin Access
+Hosts can also add someone by name from the start/edit night form (**Not on the site? Add them**, `POST /people/quick_add`); that person claims the account the same way.
 
-The first user in the database is automatically an admin. Additional admins can be toggled from the Admin page. Admin-only routes are protected by `@admin_required` in `app/utils/decorators.py`.
+**Removing** someone who has played deactivates them (`people.active = false`) so their results and stats stay; people with no history are deleted.
+
+### Roles
+
+| Role | Can do | Set by |
+|------|--------|--------|
+| Owner | Everything, including promote/demote admins | Database |
+| Admin | Manage every night, poll and person; switch **Can host** on or off | Owner, from the Admin page |
+| Host (`people.can_host`) | Start nights and polls; run the nights they host (edit, results, finalize, photos, food, polls) | An admin, from the Admin page |
+| Member | Play, nominate, vote, RSVP, answer polls | — |
+
+Each night has a `host_id`. `GameNight.managed_by(user)` is true for admins, the owner and that night's host. Decorators live in `app/utils/decorators.py`: `@admin_required`, `@owner_required`, `@host_required` (can start nights), `@night_manager_required` (manages this night) and `@game_night_access_required` (a player on the night, or someone who manages it). Admins can hand a night to any member from its edit page. Reminder emails for a night are signed by its host.
+
+### Night address
+
+A night can have an optional `address`. Only people who can open the night see it; it's never included in emails or the public recap. It's set to `NULL` when the night is finalized, and the daily reminder job clears any left on nights more than a day past (`clear_past_addresses`).
 
 ---
 
