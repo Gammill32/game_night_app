@@ -140,3 +140,10 @@ def test_reminder_signed_by_host(app, make_person, make_night, monkeypatch):
     reminders_services.check_and_send_reminders()
     assert '<strong style="color: #000000;">Hana</strong>' in sent[bo.email]
     assert "Stephen Gammill" not in sent[bo.email]
+
+
+def test_start_form_preselects_whoever_starts_it(client, make_person):
+    hana = _host(make_person)
+    login(client, hana)
+    page = client.get("/game_night/start").get_data(as_text=True)
+    assert f"const selected = new Set([{hana.id}])" in page

@@ -7,7 +7,8 @@
   <form action="{{ url_for('game_night.start_game_night') }}" method="POST" id="gameNightForm">
     {% include "_game_night_fields.html" %}
     {% include "_food_settings.html" %}
-    {% with selected_ids = request.form.getlist('attendees') | map('int') | list, form_id = 'gameNightForm' %}
+    {# Whoever starts the night is usually playing: pre-select them (they can untick). #}
+    {% with selected_ids = (request.form.getlist('attendees') | map('int') | list) if request.method == 'POST' else [current_user.id], form_id = 'gameNightForm' %}
       {% include "_attendee_picker.html" %}
     {% endwith %}
 
