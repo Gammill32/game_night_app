@@ -169,3 +169,41 @@ def seed_data(db, app):
     _db.session.delete(game_night)
     _db.session.delete(game)
     _db.session.commit()
+
+
+@pytest.fixture()
+def make_person(app, db):
+    """Create throwaway people (unique emails); deleted, with their dependents, afterwards."""
+    import uuid
+
+    from app.extensions import bcrypt
+    from app.models import Person
+
+    made = []
+
+    def _make(first="Pat", last="Test", admin=False, password="password"):
+        person = Person(
+            first_name=first,
+            last_name=last,
+            email=f"{first.lower()}_{uuid.uuid4().hex[:8]}@test.invalid",
+            password=bcrypt.generate_password_hash(password, rounds=4).decode("utf-8"),
+            admin=admin,
+        )
+        _db.session.add(person)
+        _db.session.commit()
+        made.append(person.id)
+        return person
+
+    yield _make
+
+    _db.session.rollback()
+    for pid in made:
+        person = _db.session.get(Person, pid)
+        if person is not None:
+            _db.session.delete(person)
+    _db.session.commit()
+
+
+def login(client, person, password="password"):
+    client.post("/logout")
+    client.post("/login", data={"email": person.email, "password": password})

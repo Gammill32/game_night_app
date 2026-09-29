@@ -58,10 +58,20 @@ class Person(db.Model, UserMixin):
     person_badges = relationship(
         "PersonBadge", back_populates="person", cascade="all, delete-orphan"
     )
+    payment_handles = relationship(
+        "PaymentHandle",
+        back_populates="person",
+        cascade="all, delete-orphan",
+        order_by="(PaymentHandle.preferred.desc(), PaymentHandle.id)",
+    )
 
     @property
     def is_admin_or_owner(self):
         return self.admin or self.owner
+
+    @property
+    def full_name(self):
+        return f"{self.first_name} {self.last_name}"
 
 
 class Game(db.Model):
@@ -502,3 +512,36 @@ class TrackerValue(db.Model):
     field = relationship("TrackerField", back_populates="values")
     player = relationship("Player")
     team = relationship("TrackerTeam", back_populates="values")
+
+
+# ---------------------------------------------------------------------------
+# Payment methods
+# ---------------------------------------------------------------------------
+
+PAYMENT_KINDS = ("venmo", "cashapp", "zelle", "paypal", "applecash")
+
+
+class PaymentHandle(db.Model):
+    """How someone likes to be paid back (e.g. for split food costs): a Venmo
+    username, $Cashtag, Zelle email/phone, PayPal.me username or Apple Cash
+    phone. One can be marked preferred."""
+
+    __tablename__ = "payment_handles"
+    __table_args__ = (
+        db.UniqueConstraint("person_id", "kind", "value", name="uq_payment_handles"),
+        db.CheckConstraint(
+            "kind IN ('venmo', 'cashapp', 'zelle', 'paypal', 'applecash')",
+            name="ck_payment_handles_kind",
+        ),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    person_id = db.Column(
+        db.Integer, db.ForeignKey("people.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    kind = db.Column(db.String, nullable=False)
+    value = db.Column(db.String, nullable=False)
+    preferred = db.Column(db.Boolean, nullable=False, default=False, server_default="false")
+    created_at = db.Column(db.DateTime, server_default=func.now())
+
+    person = relationship("Person", back_populates="payment_handles")

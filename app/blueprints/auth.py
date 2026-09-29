@@ -6,7 +6,7 @@ from sqlalchemy import func
 
 from app.extensions import db
 from app.models import Game, GameNightGame, Player, Result
-from app.services import auth_services
+from app.services import auth_services, payment_services
 from app.utils import flash_if_no_action
 
 auth_bp = Blueprint("auth", __name__)
@@ -193,5 +193,35 @@ def manage_user():
         "most_wins_stats": most_wins_stats,
     }
 
-    context = {"person": user, "stats": stats}
+    context = {
+        "person": user,
+        "stats": stats,
+        "payment_labels": payment_services.LABELS,
+        "payment_placeholders": payment_services.PLACEHOLDERS,
+        "payment_display": payment_services.display,
+    }
     return render_template("manage_user.html", **context)
+
+
+@auth_bp.route("/manage_user/payment", methods=["POST"])
+@login_required
+def add_payment():
+    success, message = payment_services.add_handle(
+        current_user,
+        request.form.get("kind", ""),
+        request.form.get("value", ""),
+        preferred=request.form.get("preferred") == "1",
+    )
+    flash(message, "success" if success else "error")
+    return redirect(url_for("auth.manage_user") + "#payment")
+
+
+@auth_bp.route("/manage_user/payment/<int:handle_id>", methods=["POST"])
+@login_required
+def edit_payment(handle_id):
+    if request.form.get("action") == "delete":
+        success, message = payment_services.delete_handle(current_user, handle_id)
+    else:
+        success, message = payment_services.set_preferred(current_user, handle_id)
+    flash(message, "success" if success else "error")
+    return redirect(url_for("auth.manage_user") + "#payment")
