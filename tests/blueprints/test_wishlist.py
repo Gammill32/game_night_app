@@ -156,3 +156,29 @@ def test_group_wishlist_shows_who_wants_it(client, make_person):
     OwnedBy.query.filter_by(game_id=game.id).delete()
     _db.session.delete(game)
     _db.session.commit()
+
+
+def test_wishlist_and_library_have_person_filters(client, make_person):
+    import uuid
+
+    from app.extensions import db as _db
+    from app.models import Game, OwnedBy, Wishlist
+    from tests.conftest import login
+
+    ann, bo = make_person("Ann"), make_person("Bo")
+    g = Game(name=f"Filterable {uuid.uuid4().hex[:6]}")
+    _db.session.add(g)
+    _db.session.flush()
+    _db.session.add_all(
+        [Wishlist(person_id=ann.id, game_id=g.id), OwnedBy(person_id=bo.id, game_id=g.id)]
+    )
+    _db.session.commit()
+    login(client, bo)
+    wish = client.get("/wishlist").get_data(as_text=True)
+    assert f'name="wish_person" value="{ann.id}"' in wish and f'data-wanters="{ann.id}"' in wish
+    lib = client.get("/games").get_data(as_text=True)
+    assert f'name="lib_owner" value="{bo.id}"' in lib and "Owned by…" in lib
+    Wishlist.query.filter_by(game_id=g.id).delete()
+    OwnedBy.query.filter_by(game_id=g.id).delete()
+    _db.session.delete(g)
+    _db.session.commit()

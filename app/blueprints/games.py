@@ -22,8 +22,10 @@ def games_index():
         scope = "all"
     if scope == "unowned" and not current_user.is_admin_or_owner:
         scope = "all"
+    games = games_services.get_filtered_games(current_user.id, scope=scope)
     context = {
-        "games": games_services.get_filtered_games(current_user.id, scope=scope),
+        "games": games,
+        "owner_choices": games_services.owner_choices(games) if scope == "all" else [],
         "play_stats": games_services.get_play_stats(),
         "bridesmaid_games": games_services.get_bridesmaid_games(),
         "today": date.today(),

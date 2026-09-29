@@ -33,6 +33,18 @@
         {% endfor %}
         <label class="cursor-pointer"><input type="checkbox" data-lib-unplayed class="peer sr-only"><span class="{{ chip }}">Never played</span></label>
       </div>
+      {% if owner_choices %}
+      <details class="mt-2" data-owner-filter>
+        <summary class="cursor-pointer text-sm text-stone-700"><span class="underline">Owned by…</span> <span data-owner-summary class="text-xs text-stone-500"></span></summary>
+        <p class="mt-1 text-xs text-stone-500">Pick people to see which games any of them owns, e.g. who's coming tonight.</p>
+        <div class="mt-2 flex max-h-40 flex-wrap gap-2 overflow-y-auto">
+          {% for o in owner_choices %}
+          <label class="cursor-pointer"><input type="checkbox" name="lib_owner" value="{{ o.id }}" data-owner-name="{{ o.name }}" class="peer sr-only">
+            <span class="{{ chip }}">{{ 'You' if o.id == current_user.id else o.name }} <span class="ml-1 text-xs opacity-60">{{ o.count }}</span></span></label>
+          {% endfor %}
+        </div>
+      </details>
+      {% endif %}
     </div>
 
     <ul class="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
@@ -40,7 +52,7 @@
       {% set g = item.game %}
       {% set stat = play_stats.get(g.game_id) %}
       <li data-lib-item data-name="{{ g.game_name|lower }}" data-min="{{ g.min_players or 0 }}" data-max="{{ g.max_players or 99 }}"
-          data-time="{{ g.playtime or 0 }}" data-played="{{ stat.play_count if stat else 0 }}"
+          data-time="{{ g.playtime or 0 }}" data-played="{{ stat.play_count if stat else 0 }}" data-owners="{{ (g.owner_ids or []) | join(',') }}"
           class="flex gap-3 rounded-xl border border-stone-200 bg-white p-3 shadow-sm">
         <a href="{{ url_for('games.view_game', game_id=g.game_id) }}" class="shrink-0">
           {% if g.image_url %}<img src="{{ g.image_url }}" alt="" loading="lazy" class="h-16 w-16 rounded-lg bg-stone-100 object-cover">
@@ -111,21 +123,39 @@
       const n = +(root.querySelector('input[name="lib_players"]:checked').value || 0);
       const times = [...root.querySelectorAll('input[name="lib_time"]:checked')].map(i => +i.value);
       const t = times.length ? Math.max(...times) : 0;
+      const ownerBoxes = [...root.querySelectorAll('input[name="lib_owner"]:checked')];
+      const owners = new Set(ownerBoxes.map(i => i.value));
+      const summary = root.querySelector('[data-owner-summary]');
+      if (summary) summary.textContent = ownerBoxes.length ? '(' + ownerBoxes.map(i => i.dataset.ownerName.split(' ')[0]).join(', ') + ')' : '';
+      try {  // keep the choice in the address so it can be shared or bookmarked
+        const url = new URL(location.href);
+        owners.size ? url.searchParams.set('owners', [...owners].join(',')) : url.searchParams.delete('owners');
+        history.replaceState(null, '', url);
+      } catch (e) {}
       let shown = 0;
       items.forEach(li => {
         const d = li.dataset;
+        if (owners.size && !d.owners.split(',').some(id => owners.has(id))) { li.hidden = true; return; }
         const fits = !n || (n >= 6 ? +d.max >= 6 : (+d.min <= n && n <= +d.max));
         const ok = (!q || d.name.includes(q)) && fits && (!t || (+d.time && +d.time <= t)) && (!unplayed.checked || +d.played === 0);
         li.hidden = !ok; if (ok) shown++;
       });
       root.querySelector('[data-lib-empty]').classList.toggle('hidden', shown > 0 || !items.length);
     }
+    // ?owners=1,2 preselects owners (shared links)
+    const pre = new URLSearchParams(location.search).get('owners');
+    if (pre) {
+      pre.split(',').forEach(id => { const box = root.querySelector('input[name="lib_owner"][value="' + id + '"]'); if (box) box.checked = true; });
+      const det = root.querySelector('[data-owner-filter]'); if (det) det.open = true;
+    }
+    root.querySelectorAll('input[name="lib_owner"]').forEach(el => el.addEventListener('change', filter));
     search.addEventListener('input', filter);
     root.querySelectorAll('input[name="lib_players"], input[name="lib_time"], [data-lib-unplayed]').forEach(el => el.addEventListener('change', filter));
     root.querySelector('[data-lib-reset]').addEventListener('click', () => {
       search.value = ''; root.querySelector('input[name="lib_players"][value=""]').checked = true;
-      root.querySelectorAll('input[name="lib_time"]').forEach(i => { i.checked = false; }); unplayed.checked = false; filter();
+      root.querySelectorAll('input[name="lib_time"], input[name="lib_owner"]').forEach(i => { i.checked = false; }); unplayed.checked = false; filter();
     });
+    if (pre) filter();
   })();
 </script>
 {% endblock %}

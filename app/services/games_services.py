@@ -88,6 +88,23 @@ def get_or_create_game(game_name, bgg_id=None):
     return game, None
 
 
+def owner_choices(games):
+    """People who own any of these library rows, most games first:
+    [{"id", "name", "count"}] for the 'owned by' filter."""
+    counts: dict[int, int] = {}
+    for item in games:
+        for pid in item["game"].owner_ids or []:
+            counts[pid] = counts.get(pid, 0) + 1
+    people = Person.query.filter(Person.id.in_(counts)).all() if counts else []
+    return sorted(
+        (
+            {"id": p.id, "name": f"{p.first_name} {p.last_name}", "count": counts[p.id]}
+            for p in people
+        ),
+        key=lambda c: (-c["count"], c["name"].lower()),
+    )
+
+
 def get_filtered_games(
     user_id,
     name_filter=None,
