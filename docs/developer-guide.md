@@ -137,7 +137,7 @@ cp .env.example .env
 
 ## Testing
 
-**Tests run in CI only.** The dev docker-compose does not expose the database port to the host, so `pytest` cannot connect locally without extra setup.
+CI runs the tests on every push.
 
 Tests live in `tests/` and are split by layer:
 - `tests/blueprints/` — route-level integration tests
@@ -149,13 +149,19 @@ CI runs them with:
 pytest --cov=app --cov-report=term-missing --cov-fail-under=60 -v
 ```
 
-If you need to run tests locally, you'll need a locally accessible PostgreSQL database:
+To run them locally (boxer has no `python3-venv`), start a throwaway Postgres and use `scripts/dev.sh`, which runs any command in a tooling container built from `scripts/Dockerfile.dev`:
 
 ```bash
-createdb gamenight_test
-export TEST_DATABASE_URL=postgresql://user:password@localhost:5432/gamenight_test
-pytest
+docker run -d --name game_night_testdb --rm -e POSTGRES_USER=gamenight \
+  -e POSTGRES_PASSWORD=gamenight -e POSTGRES_DB=gamenight_dev -p 127.0.0.1:55433:5432 postgres:16
+docker exec game_night_testdb psql -U gamenight -d gamenight_dev -c "CREATE DATABASE gamenight_test"
+
+scripts/dev.sh pytest
+scripts/dev.sh sh -c "ruff check . && ruff format --check . && mypy app/ tests/"
+scripts/dev.sh flask db migrate -m "describe change"
 ```
+
+Delete the `game_night_dev` image after changing `requirements*.txt` so it rebuilds.
 
 **CI configuration:** `.github/workflows/ci.yml`
 

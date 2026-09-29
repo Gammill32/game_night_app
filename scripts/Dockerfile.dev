@@ -1,0 +1,5 @@
+# Tooling image for tests/lint/migrations (boxer has no python3-venv).
+FROM python:3.11-slim
+WORKDIR /app
+COPY requirements.txt requirements-dev.txt ./
+RUN pip install --no-cache-dir -r requirements.txt -r requirements-dev.txt
