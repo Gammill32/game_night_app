@@ -1,6 +1,5 @@
 from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
-from sqlalchemy.orm import selectinload
 
 from app.services import date_poll_services
 from app.services.poll_services import (
@@ -9,7 +8,6 @@ from app.services.poll_services import (
     get_detailed_results,
     get_poll_by_token,
     parse_closes_at,
-    poll_is_active,
     submit_response,
     update_poll,
     view_context,
@@ -21,22 +19,15 @@ polls_bp = Blueprint("polls", __name__)
 
 @polls_bp.app_context_processor
 def inject_active_polls():
-    """Make the open polls the current user can see available in all templates."""
-    from app.models import Poll
+    """The number of open polls the current user can see (for the nav badge)."""
+    from app.services.poll_services import open_polls_for
 
     if not current_user.is_authenticated:
-        return {"active_polls_count": 0, "active_polls": []}
+        return {"active_polls_count": 0}
     try:
-        all_open = (
-            Poll.query.filter_by(closed=False)
-            .options(selectinload(Poll.invitees), selectinload(Poll.game_night))
-            .order_by(Poll.created_at.desc())
-            .all()
-        )
-        active = [p for p in all_open if poll_is_active(p) and can_view(p, current_user)]
-        return {"active_polls_count": len(active), "active_polls": active}
+        return {"active_polls_count": len(open_polls_for(current_user))}
     except Exception:
-        return {"active_polls_count": 0, "active_polls": []}
+        return {"active_polls_count": 0}
 
 
 def _linkable_nights():

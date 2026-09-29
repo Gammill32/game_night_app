@@ -6,9 +6,9 @@ from sqlalchemy import text
 
 from app.models import (
     AdminGameNightList,
-    AdminRecentFutureGameNight,
+    GameNight,
+    Player,
     UserGameNightList,
-    UserRecentFutureGameNight,
     db,
 )
 
@@ -41,20 +41,6 @@ def get_earliest_game_night():
     return db.session.scalar(text("SELECT earliest_date FROM public.earliest_game_night"))
 
 
-def get_recent_and_future_game_nights(user):
-    """Fetches recent and future game nights."""
-    if user.owner:
-        return AdminRecentFutureGameNight.query.order_by(
-            AdminRecentFutureGameNight.date.desc()
-        ).all()
-    else:
-        return (
-            UserRecentFutureGameNight.query.filter_by(user_id=user.id)
-            .order_by(UserRecentFutureGameNight.date.desc())
-            .all()
-        )
-
-
 def get_calendar_data(year, month):
     """Generates calendar data for the given month."""
     cal = calendar.Calendar(firstweekday=6)  # Start on Sunday
@@ -69,3 +55,57 @@ def get_navigation_dates(start_date, earliest_game_night):
 
     next_month = (start_date.replace(day=28) + timedelta(days=4)).replace(day=1)
     return prev_month, next_month
+
+
+def _visible_nights(user):
+    """Owners see every night; everyone else sees the nights they're in."""
+    query = GameNight.query
+    if not user.owner:
+        query = query.join(Player, Player.game_night_id == GameNight.id).filter(
+            Player.people_id == user.id
+        )
+    return query
+
+
+def get_upcoming_nights(user, today, limit=6):
+    """Upcoming nights with what the viewer needs at a glance."""
+    from app.services import food_services, poll_services
+
+    nights = (
+        _visible_nights(user)
+        .filter(GameNight.date >= today)
+        .order_by(GameNight.date.asc())
+        .limit(limit)
+        .all()
+    )
+    cards = []
+    for night in nights:
+        player_ids = [p.people_id for p in night.players]
+        rsvps = poll_services.rsvps_for_night(night)
+        answers = [rsvps.get(pid) for pid in player_ids]
+        cards.append(
+            {
+                "night": night,
+                "is_player": user.id in player_ids,
+                "player_count": len(player_ids),
+                "my_rsvp": rsvps.get(user.id),
+                "has_rsvp_poll": night.availability_poll is not None,
+                "rsvp_in": answers.count("Can Make It"),
+                "rsvp_maybe": answers.count("Maybe"),
+                "rsvp_none": answers.count(None),
+                "bringing": [i.name for i in night.food_items if i.claimed_by == user.id],
+                "owed": food_services.my_food_summary(night, user),
+                "days_away": (night.date - today).days,
+            }
+        )
+    return cards
+
+
+def get_recent_nights(user, today, limit=5):
+    return (
+        _visible_nights(user)
+        .filter(GameNight.date < today)
+        .order_by(GameNight.date.desc())
+        .limit(limit)
+        .all()
+    )

@@ -8,14 +8,102 @@
   {%- set _ = game_night_days.update({gn.date.day: gn}) %}
 {%- endfor %}
 
-<div class="max-w-3xl mx-auto">
-  <div class="flex items-center gap-4 mb-6">
-    <img src="{{ url_for('static', filename='images/logo.png') }}" alt="Game Night Logo" class="h-12 w-auto" />
-    <h1 class="text-2xl font-bold text-stone-800">Welcome to Game Night!</h1>
+<div class="max-w-3xl mx-auto space-y-8">
+  <div class="flex items-center gap-4">
+    <img src="{{ url_for('static', filename='images/logo.png') }}" alt="" class="h-12 w-auto" />
+    <div>
+      <h1 class="text-2xl font-bold text-stone-800">Welcome back, {{ current_user.first_name }}!</h1>
+      {% if polls_to_answer %}<p class="text-sm text-red-700 font-medium">{{ polls_to_answer|length }} poll{{ 's' if polls_to_answer|length != 1 }} waiting on your answer</p>{% endif %}
+    </div>
   </div>
 
+  <!-- Up next -->
+  <section>
+    <div class="flex items-center justify-between mb-3">
+      <h2 class="text-lg font-semibold text-stone-800">Up next</h2>
+      {% if current_user.admin or current_user.owner %}
+      <a href="{{ url_for('game_night.start_game_night') }}" class="text-sm font-medium text-red-600 hover:text-red-700">+ New game night</a>
+      {% endif %}
+    </div>
+    {% if upcoming %}
+    <div class="grid gap-3 {{ 'sm:grid-cols-2' if upcoming|length > 1 else '' }}">
+      {% for card in upcoming %}
+      {% set gn = card.night %}
+      <a href="{{ url_for('game_night.view_game_night', game_night_id=gn.id) }}"
+         class="block bg-white rounded-xl border shadow-sm p-5 hover:shadow transition-all {{ 'border-red-300 sm:col-span-2' if loop.first else 'border-stone-200 hover:border-red-300' }}">
+        <div class="flex items-start justify-between gap-3">
+          <div>
+            <p class="text-xs font-semibold uppercase tracking-wide {{ 'text-red-600' if card.days_away <= 1 else 'text-stone-400' }}">
+              {% if card.days_away == 0 %}Tonight{% elif card.days_away == 1 %}Tomorrow{% else %}In {{ card.days_away }} days{% endif %}
+            </p>
+            <p class="{{ 'text-xl' if loop.first else 'text-lg' }} font-bold text-stone-800">{{ gn.date.strftime('%A, %B %-d') }}</p>
+            {% if gn.notes %}<p class="text-sm text-stone-500 mt-0.5 line-clamp-2">{{ gn.notes }}</p>{% endif %}
+          </div>
+          {% if not card.is_player %}
+          <span class="shrink-0 rounded-full bg-stone-100 px-2.5 py-0.5 text-xs font-medium text-stone-500">Not playing</span>
+          {% elif not card.has_rsvp_poll %}
+          {% elif card.my_rsvp == "Can Make It" %}<span class="shrink-0 rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">You're in</span>
+          {% elif card.my_rsvp == "Maybe" %}<span class="shrink-0 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-800">You're a maybe</span>
+          {% elif card.my_rsvp %}<span class="shrink-0 rounded-full bg-stone-100 px-2.5 py-0.5 text-xs font-medium text-stone-600">You're out</span>
+          {% else %}<span class="shrink-0 rounded-full bg-red-600 px-2.5 py-0.5 text-xs font-medium text-white">RSVP needed</span>{% endif %}
+        </div>
+        <div class="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-stone-600">
+          <span>👥 {{ card.player_count }} player{{ 's' if card.player_count != 1 }}{% if card.has_rsvp_poll %} · {{ card.rsvp_in }} in{% if card.rsvp_maybe %}, {{ card.rsvp_maybe }} maybe{% endif %}{% if card.rsvp_none %}, {{ card.rsvp_none }} no reply{% endif %}{% endif %}</span>
+          {% if gn.food_mode == 'provided' %}<span>🍕 {{ 'You\'re' if gn.food_provider_id == current_user.id else (gn.food_provider.first_name if gn.food_provider else 'Someone') ~ ' is' }} providing food{% if gn.food_note %}: {{ gn.food_note }}{% endif %}</span>
+          {% elif gn.food_mode != 'none' %}<span>🍕 {{ gn.food_note or ('Sign-up list' if gn.food_signup else 'Splitting the cost') }}</span>{% endif %}
+          {% if card.bringing %}<span class="text-green-700">You're bringing {{ card.bringing|join(', ') }}</span>{% endif %}
+          {% for share, expense in card.owed %}<span class="text-amber-700 font-medium">You owe {{ expense.payer.first_name }} {{ share.amount_cents|money }}</span>{% endfor %}
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="bg-white rounded-xl border border-stone-200 shadow-sm p-5 text-sm text-stone-500">Nothing scheduled yet.</div>
+    {% endif %}
+  </section>
+
+  <!-- Polls -->
+  {% if polls_to_answer or polls_answered %}
+  <section id="polls">
+    <h2 class="text-lg font-semibold text-stone-800 mb-3">Polls</h2>
+    <div class="space-y-3">
+      {% for ctx in polls_to_answer %}
+      <div class="bg-white rounded-xl border border-red-200 shadow-sm p-5">
+        <div class="mb-3">
+          <p class="text-xs font-semibold uppercase tracking-wide text-red-600">Needs your answer</p>
+          <h3 class="text-base font-semibold text-stone-800">{{ ctx.poll.title }}</h3>
+          {% if ctx.poll.game_night and not ctx.poll.availability %}<p class="text-xs text-stone-500">For the {{ ctx.poll.game_night.date.strftime('%B %-d') }} game night</p>{% endif %}
+          {% if ctx.poll.availability %}<p class="text-xs text-stone-500">Your answer is your RSVP.</p>{% endif %}
+          {% if ctx.poll.description %}<p class="text-sm text-stone-500 mt-1">{{ ctx.poll.description }}</p>{% endif %}
+        </div>
+        {% with poll=ctx.poll, active=ctx.active, user_votes=ctx.user_votes, results=ctx.results, date_answers=ctx.date_answers, date_rows=ctx.date_rows, message=None %}
+          {% include "_poll_widget.html" %}
+        {% endwith %}
+      </div>
+      {% endfor %}
+      {% if polls_answered %}
+      <div class="bg-white rounded-xl border border-stone-200 shadow-sm divide-y divide-stone-100">
+        {% for ctx in polls_answered %}
+        <details class="group px-5 py-3">
+          <summary class="flex cursor-pointer list-none items-center justify-between gap-2">
+            <span class="text-sm font-medium text-stone-700">{{ ctx.poll.title }} <span class="ml-1 text-xs font-normal text-green-700">✓ answered</span></span>
+            <span class="text-xs text-stone-500 group-open:hidden">Change / results</span>
+          </summary>
+          <div class="pt-3">
+            {% with poll=ctx.poll, active=ctx.active, user_votes=ctx.user_votes, results=ctx.results, date_answers=ctx.date_answers, date_rows=ctx.date_rows, message=None %}
+              {% include "_poll_widget.html" %}
+            {% endwith %}
+          </div>
+        </details>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
+  </section>
+  {% endif %}
+
   <!-- Calendar -->
-  <div class="bg-white rounded-xl border border-stone-200 shadow-sm p-5 mb-6">
+  <div class="bg-white rounded-xl border border-stone-200 shadow-sm p-5 ">
 
     <!-- Month navigation -->
     <form action="{{ url_for('main.index') }}" method="GET">
@@ -98,60 +186,32 @@
 
   </div>
 
-  <!-- Active Polls -->
-  {% if active_polls_count > 0 %}
-  <div class="mb-6">
-    <h2 class="text-lg font-semibold text-stone-800 mb-3">Open Polls</h2>
-    <div class="space-y-2">
-      {% for poll in active_polls %}
-      <a href="{{ url_for('polls.poll_respond', token=poll.token) }}"
-         class="flex items-center justify-between bg-white rounded-xl border border-stone-200 px-5 py-3 hover:bg-stone-50 transition-colors">
-        <span class="text-sm font-medium text-stone-700">{{ poll.title }}{% if poll.game_night and not poll.availability %} <span class="text-xs font-normal text-stone-400">· {{ poll.game_night.date.strftime('%b %-d') }} game night</span>{% endif %}</span>
-        <span class="text-xs text-red-600 font-medium">Vote &rarr;</span>
-      </a>
+  <!-- Recent -->
+  <section>
+    <h2 class="text-lg font-semibold text-stone-800 mb-3">Recent game nights</h2>
+    {% if recent %}
+    <ul class="space-y-2">
+      {% for gn in recent %}
+      <li>
+        <a href="{{ url_for('game_night.view_game_night', game_night_id=gn.id) }}"
+           class="flex items-center justify-between bg-white rounded-xl border border-stone-200 shadow-sm px-5 py-3 hover:border-red-300 hover:shadow transition-all">
+          <span class="text-sm font-medium text-stone-800">{{ gn.date.strftime('%B %-d, %Y') }}</span>
+          {% if gn.final %}
+          <span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-stone-100 text-stone-600">Finalized</span>
+          {% else %}
+          <span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700">Results pending</span>
+          {% endif %}
+        </a>
+      </li>
       {% endfor %}
-    </div>
-  </div>
-  {% endif %}
-
-  <!-- Recent & Upcoming -->
-  <h2 class="text-lg font-semibold text-stone-800 mb-3">Recent &amp; Upcoming</h2>
-
-  {% if game_nights_list %}
-  <ul class="space-y-2 mb-6">
-    {% for gn in game_nights_list %}
-    <li>
-      <a href="{{ url_for('game_night.view_game_night', game_night_id=gn.game_night_id) }}"
-         class="flex items-center justify-between bg-white rounded-xl border border-stone-200 shadow-sm px-5 py-3 hover:border-red-300 hover:shadow transition-all">
-        <span class="text-sm font-medium text-stone-800">{{ gn.date.strftime('%B %d, %Y') }}</span>
-        {% if gn.final %}
-        <span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-stone-100 text-stone-600">Finalized</span>
-        {% elif gn.closed %}
-        <span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700">Voting Closed</span>
-        {% else %}
-        <span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">Open</span>
-        {% endif %}
-      </a>
-    </li>
-    {% endfor %}
-  </ul>
-  {% else %}
-  <div class="bg-white rounded-xl border border-stone-200 shadow-sm p-5 mb-6">
-    <p class="text-sm text-stone-500">No game nights found.</p>
-  </div>
-  {% endif %}
-
-  <div class="flex flex-wrap gap-3">
-    <a href="{{ url_for('main.all_game_nights') }}"
-       class="inline-flex items-center rounded-lg border border-stone-300 px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50 transition-colors">
-      See All Game Nights
-    </a>
-    {% if current_user.admin or current_user.owner %}
-    <a href="{{ url_for('game_night.start_game_night') }}"
-       class="inline-flex items-center rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 transition-colors">
-      Start a New Game Night
-    </a>
+    </ul>
+    {% else %}
+    <p class="text-sm text-stone-500">No past game nights yet.</p>
     {% endif %}
-  </div>
+    <a href="{{ url_for('main.all_game_nights') }}"
+       class="mt-3 inline-flex items-center rounded-lg border border-stone-300 px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50 transition-colors">
+      See all game nights
+    </a>
+  </section>
 </div>
 {% endblock %}

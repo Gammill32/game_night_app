@@ -169,6 +169,19 @@ def can_view(poll: Poll, user) -> bool:
     return True
 
 
+def open_polls_for(user) -> list[Poll]:
+    """Open polls this user can see, newest first."""
+    from sqlalchemy.orm import selectinload
+
+    polls = (
+        Poll.query.filter_by(closed=False)
+        .options(selectinload(Poll.invitees), selectinload(Poll.game_night))  # type: ignore[arg-type]
+        .order_by(Poll.created_at.desc())
+        .all()
+    )
+    return [p for p in polls if poll_is_active(p) and can_view(p, user)]
+
+
 def has_responded(poll: Poll, person_id: int) -> bool:
     """Check if this person has already answered."""
     return PollResponse.query.filter_by(poll_id=poll.id, person_id=person_id).first() is not None
