@@ -1,6 +1,7 @@
 Flask==2.3.2
 Werkzeug>=2.3.3,<3.0
 Flask-SQLAlchemy==3.0.3
+SQLAlchemy==2.0.51
 psycopg2-binary==2.9.11
 requests==2.31.0
 flask-bcrypt==1.0.1
