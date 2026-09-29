@@ -28,6 +28,10 @@
   <!-- HTMX CDN (used in Phase 2+) -->
   <script src="https://unpkg.com/htmx.org@1.9.12" defer></script>
 
+  <!-- Elements hidden with the `hidden` attribute stay hidden even when a
+       utility class like `flex` sets display (used by the list filters). -->
+  <style>[hidden] { display: none !important; }</style>
+
   <!-- Custom overrides -->
   <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}" />
 
