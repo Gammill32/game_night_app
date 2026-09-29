@@ -83,6 +83,10 @@ def start_schedulers(app):
 def create_app(config_class=None):
     """Factory function to create a Flask app instance."""
     app = Flask(__name__)
+    # Behind Traefik: trust its X-Forwarded-* headers so links are https://gamenight...
+    from werkzeug.middleware.proxy_fix import ProxyFix
+
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
     if config_class is None:
         config_class = Config
     app.config.from_object(config_class)

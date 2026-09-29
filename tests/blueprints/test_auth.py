@@ -326,3 +326,39 @@ def test_add_person_rejects_duplicate_name(admin_client, make_person):
     make_person("Dupe", "Name")
     admin_client.post("/add_person", data={"first_name": "dupe", "last_name": "NAME"})
     assert Person.query.filter_by(first_name="dupe").count() == 0
+
+
+def test_forgot_password_sends_one_time_reset_link(client, make_person, monkeypatch):
+    import re
+
+    from app.services import auth_services
+
+    ann = make_person("Ann")
+    sent = {}
+    monkeypatch.setattr(
+        auth_services, "send_email", lambda to, subj, body: sent.update(to=to, body=body)
+    )
+
+    # Unknown email: same answer, nothing sent
+    resp = client.post(
+        "/forgot_password", data={"email": "nobody@test.invalid"}, follow_redirects=True
+    )
+    assert b"If that email has an account" in resp.data and not sent
+
+    client.post("/forgot_password", data={"email": ann.email.upper()})
+    assert sent["to"] == ann.email
+    link = re.search(r'href="([^"]+)"', sent["body"]).group(1)
+    path = link.split("localhost", 1)[1]
+    assert "/reset_password/" in path
+    assert client.get(path).status_code == 200
+
+    resp = client.post(path, data={"new_password": "short", "confirm_password": "short"})
+    assert b"at least 8" in resp.data.lower()
+    client.post(path, data={"new_password": "brand-new-pw", "confirm_password": "brand-new-pw"})
+    resp = client.post("/login", data={"email": ann.email, "password": "brand-new-pw"})
+    assert resp.status_code == 302 and "/login" not in resp.headers["Location"]
+
+    # The link only works once
+    client.post("/logout")
+    resp = client.get(path)
+    assert resp.status_code == 302 and "/forgot_password" in resp.headers["Location"]

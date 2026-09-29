@@ -1,5 +1,4 @@
-import secrets
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from sqlalchemy import func
 
@@ -58,27 +57,71 @@ def signup(first_name, last_name, email, password):
     return True, "Signup completed successfully! You can now log in."
 
 
+RESET_MAX_AGE = 60 * 60  # reset links work for an hour
+FORGOT_MESSAGE = "If that email has an account, we've sent a link to reset the password."
+
+
+def _reset_serializer():
+    from flask import current_app
+    from itsdangerous import URLSafeTimedSerializer
+
+    return URLSafeTimedSerializer(current_app.config["SECRET_KEY"], salt="password-reset")
+
+
+def make_reset_token(user):
+    # Includes part of the current password hash, so the link stops working
+    # once the password has been changed (i.e. it can only be used once).
+    return _reset_serializer().dumps({"id": user.id, "pw": (user.password or "")[-12:]})
+
+
+def user_for_reset_token(token):
+    """The person a reset link is for, or None if it's invalid, used or expired."""
+    from itsdangerous import BadSignature, SignatureExpired
+
+    try:
+        data = _reset_serializer().loads(token, max_age=RESET_MAX_AGE)
+    except (BadSignature, SignatureExpired):
+        return None
+    user = db.session.get(Person, data.get("id"))
+    if user is None or not user.active or (user.password or "")[-12:] != data.get("pw"):
+        return None
+    return user
+
+
 def forgot_password(email):
-    """Generate a temporary password and send it to the user's email."""
-    user = Person.query.filter_by(email=email).first()
-    if not user:
-        return False, "Email not found."
+    """Email a one-time reset link. Says the same thing whether or not the
+    email has an account, so the form can't be used to find out."""
+    from flask import url_for
 
-    temp_password = secrets.token_urlsafe(8)
-    user.password = bcrypt.generate_password_hash(temp_password).decode("utf-8")
-    user.temp_pass = True
-    user.temp_pass_expires_at = datetime.utcnow() + timedelta(hours=24)
+    user = Person.query.filter(func.lower(Person.email) == (email or "").strip().lower()).first()
+    if user and user.active and user.password:
+        link = url_for("auth.reset_password", token=make_reset_token(user), _external=True)
+        html_body = f"""
+        <p>Hello {user.first_name},</p>
+        <p>Someone asked to reset your Game Night password. If it was you, use this link
+        within the next hour:</p>
+        <p><a href="{link}">{link}</a></p>
+        <p>If you didn't ask, you can ignore this email; your password hasn't changed.</p>
+        """
+        try:
+            send_email(user.email, "Reset your Game Night password", html_body)
+        except Exception:
+            import logging
+
+            logging.getLogger(__name__).exception("Password reset email failed for %s", user.id)
+    return True, FORGOT_MESSAGE
+
+
+def reset_password(user, new_password, confirm_password):
+    if not new_password or len(new_password) < 8:
+        return False, "Use at least 8 characters."
+    if new_password != confirm_password:
+        return False, "The passwords don't match."
+    user.password = bcrypt.generate_password_hash(new_password).decode("utf-8")
+    user.temp_pass = False
+    user.temp_pass_expires_at = None
     db.session.commit()
-
-    subject = "Password Reset for Game Night App"
-    html_body = f"""
-    <p>Hello {user.first_name},</p>
-    <p>Your temporary password is: <strong>{temp_password}</strong></p>
-    <p>Please log in and change your password.</p>
-    """
-    send_email(user.email, subject, html_body)
-
-    return True, "A temporary password has been sent to your email."
+    return True, "Password changed. You can sign in now."
 
 
 def update_password(user, current_password, new_password, confirm_password):

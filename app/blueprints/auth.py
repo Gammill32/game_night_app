@@ -78,6 +78,22 @@ def forgot_password():
     return render_template("forgot_password.html", **context)
 
 
+@auth_bp.route("/reset_password/<token>", methods=["GET", "POST"])
+def reset_password(token):
+    user = auth_services.user_for_reset_token(token)
+    if user is None:
+        flash("That reset link has expired or was already used. Ask for a new one.", "error")
+        return redirect(url_for("auth.forgot_password"))
+    if request.method == "POST":
+        success, message = auth_services.reset_password(
+            user, request.form.get("new_password"), request.form.get("confirm_password")
+        )
+        flash(message, "success" if success else "error")
+        if success:
+            return redirect(url_for("auth.login"))
+    return render_template("reset_password.html", person=user)
+
+
 @auth_bp.route("/update_password", methods=["GET", "POST"])
 @login_required
 def update_password():
