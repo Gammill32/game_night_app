@@ -42,6 +42,9 @@ class Config:
     # Timezone Configuration
     APP_TIMEZONE = os.getenv("APP_TIMEZONE", "America/Chicago")
 
+    # Used for links in emails sent by the scheduler (no request to build them from).
+    APP_BASE_URL = os.getenv("APP_BASE_URL", "https://gamenight.sgammill.com")
+
     # Uploads (night photos, food receipts). Production bind-mounts the
     # vault/game_night_media ZFS dataset here.
     MEDIA_DIR = os.getenv("MEDIA_DIR", "/app/media")

@@ -1,44 +1,27 @@
-<div style="font-family: Arial, sans-serif; color: #333333; line-height: 1.6; font-size: 14px;">
+<div style="font-family: Arial, sans-serif; color: #333333; line-height: 1.6; font-size: 15px; max-width: 560px;">
+  <p>Hi {{ user.first_name }},</p>
+  <p>Game night is <strong>{{ when }}</strong>, {{ game_night.date.strftime('%A, %B %-d') }}.</p>
+  {% if game_night.notes %}<p style="white-space: pre-line; color: #555555;">{{ game_night.notes }}</p>{% endif %}
 
-  <p>Hi {{ user.first_name }} {{ user.last_name }},</p>
-
-  <p>
-    This is a reminder that there is a Game Night scheduled for
-    <strong style="color: #000000;">{{ game_night.date.strftime('%B %d, %Y') }}</strong>.
-  </p>
-
-  {% if not has_nominated %}
-  <p style="color: #cc0000; font-weight: bold;">
-    You haven't nominated a game yet. Please make your nomination!
-  </p>
-  {% endif %}
-
-  {% if not has_voted %}
-  <p style="color: #cc0000; font-weight: bold;">
-    You haven't voted for the games yet. Please submit your votes!
-  </p>
+  {% if needs_rsvp or maybe or needs_nomination or needs_votes %}
+  <div style="margin: 18px 0; padding: 12px 16px; border-radius: 8px; background: #fef3c7; color: #78350f;">
+    <p style="margin: 0 0 6px; font-weight: bold;">Still to do</p>
+    <ul style="margin: 0; padding-left: 18px;">
+      {% if needs_rsvp %}<li>Say whether you can make it.</li>{% endif %}
+      {% if maybe %}<li>You said maybe. Let everyone know if you're in.</li>{% endif %}
+      {% if needs_nomination %}<li>Nominate a game you'd like to play.</li>{% endif %}
+      {% if needs_votes %}<li>Rank your top 3 of the nominated games.</li>{% endif %}
+    </ul>
+  </div>
   {% endif %}
 
   {% if leader %}
-  <div style="margin-top: 20px; border: 1px solid #dddddd; padding: 10px; border-radius: 5px; text-align: center; background-color: #f9f9f9;">
-    <p style="margin: 0 0 10px; font-weight: bold;">
-      Current Leader: <span style="color: #000000;">{{ leader.game.name }}</span>
-      with <span style="color: #000000;">{{ leader.weighted_score }}</span> vote(s).
-    </p>
-    {% if leader.game.image_url %}
-    <img src="{{ leader.game.image_url }}" alt="{{ leader.game.name }}"
-         style="max-width: 100px; border-radius: 5px; margin: 10px auto 0; display: block;">
-    {% endif %}
-  </div>
-  {% else %}
-  <p style="margin-top: 20px; font-weight: bold;">
-    Current Leader: <span style="color: #555555;">No votes have been cast yet.</span>
-  </p>
+  <p>Leading the vote: <strong>{{ leader.game_name }}</strong> with {{ leader.vote_score }} point{{ 's' if leader.vote_score != 1 }}.</p>
   {% endif %}
 
   {% if food_lines %}
-  <p style="margin-top: 20px; margin-bottom: 4px; font-weight: bold;">Food</p>
-  <ul style="margin-top: 0;">
+  <p style="margin: 18px 0 4px; font-weight: bold;">Food</p>
+  <ul style="margin-top: 0; padding-left: 18px;">
     {% for line in food_lines %}<li>{{ line }}</li>{% endfor %}
   </ul>
   {% endif %}
@@ -46,10 +29,9 @@
   <p>You owe {{ expense.payer.first_name }} {{ share.amount_cents|money }} for {{ expense.description }}.</p>
   {% endfor %}
 
-  <p style="margin-top: 20px;">
-    See you at the Game Night!
+  <p style="margin: 24px 0;">
+    <a href="{{ link }}" style="display: inline-block; padding: 10px 18px; border-radius: 8px; background: #dc2626; color: #ffffff; text-decoration: none; font-weight: bold;">Open the game night</a>
   </p>
 
   {% include 'email_templates/email_signature.html' %}
-
 </div>

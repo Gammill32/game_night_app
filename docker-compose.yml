@@ -37,6 +37,7 @@ services:
       - BGG_API_TOKEN
       - SESSION_TYPE
       - MAX_UPLOAD_MB
+      - APP_BASE_URL
       - MEDIA_DIR=/app/media
     volumes:
       # Night photos and food receipts. Create the dataset before the first

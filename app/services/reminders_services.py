@@ -3,11 +3,10 @@ from datetime import datetime
 
 import pytz
 from apscheduler.triggers.cron import CronTrigger
-from flask import current_app, render_template
-from sqlalchemy import func
+from flask import current_app, render_template, url_for
 
 from app.extensions import scheduler
-from app.models import Game, GameNight, GameNominations, GameVotes, Person, Player, db
+from app.models import GameNight, GameNominations, GameVotes, Player
 from app.services import food_services
 from app.utils import send_email
 
@@ -17,89 +16,74 @@ def _get_timezone():
     return pytz.timezone(tz_name)
 
 
+def _leader(game_night):
+    """The nominated game with the most points so far, or None."""
+    from app.models import GameNightNominationsVotes
+
+    return (
+        GameNightNominationsVotes.query.filter_by(game_night_id=game_night.id)
+        .filter(GameNightNominationsVotes.total_nominations > 0)
+        .order_by(GameNightNominationsVotes.vote_score.desc())
+        .first()
+    )
+
+
 def check_and_send_reminders():
-    """Checks for upcoming game nights and sends reminder emails to participants."""
+    """Email the players of tomorrow's and today's game nights (run once a day)."""
+    from datetime import timedelta
+
+    from app.services import poll_services
+
     tz = _get_timezone()
-    today_central = datetime.now(tz).date()
+    today = datetime.now(tz).date()
+    base_url = current_app.config.get("APP_BASE_URL", "https://gamenight.sgammill.com")
 
-    game_nights = GameNight.query.filter_by(date=today_central).all()
-    if not game_nights:
-        return
-
-    for game_night in game_nights:
-        leader = (
-            db.session.query(
-                Game,
-                func.sum(
-                    db.case(
-                        (GameVotes.rank == 1, 3),
-                        (GameVotes.rank == 2, 2),
-                        (GameVotes.rank == 3, 1),
-                    )
-                ).label("weighted_score"),
-                func.count(GameVotes.id).label("vote_count"),
+    for game_night in GameNight.query.filter(
+        GameNight.date.in_([today, today + timedelta(days=1)]), GameNight.final.is_(False)
+    ).all():
+        when = "tonight" if game_night.date == today else "tomorrow"
+        rsvps = poll_services.rsvps_for_night(game_night)
+        has_rsvp_poll = game_night.availability_poll is not None
+        leader = _leader(game_night)
+        with current_app.test_request_context(base_url=base_url):
+            link = url_for(
+                "game_night.view_game_night", game_night_id=game_night.id, _external=True
             )
-            .join(GameVotes, Game.id == GameVotes.game_id)
-            .join(
-                GameNominations,
-                (GameNominations.game_id == Game.id)
-                & (GameNominations.game_night_id == GameVotes.game_night_id),
-            )
-            .filter(GameVotes.game_night_id == game_night.id)
-            .group_by(Game.id)
-            .order_by(
-                func.sum(
-                    db.case(
-                        (GameVotes.rank == 1, 3),
-                        (GameVotes.rank == 2, 2),
-                        (GameVotes.rank == 3, 1),
-                    )
-                ).desc()
-            )
-            .first()
-        )
 
-        leader_data = (
-            {
-                "game": leader[0] if leader else None,
-                "weighted_score": leader[1] if leader else None,
-                "vote_count": leader[2] if leader else 0,
-            }
-            if leader
-            else None
-        )
-
-        players = Player.query.filter_by(game_night_id=game_night.id).all()
-        people_by_id = {
-            p.id: p
-            for p in Person.query.filter(Person.id.in_([pl.people_id for pl in players])).all()
-        }
-
-        for player in players:
-            user = people_by_id.get(player.people_id)
-            if not user or not user.email:
+        for player in Player.query.filter_by(game_night_id=game_night.id).all():
+            user = player.person
+            if not user or not user.email or not user.active:
                 continue
-
-            has_nominated = GameNominations.query.filter_by(
-                game_night_id=game_night.id, player_id=player.id
-            ).first()
-            has_voted = GameVotes.query.filter_by(
-                game_night_id=game_night.id, player_id=player.id
-            ).first()
-
+            answer = rsvps.get(user.id)
+            if answer == "Can't Make It":
+                continue  # they told us; don't nag
+            voting_open = not game_night.closed
             html_body = render_template(
                 "email_templates/reminder_body.html",
                 user=user,
                 game_night=game_night,
-                has_nominated=has_nominated,
-                has_voted=has_voted,
-                leader=leader_data,
+                when=when,
+                link=link,
+                needs_rsvp=has_rsvp_poll and answer is None,
+                maybe=answer == "Maybe",
+                needs_nomination=voting_open
+                and not GameNominations.query.filter_by(
+                    game_night_id=game_night.id, player_id=player.id
+                ).first(),
+                needs_votes=voting_open
+                and leader is not None
+                and not GameVotes.query.filter_by(
+                    game_night_id=game_night.id, player_id=player.id
+                ).first(),
+                leader=leader,
                 food_lines=food_services.reminder_lines(game_night),
                 owed=food_services.my_food_summary(game_night, user),
             )
-
+            subject = f"Game night {when}" + (
+                f" ({game_night.date.strftime('%a, %b %-d')})" if when == "tomorrow" else ""
+            )
             try:
-                send_email(user.email, "Game Night Reminder", html_body)
+                send_email(user.email, subject, html_body)
                 logging.info("Reminder email sent to %s", user.email)
             except Exception as e:
                 logging.error("Failed to send reminder email to %s: %s", user.email, e)

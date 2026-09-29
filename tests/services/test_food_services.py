@@ -239,3 +239,35 @@ def test_provided_night_takes_extras_without_splitting(
     )
     reminders_services.check_and_send_reminders()
     assert "Ann is also bringing Cornbread" in sent[adm.email]
+
+
+def test_reminders_go_out_day_before_and_skip_people_who_are_out(
+    app, make_person, make_night, monkeypatch
+):
+    import datetime
+
+    import pytz
+
+    from app.services import reminders_services
+    from app.services.poll_services import create_availability_poll, submit_response
+
+    ann, bo, cy = make_person("Ann"), make_person("Bo"), make_person("Cy")
+    tomorrow = datetime.datetime.now(
+        pytz.timezone(app.config["APP_TIMEZONE"])
+    ).date() + datetime.timedelta(days=1)
+    gn = make_night(ann, bo, cy, date=tomorrow)
+    create_availability_poll(gn.id, ann.id)
+    poll = gn.availability_poll
+    submit_response(poll, [poll.options[2].id], bo.id)  # Bo can't make it
+    submit_response(poll, [poll.options[0].id], cy.id)
+    sent = {}
+    monkeypatch.setattr(
+        reminders_services, "send_email", lambda to, subj, body: sent.__setitem__(to, (subj, body))
+    )
+    reminders_services.check_and_send_reminders()
+    assert bo.email not in sent
+    subj, body = sent[ann.email]
+    assert subj.startswith("Game night tomorrow")
+    assert "Say whether you can make it" in body and f"/game_night/{gn.id}" in body
+    assert "https://" in body
+    assert "Say whether you can make it" not in sent[cy.email][1]
