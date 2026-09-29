@@ -112,7 +112,7 @@ def test_vote_count_includes_votes(app, wishlist_setup):
 def test_group_wishlist_page_loads(auth_client, wishlist_setup):
     resp = auth_client.get("/wishlist")
     assert resp.status_code == 200
-    assert b"Group Wishlist" in resp.data
+    assert b"Everyone&#39;s" in resp.data or b"Everyone's" in resp.data
     assert wishlist_setup["game_a"].name.encode() in resp.data
 
 
@@ -120,3 +120,37 @@ def test_my_wishlist_page_loads(auth_client):
     resp = auth_client.get("/wishlist/mine")
     assert resp.status_code == 200
     assert b"My Wishlist" in resp.data
+
+
+def test_group_wishlist_shows_who_wants_it(client, make_person):
+    import uuid
+
+    from app.extensions import db as _db
+    from app.models import Game, Wishlist, WishlistVote
+    from tests.conftest import login
+
+    ann, bo = make_person("Ann"), make_person("Bo")
+    game = Game(name=f"Wanted {uuid.uuid4().hex[:6]}")
+    _db.session.add(game)
+    _db.session.flush()
+    _db.session.add(Wishlist(person_id=ann.id, game_id=game.id))
+    _db.session.commit()
+
+    login(client, bo)
+    page = " ".join(client.get("/wishlist").get_data(as_text=True).split())
+    assert game.name in page and "<strong>1</strong> wants it: Ann" in page and "+ Me too" in page
+    client.post(f"/wishlist/vote/{game.id}")
+    page = " ".join(client.get("/wishlist").get_data(as_text=True).split())
+    assert "<strong>2</strong> want it: Ann, you" in page and "✓ You want it too" in page
+
+    client.post(f"/game/{game.id}/claim")  # Bo bought it
+    page = " ".join(client.get("/wishlist").get_data(as_text=True).split())
+    assert "Bo owns it now" in page
+
+    WishlistVote.query.filter_by(game_id=game.id).delete()
+    Wishlist.query.filter_by(game_id=game.id).delete()
+    from app.models import OwnedBy
+
+    OwnedBy.query.filter_by(game_id=game.id).delete()
+    _db.session.delete(game)
+    _db.session.commit()

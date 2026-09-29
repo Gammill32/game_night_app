@@ -107,16 +107,15 @@ def test_view_game_shows_play_history(auth_client, game_with_plays):
     game_id = game_with_plays["game"].id
     resp = auth_client.get(f"/game/{game_id}")
     assert resp.status_code == 200
-    assert b"Play History" in resp.data
-    assert b"Times Played" in resp.data
-    assert b"Last Played" in resp.data
+    assert b"Played 2 times, last on" in resp.data
+    assert b"Game nights it was played" in resp.data
 
 
 def test_view_game_shows_fatigued_badge(auth_client, game_with_plays):
     game_id = game_with_plays["game"].id
     resp = auth_client.get(f"/game/{game_id}")
     assert resp.status_code == 200
-    assert b"Recently Played" in resp.data
+    assert b"Played recently" in resp.data
 
 
 # --- Always Bridesmaid ---
@@ -233,3 +232,13 @@ def test_games_index_shows_bridesmaid_section(auth_client, bridesmaid_setup):
     assert resp.status_code == 200
     assert b"Always nominated, never played" in resp.data
     assert bridesmaid_setup["bridesmaid"].name.encode() in resp.data
+
+
+def test_game_leaderboard_counts_wins_per_person(auth_client, game_with_plays):
+    """Two wins on two different nights are one row with 2 wins, not two rows."""
+    game = game_with_plays["game"]
+    person = game_with_plays["person"]
+    page = " ".join(auth_client.get(f"/game/{game.id}").get_data(as_text=True).split())
+    name = f"{person.first_name} {person.last_name}"
+    assert f'{name}</span> <span class="tabular-nums">2 wins' in page
+    assert page.count(f"🥇 {name}") == 1

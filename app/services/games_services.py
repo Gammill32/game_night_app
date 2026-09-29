@@ -281,31 +281,57 @@ def modify_ownership(person_id, game_id, add=True, *, actor_is_self=True):
 
 
 def get_game_details(game_id, user_id):
-    """Retrieve details of a game, including leaderboard, game nights, and user's rating."""
+    """A game with its top winners (by person), the nights it was played (with
+    who won), the viewer's rating and the group's average."""
     game = Game.query.get_or_404(game_id)
 
+    wins = func.count(Result.id)
     leaderboard = (
-        db.session.query(Player, func.count(Result.id).label("wins"))
-        .join(Result)
-        .join(GameNightGame)
-        .filter(GameNightGame.game_id == game_id, Result.position == 1)
-        .group_by(Player.id)
-        .order_by(func.count(Result.id).desc())
-        .limit(3)
+        db.session.query(Person, wins.label("wins"))
+        .join(Player, Player.people_id == Person.id)
+        .join(Result, Result.player_id == Player.id)
+        .join(GameNightGame, GameNightGame.id == Result.game_night_game_id)
+        .join(GameNight, GameNight.id == GameNightGame.game_night_id)
+        .filter(GameNightGame.game_id == game_id, Result.position == 1, GameNight.final.is_(True))
+        .group_by(Person.id)
+        .order_by(wins.desc(), Person.first_name)
+        .limit(5)
         .all()
     )
 
-    game_nights = (
-        GameNight.query.join(GameNightGame)
+    plays = (
+        GameNightGame.query.join(GameNight, GameNight.id == GameNightGame.game_night_id)
         .filter(GameNightGame.game_id == game_id)
-        .order_by(GameNight.date.desc())
+        .order_by(GameNight.date.desc(), GameNightGame.round)
         .all()
     )
+    history = [
+        {
+            "night": gng.game_night,
+            "round": gng.round,
+            "winners": [r.player.person.first_name for r in gng.results if r.position == 1],
+        }
+        for gng in plays
+    ]
 
-    user_rating_obj = GameRatings.query.filter_by(game_id=game_id, person_id=user_id).first()
-    user_rating = user_rating_obj.ranking if user_rating_obj else None
+    ratings = GameRatings.query.filter_by(game_id=game_id).all()
+    user_rating = next((r.ranking for r in ratings if r.person_id == user_id), None)
+    rated = [r.ranking for r in ratings if r.ranking is not None]
+    group_rating = {
+        "average": round(sum(rated) / len(rated), 1) if rated else None,
+        "count": len(rated),
+    }
 
-    return game, leaderboard, game_nights, user_rating
+    return {
+        "game": game,
+        "leaderboard": leaderboard,
+        "history": history,
+        "user_rating": user_rating,
+        "group_rating": group_rating,
+        "owns": any(o.person_id == user_id for o in game.owners),
+        "wishlisted": Wishlist.query.filter_by(game_id=game_id, person_id=user_id).first()
+        is not None,
+    }
 
 
 def get_wishlist(user_id):
@@ -406,6 +432,13 @@ def get_group_wishlist(user_id):
 
     user_wishlisted = {w.game_id for w in Wishlist.query.filter_by(person_id=user_id).all()}
     user_voted = {v.game_id for v in WishlistVote.query.filter_by(person_id=user_id).all()}
+    ids = [game.id for game, _, _ in rows]
+    wanters: dict[int, list] = {}
+    for model in (Wishlist, WishlistVote):
+        for entry in model.query.filter(model.game_id.in_(ids)).all():
+            names = wanters.setdefault(entry.game_id, [])
+            if entry.person not in names:
+                names.append(entry.person)
 
     return [
         {
@@ -413,6 +446,8 @@ def get_group_wishlist(user_id):
             "total_want": wl_count + vote_count,
             "user_wishlisted": game.id in user_wishlisted,
             "user_voted": game.id in user_voted,
+            "wanters": sorted(wanters.get(game.id, []), key=lambda p: p.first_name.lower()),
+            "owners": [o.person for o in game.owners],
         }
         for game, wl_count, vote_count in rows
     ]

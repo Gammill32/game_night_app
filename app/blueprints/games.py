@@ -55,14 +55,10 @@ def add_game():
 def view_game(game_id):
     from app.models import Person
 
-    game, leaderboard, game_nights, user_rating = games_services.get_game_details(
-        game_id, current_user.id
-    )
-    play_stats = games_services.get_play_stats()
-    game_stat = play_stats.get(game_id)
-
+    context = games_services.get_game_details(game_id, current_user.id)
+    game = context["game"]
     assignable_owners = []
-    if current_user.admin or current_user.owner:
+    if current_user.is_admin_or_owner:
         owned_ids = {ob.person_id for ob in game.owners}
         assignable_owners = [
             p
@@ -71,16 +67,11 @@ def view_game(game_id):
             .all()
             if p.id not in owned_ids
         ]
-
-    context = {
-        "game": game,
-        "leaderboard": leaderboard,
-        "game_nights": game_nights,
-        "user_rating": user_rating,
-        "game_stat": game_stat,
-        "today": date.today(),
-        "assignable_owners": assignable_owners,
-    }
+    context.update(
+        game_stat=games_services.get_play_stats().get(game_id),
+        today=date.today(),
+        assignable_owners=assignable_owners,
+    )
     return render_template("view_game.html", **context)
 
 

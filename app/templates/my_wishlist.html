@@ -1,36 +1,22 @@
 {% extends "base.html" %}
-{% from "_game_card.html" import game_card %}
+{% from "_wishlist_row.html" import wishlist_row with context %}
 {% block title %}My Wishlist{% endblock %}
-
 {% block content %}
-<div class="flex items-center justify-between mb-6">
-  <div>
-    <a href="{{ url_for('games.wishlist') }}" class="text-sm text-stone-500 hover:text-red-600 block mb-1">← Group Wishlist</a>
-    <h1 class="text-2xl font-bold text-stone-800">My Wishlist</h1>
-  </div>
-  <a href="{{ url_for('games.add_to_wishlist') }}"
-     class="inline-flex items-center rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 transition-colors">
-    Add a Game
-  </a>
-</div>
-
-<!-- My Wishlist Grid -->
-<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-  {% for game in games %}
-  {% call game_card(game) %}
-    <form action="{{ url_for('games.remove_from_wishlist', game_id=game.id) }}" method="POST">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
-      <button class="inline-flex items-center rounded-lg border border-stone-300 px-3 py-1.5 text-xs font-medium text-stone-700 hover:bg-stone-50 transition-colors"
-              type="submit">Remove</button>
-    </form>
-    <form action="{{ url_for('games.claim_game', game_id=game.id) }}" method="POST">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
-      <button class="inline-flex items-center rounded-lg bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700 transition-colors"
-              type="submit">I Own This</button>
-    </form>
-  {% endcall %}
-  {% else %}
-  <div class="col-span-full text-center py-12 text-stone-500 text-sm">Nothing on your wishlist yet.</div>
-  {% endfor %}
+<div class="max-w-5xl mx-auto">
+  {% with active = 'mine' %}{% include "_wishlist_header.html" %}{% endwith %}
+  <ul class="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+    {% for game in games %}
+    {% call wishlist_row(game, None, game.owners | map(attribute='person') | list) %}
+      <form action="{{ url_for('games.claim_game', game_id=game.id) }}" method="POST">
+        <button class="rounded-full bg-red-600 px-2.5 py-0.5 text-[11px] font-medium text-white hover:bg-red-700">I bought it</button>
+      </form>
+      <form action="{{ url_for('games.remove_from_wishlist', game_id=game.id) }}" method="POST" data-confirm="Take {{ game.name }} off your wishlist?">
+        <button class="rounded-full border border-stone-300 px-2.5 py-0.5 text-[11px] font-medium text-stone-700 hover:bg-stone-50">Remove</button>
+      </form>
+    {% endcall %}
+    {% else %}
+    <li class="col-span-full rounded-xl border border-dashed border-stone-300 p-8 text-center text-sm text-stone-500">Nothing on your wishlist yet. <a href="{{ url_for('games.add_to_wishlist') }}" class="text-red-600 underline">Add a game</a>, or tap <em>Me too</em> on <a href="{{ url_for('games.wishlist') }}" class="underline">everyone's list</a>.</li>
+    {% endfor %}
+  </ul>
 </div>
 {% endblock %}

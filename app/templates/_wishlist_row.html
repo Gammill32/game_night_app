@@ -1,0 +1,16 @@
+{# One game on a wishlist page. Expects: game; optional wanters, owners; then caller() for buttons. #}
+{% macro wishlist_row(game, wanters=None, owners=None) %}
+<li class="flex gap-3 rounded-xl border border-stone-200 bg-white p-3 shadow-sm">
+  <a href="{{ url_for('games.view_game', game_id=game.id) }}" class="shrink-0">
+    {% if game.image_url %}<img src="{{ game.image_url }}" alt="" loading="lazy" class="h-16 w-16 rounded-lg bg-stone-100 object-cover">
+    {% else %}<span class="flex h-16 w-16 items-center justify-center rounded-lg bg-stone-100 text-2xl">🎲</span>{% endif %}
+  </a>
+  <div class="min-w-0 flex-1">
+    <a href="{{ url_for('games.view_game', game_id=game.id) }}" class="block truncate font-semibold text-stone-800 hover:text-red-600">{{ game.name }}</a>
+    <p class="text-xs text-stone-500">{{ game.min_players or '?' }}–{{ game.max_players or '?' }} players{% if game.playtime %} · {{ game.playtime }} min{% endif %}</p>
+    {% if wanters %}<p class="text-xs text-stone-600"><strong>{{ wanters|length }}</strong> want{{ 's' if wanters|length == 1 }} it: {% for p in wanters %}{{ 'you' if p.id == current_user.id else p.first_name }}{% if not loop.last %}, {% endif %}{% endfor %}</p>{% endif %}
+    {% if owners %}<p class="text-xs text-green-700">{{ owners|map(attribute='first_name')|join(', ') }} {{ 'owns' if owners|length == 1 else 'own' }} it now</p>{% endif %}
+    <div class="mt-1.5 flex flex-wrap items-center gap-1.5">{{ caller() }}</div>
+  </div>
+</li>
+{% endmacro %}
