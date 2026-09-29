@@ -16,7 +16,25 @@ class GameNight(db.Model):
     created_at = db.Column(db.DateTime, server_default=func.now())
     final = db.Column(db.Boolean, default=False)
     closed = db.Column(db.Boolean, default=False)
+    # Food: none / provided (someone has it covered) / signup (who's bringing
+    # what) / split (someone buys, everyone chips in) / both (signup + split).
+    food_mode = db.Column(db.String, nullable=False, default="none", server_default="none")
+    food_provider_id = db.Column(db.Integer, db.ForeignKey("people.id", ondelete="SET NULL"))
+    food_note = db.Column(db.String)
 
+    food_provider = relationship("Person", foreign_keys=[food_provider_id])
+    food_items = relationship(
+        "FoodItem",
+        back_populates="game_night",
+        cascade="all, delete-orphan",
+        order_by="FoodItem.id",
+    )
+    food_expenses = relationship(
+        "FoodExpense",
+        back_populates="game_night",
+        cascade="all, delete-orphan",
+        order_by="FoodExpense.id",
+    )
     players = relationship("Player", back_populates="game_night", cascade="all, delete-orphan")
     game_night_games = relationship(
         "GameNightGame", back_populates="game_night", cascade="all, delete-orphan"
@@ -32,6 +50,14 @@ class GameNight(db.Model):
         order_by="GameNightPhoto.created_at",
     )
     polls = db.relationship("Poll", back_populates="game_night", order_by="Poll.created_at")
+
+    @property
+    def food_signup(self):
+        return self.food_mode in ("signup", "both")
+
+    @property
+    def food_split(self):
+        return self.food_mode in ("split", "both")
 
     @property
     def availability_poll(self):
@@ -571,3 +597,89 @@ class GameNightPhoto(db.Model):
 
     game_night = relationship("GameNight", back_populates="photos")
     uploader = relationship("Person")
+
+
+# ---------------------------------------------------------------------------
+# Food
+# ---------------------------------------------------------------------------
+
+FOOD_MODES = ("none", "provided", "signup", "split", "both")
+
+
+class FoodItem(db.Model):
+    """A sign-up list entry: something someone is bringing."""
+
+    __tablename__ = "food_items"
+
+    id = db.Column(db.Integer, primary_key=True)
+    game_night_id = db.Column(
+        db.Integer, db.ForeignKey("gamenights.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    name = db.Column(db.String, nullable=False)
+    claimed_by = db.Column(db.Integer, db.ForeignKey("people.id", ondelete="SET NULL"))
+    added_by = db.Column(db.Integer, db.ForeignKey("people.id", ondelete="SET NULL"))
+    created_at = db.Column(db.DateTime, server_default=func.now())
+
+    game_night = relationship("GameNight", back_populates="food_items")
+    claimer = relationship("Person", foreign_keys=[claimed_by])
+    adder = relationship("Person", foreign_keys=[added_by])
+
+
+class FoodExpense(db.Model):
+    """Food someone paid for, split evenly among the people it covers."""
+
+    __tablename__ = "food_expenses"
+    __table_args__ = (db.CheckConstraint("amount_cents > 0", name="ck_food_expenses_positive"),)
+
+    id = db.Column(db.Integer, primary_key=True)
+    game_night_id = db.Column(
+        db.Integer, db.ForeignKey("gamenights.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    description = db.Column(db.String, nullable=False)
+    amount_cents = db.Column(db.Integer, nullable=False)
+    paid_by = db.Column(
+        db.Integer, db.ForeignKey("people.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    receipt_path = db.Column(db.String)  # relative to MEDIA_DIR
+    created_by = db.Column(db.Integer, db.ForeignKey("people.id", ondelete="SET NULL"))
+    created_at = db.Column(db.DateTime, server_default=func.now())
+
+    game_night = relationship("GameNight", back_populates="food_expenses")
+    payer = relationship("Person", foreign_keys=[paid_by])
+    creator = relationship("Person", foreign_keys=[created_by])
+    shares = relationship(
+        "FoodExpenseShare",
+        back_populates="expense",
+        cascade="all, delete-orphan",
+        order_by="FoodExpenseShare.person_id",
+    )
+
+    @property
+    def covered_ids(self):
+        return {s.person_id for s in self.shares}
+
+
+class FoodExpenseShare(db.Model):
+    """One person's share of a food expense, and whether they've paid the buyer."""
+
+    __tablename__ = "food_expense_shares"
+    __table_args__ = (
+        db.UniqueConstraint("expense_id", "person_id", name="uq_food_expense_shares"),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    expense_id = db.Column(
+        db.Integer,
+        db.ForeignKey("food_expenses.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    person_id = db.Column(
+        db.Integer, db.ForeignKey("people.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    amount_cents = db.Column(db.Integer, nullable=False)
+    paid = db.Column(db.Boolean, nullable=False, default=False, server_default="false")
+    paid_at = db.Column(db.DateTime)
+
+    expense = relationship("FoodExpense", back_populates="shares")
+    person = relationship("Person")

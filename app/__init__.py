@@ -42,6 +42,7 @@ def register_blueprints(app):
     app.register_blueprint(blueprints.polls_bp)
     app.register_blueprint(blueprints.tracker_bp)
     app.register_blueprint(blueprints.photos_bp)
+    app.register_blueprint(blueprints.food_bp)
     # test_bp removed — was a debug artifact registered unconditionally
 
 
@@ -97,6 +98,10 @@ def create_app(config_class=None):
     start_schedulers(app)
 
     app.jinja_env.filters["strip_html"] = _strip_html
+
+    from app.services.food_services import money
+
+    app.jinja_env.filters["money"] = money
 
     @app.errorhandler(413)
     def upload_too_large(_error):

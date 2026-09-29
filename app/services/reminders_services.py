@@ -8,6 +8,7 @@ from sqlalchemy import func
 
 from app.extensions import scheduler
 from app.models import Game, GameNight, GameNominations, GameVotes, Person, Player, db
+from app.services import food_services
 from app.utils import send_email
 
 
@@ -88,6 +89,8 @@ def check_and_send_reminders():
                 has_nominated=has_nominated,
                 has_voted=has_voted,
                 leader=leader_data,
+                food_lines=food_services.reminder_lines(game_night),
+                owed=food_services.my_food_summary(game_night, user),
             )
 
             try:

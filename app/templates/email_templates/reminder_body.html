@@ -36,6 +36,16 @@
   </p>
   {% endif %}
 
+  {% if food_lines %}
+  <p style="margin-top: 20px; margin-bottom: 4px; font-weight: bold;">Food</p>
+  <ul style="margin-top: 0;">
+    {% for line in food_lines %}<li>{{ line }}</li>{% endfor %}
+  </ul>
+  {% endif %}
+  {% for share, expense in owed %}
+  <p>You owe {{ expense.payer.first_name }} {{ share.amount_cents|money }} for {{ expense.description }}.</p>
+  {% endfor %}
+
   <p style="margin-top: 20px;">
     See you at the Game Night!
   </p>

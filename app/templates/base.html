@@ -190,6 +190,16 @@
         }
       });
     });
+    // Copy buttons: <button data-copy="text">
+    document.addEventListener('click', function (e) {
+      const btn = e.target.closest('[data-copy]');
+      if (!btn || !navigator.clipboard) return;
+      navigator.clipboard.writeText(btn.dataset.copy).then(function () {
+        const label = btn.textContent;
+        btn.textContent = 'Copied';
+        setTimeout(function () { btn.textContent = label; }, 1500);
+      });
+    });
     // Inject CSRF header into every HTMX request
     document.addEventListener('htmx:configRequest', function (evt) {
       evt.detail.headers['X-CSRFToken'] = csrfToken;

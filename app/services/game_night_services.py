@@ -23,7 +23,7 @@ from app.models import (
     Wishlist,
     db,
 )
-from app.services import poll_services
+from app.services import food_services, poll_services
 from app.services.admin_services import get_all_people
 
 logger = logging.getLogger(__name__)
@@ -52,20 +52,21 @@ def manage_attendees(game_night, attendees_ids):
     ).delete()
 
 
-def start_game_night(date_str, notes, attendees_ids):
-    """Create a new game night and add attendees."""
+def start_game_night(date_str, notes, attendees_ids, food=("none", None, None)):
+    """Create a new game night and add attendees. Returns (success, message, game_night)."""
     date = parse_date(date_str)
     if not date:
-        return False, "Invalid date format. Please use YYYY-MM-DD."
+        return False, "Invalid date format. Please use YYYY-MM-DD.", None
 
     game_night = GameNight(date=date, notes=notes)
+    food_services.apply_food_settings(game_night, *food)
     db.session.add(game_night)
     db.session.flush()  # get game_night.id without committing
 
     manage_attendees(game_night, attendees_ids)
     db.session.commit()
 
-    return True, "Game night started successfully."
+    return True, "Game night started successfully.", game_night
 
 
 def get_game_night_details(game_night_id):
@@ -76,7 +77,7 @@ def get_game_night_details(game_night_id):
     return game_night, people, current_attendees
 
 
-def edit_game_night(game_night_id, date_str, notes, attendees_ids):
+def edit_game_night(game_night_id, date_str, notes, attendees_ids, food=None):
     """Edit an existing game night."""
     game_night = GameNight.query.get_or_404(game_night_id)
 
@@ -86,6 +87,8 @@ def edit_game_night(game_night_id, date_str, notes, attendees_ids):
 
     game_night.date = date
     game_night.notes = notes
+    if food is not None:
+        food_services.apply_food_settings(game_night, *food)
     manage_attendees(game_night, attendees_ids)
 
     db.session.commit()
@@ -102,7 +105,7 @@ def delete_game_night(game_night_id):
 
     from app.services import media_services, photo_services
 
-    files = photo_services.files_for_night(game_night)
+    files = photo_services.files_for_night(game_night) + food_services.files_for_night(game_night)
     db.session.delete(game_night)
     db.session.commit()
     media_services.delete(*files)

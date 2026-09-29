@@ -4,8 +4,14 @@ from flask import Blueprint, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 
 from app.models import GameNightGame, TrackerSession
-from app.services import admin_services, game_night_services, photo_services, poll_services
-from app.utils import admin_required, flash_if_no_action, game_night_access_required
+from app.services import (
+    admin_services,
+    food_services,
+    game_night_services,
+    photo_services,
+    poll_services,
+)
+from app.utils import admin_required, game_night_access_required
 
 game_night_bp = Blueprint("game_night", __name__)
 
@@ -13,22 +19,28 @@ game_night_bp = Blueprint("game_night", __name__)
 @game_night_bp.route("/game_night/start", methods=["GET", "POST"])
 @login_required
 @admin_required
-@flash_if_no_action("Please provide the required data to start a game night.", "error")
 def start_game_night():
+    form = request.form
     if request.method == "POST":
-        date_str = request.form.get("date")
-        notes = request.form.get("notes")
-        attendees_ids = request.form.getlist("attendees")
+        try:
+            food = food_services.parse_food_settings(form, current_user.id)
+        except food_services.FoodError as e:
+            flash(str(e), "error")
+        else:
+            success, message, game_night = game_night_services.start_game_night(
+                form.get("date"), form.get("notes"), form.getlist("attendees"), food
+            )
+            flash(message, "success" if success else "error")
+            if success:
+                return redirect(url_for("game_night.view_game_night", game_night_id=game_night.id))
 
-        success, message = game_night_services.start_game_night(date_str, notes, attendees_ids)
-        flash(message, "success" if success else "error")
-
-        if success:
-            return redirect(url_for("main.index"))
-
-    people = admin_services.get_all_people()
-
-    context = {"people": people}
+    context = {
+        "people": admin_services.get_all_people(),
+        "food_mode_labels": food_services.FOOD_MODE_LABELS,
+        "food_mode": form.get("food_mode", "none"),
+        "food_provider_id": None,
+        "food_note": form.get("food_note"),
+    }
     return render_template("start_game_night.html", **context)
 
 
@@ -58,7 +70,13 @@ def view_game_night(game_night_id):
         for poll in context["game_night"].polls
         if poll_services.can_view(poll, current_user)
     ]
-    context["can_upload_photos"] = photo_services.can_upload(context["game_night"], current_user)
+    game_night = context["game_night"]
+    context["can_upload_photos"] = photo_services.can_upload(game_night, current_user)
+    if game_night.food_mode != "none":
+        context["food_rows"] = food_services.expense_rows(game_night, current_user)
+        context["food_coverable"] = food_services.coverable(game_night)
+        context["food_default_covered"] = food_services.default_covered(game_night)
+        context["food_is_player"] = food_services.is_player(game_night, current_user)
     context["can_delete_photo"] = photo_services.can_delete
     return render_template("view_game_night.html", **context)
 
@@ -72,19 +90,28 @@ def edit_game_night(game_night_id):
     )
 
     if request.method == "POST":
-        date_str = request.form.get("date")
-        notes = request.form.get("notes")
-        attendees_ids = request.form.getlist("attendees")
+        form = request.form
+        try:
+            food = food_services.parse_food_settings(form, current_user.id)
+        except food_services.FoodError as e:
+            flash(str(e), "error")
+        else:
+            success, message = game_night_services.edit_game_night(
+                game_night_id, form.get("date"), form.get("notes"), form.getlist("attendees"), food
+            )
+            flash(message, "success" if success else "error")
+            if success:
+                return redirect(url_for("game_night.view_game_night", game_night_id=game_night_id))
 
-        success, message = game_night_services.edit_game_night(
-            game_night_id, date_str, notes, attendees_ids
-        )
-        flash(message, "success" if success else "error")
-
-        if success:
-            return redirect(url_for("game_night.view_game_night", game_night_id=game_night_id))
-
-    context = {"game_night": game_night, "people": people, "current_attendees": current_attendees}
+    context = {
+        "game_night": game_night,
+        "people": people,
+        "current_attendees": current_attendees,
+        "food_mode_labels": food_services.FOOD_MODE_LABELS,
+        "food_mode": game_night.food_mode,
+        "food_provider_id": game_night.food_provider_id,
+        "food_note": game_night.food_note,
+    }
     return render_template("edit_game_night.html", **context)
 
 
