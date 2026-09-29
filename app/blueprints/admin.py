@@ -12,9 +12,10 @@ admin_bp = Blueprint("admin", __name__)
 @admin_required
 def admin_page():
     """Displays the admin panel with a list of users."""
-    people = admin_services.get_all_people()
-
-    context = {"people": people}
+    context = {
+        "people": admin_services.get_all_people(),
+        "inactive_people": admin_services.get_inactive_people(),
+    }
     return render_template("admin_page.html", **context)
 
 
@@ -34,6 +35,15 @@ def toggle_admin_status(user_id):
 def remove_user(user_id):
     """Removes a user from the system (only by an admin)."""
     success, message = admin_services.remove_user(user_id, current_user.id)
+    flash(message, "success" if success else "error")
+    return redirect(url_for("admin.admin_page"))
+
+
+@admin_bp.route("/restore_user/<int:user_id>", methods=["POST"])
+@login_required
+@admin_required
+def restore_user(user_id):
+    success, message = admin_services.restore_user(user_id)
     flash(message, "success" if success else "error")
     return redirect(url_for("admin.admin_page"))
 

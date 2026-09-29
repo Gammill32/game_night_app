@@ -72,8 +72,11 @@ def start_game_night(date_str, notes, attendees_ids, food=("none", None, None)):
 def get_game_night_details(game_night_id):
     """Retrieve game night details and attendees."""
     game_night = GameNight.query.get_or_404(game_night_id)
-    people = get_all_people()
     current_attendees = {p.people_id for p in game_night.players}
+    people = get_all_people()
+    listed = {p.id for p in people}
+    # Keep deactivated attendees visible so saving doesn't silently drop them.
+    people += [p.person for p in game_night.players if p.people_id not in listed]
     return game_night, people, current_attendees
 
 

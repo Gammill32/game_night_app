@@ -58,7 +58,8 @@ def register_user_loader(app):
 
     @login_manager.user_loader
     def load_user(user_id):
-        return db.session.get(Person, int(user_id))
+        person = db.session.get(Person, int(user_id))
+        return person if person is not None and person.active else None
 
 
 def start_schedulers(app):

@@ -88,7 +88,7 @@ def poll_results(poll_id: int):
 def poll_create():
     from app.models import Person
 
-    people = Person.query.order_by(Person.first_name).all()
+    people = Person.query.filter_by(active=True).order_by(Person.first_name).all()
     nights = _linkable_nights()
 
     if request.method == "POST":
@@ -135,7 +135,7 @@ def poll_edit(poll_id: int):
     from app.models import Person, Poll
 
     poll = Poll.query.get_or_404(poll_id)
-    people = Person.query.order_by(Person.first_name).all()
+    people = Person.query.filter_by(active=True).order_by(Person.first_name).all()
     nights = _linkable_nights()
     if poll.game_night and poll.game_night not in nights:
         nights.insert(0, poll.game_night)

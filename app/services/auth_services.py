@@ -34,7 +34,8 @@ def signup(first_name, last_name, email, password):
 
     # Try to find a matching person by name
     user = (
-        Person.query.filter(func.lower(Person.first_name) == first_name)
+        Person.query.filter_by(active=True)
+        .filter(func.lower(Person.first_name) == first_name)
         .filter(func.lower(Person.last_name) == last_name)
         .first()
     )

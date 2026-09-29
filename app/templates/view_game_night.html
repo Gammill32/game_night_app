@@ -72,7 +72,7 @@
             <form method="POST" action="{{ url_for('food.claim_item', game_night_id=game_night.id, item_id=item.id) }}"><input type="hidden" name="claim" value="0"><button class="text-xs underline text-stone-600">Not me after all</button></form>
             {% endif %}
             {% if is_admin or item.added_by == current_user.id %}
-            <form method="POST" action="{{ url_for('food.delete_item', game_night_id=game_night.id, item_id=item.id) }}" onsubmit="return confirm('Remove {{ item.name }} from the list?')"><button class="text-xs text-red-600 underline">Remove</button></form>
+            <form method="POST" action="{{ url_for('food.delete_item', game_night_id=game_night.id, item_id=item.id) }}" data-confirm="Remove {{ item.name }} from the list?"><button class="text-xs text-red-600 underline">Remove</button></form>
             {% endif %}
           </span>
           {% endif %}
@@ -107,7 +107,7 @@
             <span class="text-sm"><strong>{{ expense.description }}</strong> · {{ expense.amount_cents|money }} paid by {{ 'you' if expense.paid_by == current_user.id else expense.payer.first_name }}
               {% if expense.receipt_path %} · <a class="underline text-stone-600" href="{{ url_for('food.receipt', game_night_id=game_night.id, expense_id=expense.id) }}" target="_blank" rel="noopener">receipt</a>{% endif %}</span>
             {% if food_open and (is_admin or expense.created_by == current_user.id) %}
-            <form method="POST" action="{{ url_for('food.delete_expense', game_night_id=game_night.id, expense_id=expense.id) }}" onsubmit="return confirm('Remove {{ expense.description }}?')"><button class="text-xs text-red-600 underline">Remove</button></form>
+            <form method="POST" action="{{ url_for('food.delete_expense', game_night_id=game_night.id, expense_id=expense.id) }}" data-confirm="Remove {{ expense.description }}?"><button class="text-xs text-red-600 underline">Remove</button></form>
             {% endif %}
           </div>
           <p class="text-xs text-stone-500 mt-0.5">Split {{ expense.shares|length }} ways{% if row.outstanding %} · {{ row.outstanding|money }} still owed{% else %} · all paid up{% endif %}</p>
@@ -398,7 +398,7 @@
         </button>
         {% if ph.caption %}<p class="mt-0.5 truncate text-xs text-stone-600">{{ ph.caption }}</p>{% endif %}
         {% if can_delete_photo(ph, current_user) %}
-        <form method="POST" action="{{ url_for('photos.delete', game_night_id=game_night.id, photo_id=ph.id) }}" onsubmit="return confirm('Delete this photo?')" class="absolute right-1 top-1">
+        <form method="POST" action="{{ url_for('photos.delete', game_night_id=game_night.id, photo_id=ph.id) }}" data-confirm="Delete this photo?" class="absolute right-1 top-1">
           <button class="rounded-full bg-black/60 px-1.5 text-xs text-white" aria-label="Delete photo">✕</button>
         </form>
         {% endif %}

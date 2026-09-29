@@ -86,7 +86,9 @@ def view_game(game_id):
         owned_ids = {ob.person_id for ob in game.owners}
         assignable_owners = [
             p
-            for p in Person.query.order_by(Person.first_name, Person.last_name).all()
+            for p in Person.query.filter_by(active=True)
+            .order_by(Person.first_name, Person.last_name)
+            .all()
             if p.id not in owned_ids
         ]
 

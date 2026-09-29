@@ -271,3 +271,58 @@ def test_profile_rejects_taken_email(client, make_person):
     login(client, ann)
     client.post("/manage_user", data={"current_password": "password", "email": bo.email})
     assert ann.email != bo.email
+
+
+def test_remove_user_with_history_deactivates(admin_client, make_person, make_night):
+    from app.extensions import db as _db
+    from app.models import Person
+    from app.services.poll_services import create_poll, submit_response
+
+    ann, bo, cy = make_person("Ann"), make_person("Bo"), make_person("Cy")
+    make_night(ann)
+    poll = create_poll("P", None, ["A", "B"], cy.id, False)
+    submit_response(poll, [poll.options[0].id], bo.id)
+    loner = make_person("Loner")
+    loner_id = loner.id
+
+    for person in (ann, bo, cy):
+        admin_client.post(f"/remove_user/{person.id}")
+        _db.session.refresh(person)
+        assert person.active is False and person.email is None and person.password is None
+    admin_client.post(f"/remove_user/{loner_id}")
+    assert _db.session.get(Person, loner_id) is None  # no history: deleted
+
+    page = admin_client.get("/admin").get_data(as_text=True)
+    assert "Deactivated (" in page
+    admin_client.post(f"/restore_user/{ann.id}")
+    assert ann.active is True
+
+    _db.session.delete(poll)
+    _db.session.commit()
+
+
+def test_deactivated_user_is_logged_out_and_cannot_reclaim(client, make_person, make_night):
+    from app.services import admin_services
+    from tests.conftest import login
+
+    ann, adm = make_person("Ann"), make_person("Adm", admin=True)
+    make_night(ann)
+    login(client, ann)
+    assert admin_services.remove_user(ann.id, adm.id)[0]
+    from flask import g
+
+    g.pop("_login_user", None)  # the suite shares one app context; see conftest
+    assert client.get("/").status_code == 302  # session no longer loads a user
+    client.post(
+        "/signup",
+        data={"first_name": "Ann", "last_name": "Test", "email": "x@test.invalid", "password": "p"},
+    )
+    assert ann.email is None
+
+
+def test_add_person_rejects_duplicate_name(admin_client, make_person):
+    from app.models import Person
+
+    make_person("Dupe", "Name")
+    admin_client.post("/add_person", data={"first_name": "dupe", "last_name": "NAME"})
+    assert Person.query.filter_by(first_name="dupe").count() == 0

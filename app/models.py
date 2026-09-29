@@ -77,6 +77,9 @@ class Person(db.Model, UserMixin):
     temp_pass_expires_at = db.Column(db.DateTime, nullable=True)
     admin = db.Column(db.Boolean, default=False, nullable=False)
     owner = db.Column(db.Boolean, default=False, nullable=False)
+    # Removed people who have history are deactivated instead of deleted, so
+    # past results keep their names. They can't log in or be picked.
+    active = db.Column(db.Boolean, default=True, nullable=False, server_default="true")
 
     players = relationship("Player", back_populates="person", cascade="all, delete-orphan")
     owned_games = relationship("OwnedBy", back_populates="person", cascade="all, delete-orphan")

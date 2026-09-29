@@ -117,7 +117,7 @@
         {% if not h.preferred %}
         <form method="POST" action="{{ url_for('auth.edit_payment', handle_id=h.id) }}"><input type="hidden" name="action" value="prefer"><button class="text-xs underline text-stone-600">Make preferred</button></form>
         {% endif %}
-        <form method="POST" action="{{ url_for('auth.edit_payment', handle_id=h.id) }}" onsubmit="return confirm('Remove {{ payment_labels[h.kind] }} {{ payment_display(h) }}?')"><input type="hidden" name="action" value="delete"><button class="text-xs text-red-600 underline">Remove</button></form>
+        <form method="POST" action="{{ url_for('auth.edit_payment', handle_id=h.id) }}" data-confirm="Remove {{ payment_labels[h.kind] }} {{ payment_display(h) }}?"><input type="hidden" name="action" value="delete"><button class="text-xs text-red-600 underline">Remove</button></form>
       </span>
     </li>
     {% endfor %}

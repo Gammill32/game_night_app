@@ -190,6 +190,11 @@
         }
       });
     });
+    // Confirm before submitting: <form data-confirm="Delete this?">
+    document.addEventListener('submit', function (e) {
+      const msg = e.target.dataset && e.target.dataset.confirm;
+      if (msg && !window.confirm(msg)) e.preventDefault();
+    });
     // Copy buttons: <button data-copy="text">
     document.addEventListener('click', function (e) {
       const btn = e.target.closest('[data-copy]');
