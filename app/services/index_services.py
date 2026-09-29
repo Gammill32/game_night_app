@@ -109,3 +109,42 @@ def get_recent_nights(user, today, limit=5):
         .limit(limit)
         .all()
     )
+
+
+def get_all_night_cards(user):
+    """Every night the user can see, newest first, with counts and the winner."""
+    from sqlalchemy import func
+
+    from app.models import GameNightGame, GameNightRankings, Person
+
+    nights = _visible_nights(user).order_by(GameNight.date.desc()).all()
+    ids = [n.id for n in nights]
+    players = dict(
+        db.session.query(Player.game_night_id, func.count(Player.id))
+        .filter(Player.game_night_id.in_(ids))
+        .group_by(Player.game_night_id)
+        .all()
+    )
+    games = dict(
+        db.session.query(GameNightGame.game_night_id, func.count(GameNightGame.id))
+        .filter(GameNightGame.game_night_id.in_(ids))
+        .group_by(GameNightGame.game_night_id)
+        .all()
+    )
+    winners: dict[int, list[str]] = {}
+    for night_id, first_name in (
+        db.session.query(GameNightRankings.game_night_id, Person.first_name)
+        .join(Player, Player.id == GameNightRankings.player_id)
+        .join(Person, Person.id == Player.people_id)
+        .filter(GameNightRankings.game_night_id.in_(ids), GameNightRankings.rank == 1)
+    ):
+        winners.setdefault(night_id, []).append(first_name)
+    return [
+        {
+            "night": n,
+            "players": players.get(n.id, 0),
+            "games": games.get(n.id, 0),
+            "winners": winners.get(n.id, []) if n.final else [],
+        }
+        for n in nights
+    ]

@@ -1,0 +1,103 @@
+{# Searchable, tappable game list shared by the nominate and add-a-game pages.
+   Usage: {% from "_game_picker.html" import game_picker %}
+          {% call game_picker(sections, player_count, selected_id) %}…footer buttons…{% endcall %}
+   sections: [(heading or None, items)] from game_picker_services.picker_items.
+   The chosen game is submitted as game_id; wrap the call in a <form>. #}
+{% macro game_picker(sections, player_count, selected_id=None) %}
+<div data-picker>
+  <div class="sticky top-14 md:top-0 z-10 -mx-4 bg-stone-50/95 px-4 py-3 backdrop-blur">
+    <input type="search" data-picker-search placeholder="Search games…" aria-label="Search games" autocomplete="off"
+           class="w-full rounded-lg border border-stone-300 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-500">
+    <div class="mt-2 flex flex-wrap gap-2 text-sm">
+      {% if player_count %}
+      <label class="cursor-pointer"><input type="checkbox" data-picker-fits="{{ player_count }}" class="peer sr-only" checked>
+        <span class="inline-flex min-h-[2.25rem] items-center rounded-full border border-stone-300 bg-white px-3 text-stone-700 peer-checked:border-red-600 peer-checked:bg-red-600 peer-checked:text-white peer-focus-visible:ring-2 peer-focus-visible:ring-red-400">Fits {{ player_count }} players</span></label>
+      {% endif %}
+      {% for mins in [45, 90] %}
+      <label class="cursor-pointer"><input type="radio" name="picker_time" data-picker-time="{{ mins }}" class="peer sr-only">
+        <span class="inline-flex min-h-[2.25rem] items-center rounded-full border border-stone-300 bg-white px-3 text-stone-700 peer-checked:border-red-600 peer-checked:bg-red-600 peer-checked:text-white peer-focus-visible:ring-2 peer-focus-visible:ring-red-400">≤ {{ mins }} min</span></label>
+      {% endfor %}
+      <label class="cursor-pointer"><input type="radio" name="picker_time" data-picker-time="" class="peer sr-only" checked>
+        <span class="inline-flex min-h-[2.25rem] items-center rounded-full border border-stone-300 bg-white px-3 text-stone-700 peer-checked:border-red-600 peer-checked:bg-red-600 peer-checked:text-white peer-focus-visible:ring-2 peer-focus-visible:ring-red-400">Any length</span></label>
+    </div>
+  </div>
+
+  {% for heading, items in sections %}
+  {% if items %}
+  <section data-picker-section class="mt-4">
+    {% if heading %}<h2 class="mb-2 text-sm font-semibold uppercase tracking-wide text-stone-500">{{ heading }}</h2>{% endif %}
+    <ul class="grid gap-2 sm:grid-cols-2">
+      {% for item in items %}
+      {% set g = item.game %}
+      <li data-picker-item data-name="{{ g.name|lower }}" data-min="{{ g.min_players or 0 }}" data-max="{{ g.max_players or 99 }}" data-time="{{ g.playtime or 0 }}">
+        <label class="flex h-full cursor-pointer items-center gap-3 rounded-xl border border-stone-200 bg-white p-3 shadow-sm transition-colors hover:border-red-300 has-[:checked]:border-red-500 has-[:checked]:bg-red-50 has-[:checked]:ring-2 has-[:checked]:ring-red-300">
+          <input type="radio" name="game_id" value="{{ g.id }}" data-label="{{ g.name }}" {% if g.id == selected_id %}checked{% endif %} class="sr-only peer">
+          {% if g.image_url %}<img src="{{ g.image_url }}" alt="" loading="lazy" class="h-16 w-16 shrink-0 rounded-lg bg-stone-100 object-cover">
+          {% else %}<span class="flex h-16 w-16 shrink-0 items-center justify-center rounded-lg bg-stone-100 text-2xl">🎲</span>{% endif %}
+          <span class="min-w-0 flex-1">
+            <span class="block font-semibold text-stone-800">{{ g.name }}</span>
+            <span class="block text-xs text-stone-500">{{ g.min_players or '?' }}–{{ g.max_players or '?' }} players{% if g.playtime %} · {{ g.playtime }} min{% endif %}{% if item.avg_rating is not none %} · ★ {{ item.avg_rating }}{% endif %}</span>
+            <span class="block text-xs text-stone-400 truncate">Owned by {{ item.owners|join(', ') }}</span>
+            {% if item.nominated_by or item.in_wishlist %}
+            <span class="mt-1 flex flex-wrap gap-1">
+              {% if item.nominated_by %}<span class="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-800">Nominated by {{ item.nominated_by }}{% if item.vote_score %} · {{ item.vote_score }} pts{% endif %}</span>{% endif %}
+              {% if item.in_wishlist %}<span class="rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-blue-700">♥ Your wishlist</span>{% endif %}
+            </span>
+            {% endif %}
+          </span>
+          <svg class="h-6 w-6 shrink-0 text-red-600 opacity-0 peer-checked:opacity-100" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+        </label>
+      </li>
+      {% endfor %}
+    </ul>
+  </section>
+  {% endif %}
+  {% endfor %}
+  <p data-picker-empty class="hidden py-10 text-center text-sm text-stone-500">No games match. <button type="button" data-picker-reset class="underline">Clear filters</button></p>
+
+  <div class="h-24"></div>
+  <div class="fixed bottom-16 md:bottom-0 left-0 right-0 md:left-16 z-20 border-t border-stone-200 bg-white shadow-lg">
+    <div class="mx-auto flex max-w-3xl flex-wrap items-center gap-3 px-4 py-3">
+      <p class="min-w-0 flex-1 truncate text-sm"><span data-picker-chosen class="text-stone-500">Tap a game to choose it</span></p>
+      {{ caller() }}
+    </div>
+  </div>
+</div>
+<script>
+  (function () {
+    const root = document.currentScript.previousElementSibling;
+    const items = [...root.querySelectorAll('[data-picker-item]')];
+    const search = root.querySelector('[data-picker-search]');
+    const fits = root.querySelector('[data-picker-fits]');
+    const chosen = root.querySelector('[data-picker-chosen]');
+    const submit = root.closest('form').querySelector('[data-picker-submit]');
+    function filter() {
+      const q = search.value.trim().toLowerCase();
+      const n = fits && fits.checked ? +fits.dataset.pickerFits : 0;
+      const t = +(root.querySelector('[data-picker-time]:checked').dataset.pickerTime || 0);
+      let shown = 0;
+      items.forEach(li => {
+        const d = li.dataset, picked = li.querySelector('input').checked;
+        const ok = picked || ((!q || d.name.includes(q)) && (!n || (+d.min <= n && n <= +d.max)) && (!t || (+d.time && +d.time <= t)));
+        li.hidden = !ok; if (ok) shown++;
+      });
+      root.querySelectorAll('[data-picker-section]').forEach(s => { s.hidden = !s.querySelector('[data-picker-item]:not([hidden])'); });
+      root.querySelector('[data-picker-empty]').classList.toggle('hidden', shown > 0);
+    }
+    function sync() {
+      const input = root.querySelector('input[name="game_id"]:checked');
+      chosen.textContent = input ? input.dataset.label : 'Tap a game to choose it';
+      chosen.className = input ? 'font-semibold text-stone-800' : 'text-stone-500';
+      if (submit) submit.disabled = !input;
+    }
+    search.addEventListener('input', filter);
+    root.querySelectorAll('[data-picker-fits], [data-picker-time]').forEach(el => el.addEventListener('change', filter));
+    root.querySelector('[data-picker-reset]').addEventListener('click', () => {
+      search.value = ''; if (fits) fits.checked = false;
+      root.querySelector('[data-picker-time=""]').checked = true; filter();
+    });
+    root.addEventListener('change', e => { if (e.target.name === 'game_id') sync(); });
+    filter(); sync();
+  })();
+</script>
+{% endmacro %}

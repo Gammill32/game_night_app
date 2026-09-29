@@ -1,16 +1,467 @@
 {% extends "base.html" %}
 
-{% block title %}Game Night Details{% endblock %}
+{% block title %}Game Night · {{ game_night.date.strftime('%b %-d') }}{% endblock %}
 
 {% block content %}
+{% set is_admin = current_user.admin or current_user.owner %}
 <div class="max-w-3xl mx-auto space-y-6">
 
   <!-- Header -->
   <div>
-    <h1 class="text-2xl font-bold text-stone-800 mb-1">Game Night on {{ game_night.date.strftime('%B %d, %Y') }}</h1>
-    <p class="text-sm text-stone-500">{{ game_night.notes or 'No notes available.' }}</p>
+    <div class="flex flex-wrap items-center gap-2">
+      <h1 class="text-2xl font-bold text-stone-800">{{ game_night.date.strftime('%A, %B %-d, %Y') }}</h1>
+      {% if game_night.final %}<span class="rounded-full bg-stone-200 px-2.5 py-0.5 text-xs font-medium text-stone-700">Finalized</span>
+      {% elif game_night.closed %}<span class="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-800">Voting closed</span>
+      {% else %}<span class="rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">Voting open</span>{% endif %}
+    </div>
+    {% if game_night.notes %}<p class="mt-1 text-sm text-stone-600 whitespace-pre-line">{{ game_night.notes }}</p>{% endif %}
+    <div class="mt-3 flex flex-wrap gap-2">
+      {% if game_night.final %}
+      <a href="{{ url_for('game_night.recap_game_night', game_night_id=game_night.id) }}" class="rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm font-medium text-stone-700 hover:bg-stone-50">Share recap</a>
+      {% endif %}
+      {% if is_admin %}
+      <a href="{{ url_for('game_night.edit_game_night', game_night_id=game_night.id) }}" class="rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm font-medium text-stone-700 hover:bg-stone-50">Edit</a>
+      {% if not game_night.final %}
+      <form action="{{ url_for('game_night.toggle_game_night_field', game_night_id=game_night.id, field='closed') }}" method="POST">
+        <button class="rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm font-medium text-stone-700 hover:bg-stone-50">{{ 'Reopen voting' if game_night.closed else 'Close voting' }}</button>
+      </form>
+      {% endif %}
+      <form action="{{ url_for('game_night.toggle_game_night_field', game_night_id=game_night.id, field='final') }}" method="POST"
+            data-confirm="{{ 'Reopen results? Badges from this night are removed until you finalize again.' if game_night.final else 'Finalize results? This awards badges and closes the night’s polls.' }}">
+        <button class="rounded-lg px-3 py-1.5 text-sm font-medium {{ 'border border-stone-300 bg-white text-stone-700 hover:bg-stone-50' if game_night.final else 'bg-red-600 text-white hover:bg-red-700' }}">{{ 'Reopen results' if game_night.final else 'Finalize results' }}</button>
+      </form>
+      {% endif %}
+    </div>
   </div>
 
+{% if game_night.final %}
+  <!-- Top places -->
+  {% if game_night.final and top_places %}
+  <div class="grid grid-cols-3 gap-3">
+    {% for place, player_ids in top_places %}
+    <div class="rounded-xl border p-4 text-center shadow-sm {{ 'border-amber-300 bg-amber-50' if place == 1 else 'border-stone-200 bg-white' }}">
+      <div class="text-2xl" aria-hidden="true">{{ ['🥇', '🥈', '🥉'][place - 1] if place <= 3 else '' }}</div>
+      <p class="text-xs font-semibold uppercase tracking-wide text-stone-500">{{ place }}{{ 'st' if place == 1 else 'nd' if place == 2 else 'rd' if place == 3 else 'th' }}</p>
+      {% for player_id in player_ids %}
+      {% set player = players | selectattr("id", "equalto", player_id) | first %}
+      <p class="text-sm font-semibold text-stone-800">{{ player.person.first_name ~ ' ' ~ player.person.last_name if player and player.person else 'Unknown' }}</p>
+      {% endfor %}
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <!-- Games Played -->
+  {% set can_add_game = not game_night.final and (current_user.admin or current_user.owner) %}
+  {% if game_night_games or can_add_game %}
+  <div id="played" class="bg-white rounded-xl border border-stone-200 shadow-sm p-5">
+    <div class="flex items-center justify-between gap-2 mb-4">
+      <h2 class="text-lg font-semibold text-stone-800">Games played</h2>
+      {% if can_add_game %}
+      <a href="{{ url_for('game_night.add_game_to_night', game_night_id=game_night.id) }}"
+         class="inline-flex items-center rounded-lg bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700">+ Add a game</a>
+      {% endif %}
+    </div>
+    {% if not game_night_games %}<p class="text-sm text-stone-500">No games added yet. Add one when you sit down to play.</p>{% endif %}
+    <ul class="space-y-6">
+      {% for gng in game_night_games %}
+      <li class="border-b border-stone-100 last:border-0 pb-6 last:pb-0">
+        <div class="flex gap-4">
+          <a href="{{ url_for('games.view_game', game_id=gng.game_id) }}" class="flex-shrink-0">
+            <img src="{{ gng.game_image_url }}" alt="{{ gng.game_name }}" class="h-16 w-16 rounded-lg object-cover border border-stone-200">
+          </a>
+          <div class="flex-1 min-w-0">
+            <div class="flex items-start justify-between gap-2 mb-1">
+              <strong class="text-sm font-semibold text-stone-800">{{ gng.game_name }}</strong>
+              <span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-stone-100 text-stone-600 whitespace-nowrap">Round {{ gng.round }}</span>
+            </div>
+            <p class="text-xs text-stone-500 mb-3 flex flex-wrap items-center gap-x-3 gap-y-1">
+              <span>Your rating: {{ user_ratings_by_game_id.get(gng.game_id, 'not rated') }}</span>
+              {% if gng.game_id not in owned_game_ids %}
+              <form action="{{ url_for('games.toggle_wishlist', game_id=gng.game_id) }}" method="POST" class="inline">
+                <button type="submit" class="underline hover:text-red-600">{% if gng.game_id in wishlist_game_ids %}♥ On your wishlist{% else %}♡ Add to wishlist{% endif %}</button>
+              </form>
+              {% endif %}
+            </p>
+
+            {% if not game_night.final and (current_user.admin or current_user.owner) %}
+            <div class="flex flex-wrap gap-2 mb-3">
+              <form action="{{ url_for('game_night.log_results', game_night_id=game_night.id, game_night_game_id=gng.game_night_game_id) }}" method="GET">
+                <button type="submit"
+                        class="inline-flex items-center rounded-lg bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700 transition-colors">
+                  Log results
+                </button>
+              </form>
+
+              {% set tracker_session = tracker_sessions.get(gng.game_night_game_id) %}
+              {% if tracker_session and tracker_session.status == 'active' %}
+              <a href="{{ url_for('tracker.live_tracker', session_id=tracker_session.id) }}"
+                 class="inline-flex items-center rounded-lg border border-blue-300 px-3 py-1.5 text-xs font-medium text-blue-600 hover:bg-blue-50 transition-colors">
+                &#9654; Resume Tracker
+              </a>
+              {% else %}
+              <a href="{{ url_for('tracker.setup_tracker', gng_id=gng.game_night_game_id) }}"
+                 class="inline-flex items-center rounded-lg border border-stone-300 px-3 py-1.5 text-xs font-medium text-stone-600 hover:bg-stone-50 transition-colors">
+                &#128202; Track
+              </a>
+              {% endif %}
+
+              <form action="{{ url_for('game_night.manage_game_in_night', game_night_id=game_night.id) }}" method="POST" data-confirm="Remove {{ gng.game_name }} and any results logged for it?">
+                <input type="hidden" name="action" value="remove">
+                <input type="hidden" name="game_night_game_id" value="{{ gng.game_night_game_id }}">
+                <button type="submit"
+                        class="inline-flex items-center rounded-lg border border-stone-300 px-3 py-1.5 text-xs font-medium text-stone-700 hover:bg-stone-50 transition-colors">
+                  Remove
+                </button>
+              </form>
+
+            </div>
+            {% endif %}
+
+            <!-- Results table -->
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm">
+                <thead>
+                  <tr class="border-b border-stone-200">
+                    <th class="text-left py-1.5 pr-4 text-xs font-medium text-stone-500">Player</th>
+                    <th class="text-left py-1.5 pr-4 text-xs font-medium text-stone-500">Place</th>
+                    <th class="text-left py-1.5 text-xs font-medium text-stone-500">Score</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for result in gng.results %}
+                  <tr class="border-b border-stone-100 last:border-0 {{ 'bg-amber-50/60' if result.position == 1 else '' }}">
+                    <td class="py-1.5 pr-4 text-sm text-stone-700">{% if result.position == 1 %}🏆 {% endif %}{{ result.first_name }} {{ result.last_name }}</td>
+                    <td class="py-1.5 pr-4 text-sm text-stone-700">{% if result.position is not none %}{{ result.position }}{% else %}-{% endif %}</td>
+                    <td class="py-1.5 text-sm text-stone-700">{% if result.score is not none %}{{ result.score }}{% else %}-{% endif %}</td>
+                  </tr>
+                  {% else %}
+                  <tr>
+                    <td colspan="3" class="py-2 text-sm text-stone-500">No results logged.</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
+  <!-- Badges earned this night -->
+  {% if night_badges %}
+  <div id="badges" class="bg-white rounded-xl border border-stone-200 shadow-sm p-5">
+    <div class="flex items-baseline justify-between gap-2 mb-3">
+      <h2 class="text-lg font-semibold text-stone-800">🏅 Badges earned</h2>
+      <a href="{{ url_for('games.badges') }}" class="text-xs text-stone-500 underline hover:text-red-600">All badges</a>
+    </div>
+    <ul class="space-y-2">
+      {% for person_id, awards in night_badges | groupby('person_id') %}
+      {% set person = awards[0].person %}
+      <li class="flex flex-wrap items-center gap-2 rounded-lg px-3 py-2 {{ 'bg-green-50 ring-1 ring-green-200' if person_id == current_user.id else 'bg-stone-50' }}">
+        <span class="w-24 shrink-0 text-sm font-semibold text-stone-800">{{ 'You' if person_id == current_user.id else person.first_name }}</span>
+        {% for pb in awards %}
+        <button type="button" data-badge-icon="{{ pb.badge.icon }}" data-badge-name="{{ pb.badge.name }}" data-badge-rule="{{ pb.badge.description }}"
+                data-badge-when="{{ ('You' if person_id == current_user.id else person.first_name) ~ ' earned it at this game night.' }}"
+                class="inline-flex items-center gap-1 rounded-full border border-stone-200 bg-white px-2.5 py-1 text-xs font-medium text-stone-700 hover:border-red-300">
+          <span aria-hidden="true">{{ pb.badge.icon }}</span>{{ pb.badge.name }}
+        </button>
+        {% endfor %}
+      </li>
+      {% endfor %}
+    </ul>
+    <p class="mt-2 text-xs text-stone-500">Tap a badge to see what it's for.</p>
+  </div>
+  {% include "_badge_dialog.html" %}
+  {% endif %}
+
+  <!-- Photos -->
+  {% set photos = game_night.photos %}
+  {% if photos or can_upload_photos %}
+  <div id="photos" class="bg-white rounded-xl border border-stone-200 shadow-sm p-5">
+    <h2 class="text-lg font-semibold text-stone-800 mb-3">Photos</h2>
+    {% if photos %}
+    <ul class="grid grid-cols-3 sm:grid-cols-4 gap-2">
+      {% for ph in photos %}
+      <li class="relative">
+        <button type="button" data-photo="{{ url_for('photos.image', game_night_id=game_night.id, photo_id=ph.id, size='full') }}" data-caption="{{ ph.caption or '' }}" data-by="{{ ph.uploader.first_name if ph.uploader else '' }}"
+                class="block w-full overflow-hidden rounded-lg bg-stone-100 aspect-square" aria-label="Open photo{% if ph.caption %}: {{ ph.caption }}{% endif %}">
+          <img src="{{ url_for('photos.image', game_night_id=game_night.id, photo_id=ph.id, size='thumb') }}" alt="{{ ph.caption or 'Photo from the night' }}" loading="lazy" class="h-full w-full object-cover">
+        </button>
+        {% if ph.caption %}<p class="mt-0.5 truncate text-xs text-stone-600">{{ ph.caption }}</p>{% endif %}
+        {% if can_delete_photo(ph, current_user) %}
+        <form method="POST" action="{{ url_for('photos.delete', game_night_id=game_night.id, photo_id=ph.id) }}" data-confirm="Delete this photo?" class="absolute right-1 top-1">
+          <button class="rounded-full bg-black/60 px-1.5 text-xs text-white" aria-label="Delete photo">✕</button>
+        </form>
+        {% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="text-sm text-stone-500">No photos yet.</p>
+    {% endif %}
+    {% if can_upload_photos %}
+    <form method="POST" action="{{ url_for('photos.upload', game_night_id=game_night.id) }}" enctype="multipart/form-data" class="mt-4 flex flex-wrap items-end gap-2">
+      <label class="text-sm font-medium text-stone-700">Add a photo
+        <input type="file" name="photo" required accept="image/jpeg,image/png,image/heic,image/heif,.heic,.heif" class="mt-1 block text-sm">
+      </label>
+      <label class="text-sm font-medium text-stone-700">Caption <span class="font-normal text-stone-500">(optional)</span>
+        <input name="caption" maxlength="200" class="mt-1 block w-56 max-w-full rounded-lg border border-stone-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent">
+      </label>
+      <button class="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 transition-colors">Upload</button>
+      <p class="w-full text-xs text-stone-500">JPEG, PNG or HEIC (iPhone), up to {{ config.MAX_UPLOAD_BYTES // (1024 * 1024) }} MB. Location and other photo metadata are stripped.</p>
+    </form>
+    {% endif %}
+  </div>
+  <dialog id="lightbox" class="max-w-[95vw] rounded-xl bg-black p-0 text-white backdrop:bg-black/80">
+    <figure class="relative">
+      <img alt="" class="max-h-[80vh] max-w-[95vw] object-contain" data-lightbox-img>
+      <figcaption class="px-4 py-2 text-sm" data-lightbox-caption></figcaption>
+      <button type="button" data-lightbox-close class="absolute right-2 top-2 rounded-full bg-black/60 px-3 py-1 text-lg" aria-label="Close">✕</button>
+      <button type="button" data-lightbox-prev class="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-black/60 px-3 py-2 text-lg" aria-label="Previous photo">‹</button>
+      <button type="button" data-lightbox-next class="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-black/60 px-3 py-2 text-lg" aria-label="Next photo">›</button>
+    </figure>
+  </dialog>
+  {% endif %}
+
+  <!-- Players -->
+  <div class="bg-white rounded-xl border border-stone-200 shadow-sm p-5">
+    <div class="flex items-baseline justify-between gap-2 mb-3">
+      <h2 class="text-lg font-semibold text-stone-800">Players</h2>
+      {% if availability_poll %}
+      <span class="text-xs text-stone-500">{{ rsvp_in_count }} of {{ players | length }} can make it</span>
+      {% endif %}
+    </div>
+    <ul class="flex flex-wrap gap-2">
+      {% for player in players %}
+        {% set answer = rsvps.get(player.people_id) %}
+        <li class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-stone-100 text-stone-700">
+          {{ player.person.first_name }} {{ player.person.last_name }}
+          {% if availability_poll %}
+            {% if answer == "Can Make It" %}<span class="rounded-full bg-green-100 px-1.5 text-green-800">In</span>
+            {% elif answer == "Maybe" %}<span class="rounded-full bg-amber-100 px-1.5 text-amber-800">Maybe</span>
+            {% elif answer == "Can't Make It" %}<span class="rounded-full bg-red-100 px-1.5 text-red-800">Out</span>
+            {% elif answer %}<span class="rounded-full bg-stone-200 px-1.5 text-stone-700">{{ answer }}</span>
+            {% else %}<span class="text-stone-400">no reply</span>{% endif %}
+          {% endif %}
+        </li>
+      {% else %}
+        <li class="text-sm text-stone-500">No players found.</li>
+      {% endfor %}
+    </ul>
+    {% if availability_poll and availability_poll.id in (night_polls | map(attribute="poll.id") | list) %}
+    <p class="text-xs text-stone-500 mt-3">RSVPs come from the <a href="#polls" class="underline">availability poll</a> below.</p>
+    {% endif %}
+  </div>
+
+  <!-- Food -->
+  {% if game_night.food_mode != 'none' %}
+  {% set is_admin = current_user.admin or current_user.owner %}
+  {% set food_open = not game_night.final %}
+  <div id="food" class="bg-white rounded-xl border border-stone-200 shadow-sm p-5 space-y-5">
+    <div>
+      <h2 class="text-lg font-semibold text-stone-800">Food</h2>
+      {% if game_night.food_mode == 'provided' %}
+      <p class="text-sm text-stone-700 mt-1">🍕 <strong>{{ 'You' if game_night.food_provider_id == current_user.id else (game_night.food_provider.first_name if game_night.food_provider else 'Someone') }}</strong> {{ 'are' if game_night.food_provider_id == current_user.id else 'is' }} providing food{% if game_night.food_note %}: {{ game_night.food_note }}{% endif %}.</p>
+      {% elif game_night.food_note %}
+      <p class="text-sm text-stone-700 mt-1">{{ game_night.food_note }}</p>
+      {% endif %}
+    </div>
+
+    {% if game_night.food_signup %}
+    <div>
+      <h3 class="text-sm font-semibold text-stone-700 mb-2">Who's bringing what</h3>
+      {% if game_night.food_items %}
+      <ul class="divide-y divide-stone-100 text-sm mb-3">
+        {% for item in game_night.food_items %}
+        <li class="flex flex-wrap items-center justify-between gap-2 py-2">
+          <span><strong>{{ item.name }}</strong> ·
+            {% if item.claimer %}<span class="text-green-700">{{ 'You' if item.claimed_by == current_user.id else item.claimer.first_name }}</span>{% else %}<span class="text-amber-700">nobody yet</span>{% endif %}</span>
+          {% if food_open %}
+          <span class="flex items-center gap-3">
+            {% if food_is_player and not item.claimer %}
+            <form method="POST" action="{{ url_for('food.claim_item', game_night_id=game_night.id, item_id=item.id) }}"><button class="rounded-lg bg-red-600 px-3 py-1 text-xs font-medium text-white hover:bg-red-700">I'll bring it</button></form>
+            {% elif item.claimed_by == current_user.id %}
+            <form method="POST" action="{{ url_for('food.claim_item', game_night_id=game_night.id, item_id=item.id) }}"><input type="hidden" name="claim" value="0"><button class="text-xs underline text-stone-600">Not me after all</button></form>
+            {% endif %}
+            {% if is_admin or item.added_by == current_user.id %}
+            <form method="POST" action="{{ url_for('food.delete_item', game_night_id=game_night.id, item_id=item.id) }}" data-confirm="Remove {{ item.name }} from the list?"><button class="text-xs text-red-600 underline">Remove</button></form>
+            {% endif %}
+          </span>
+          {% endif %}
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p class="text-sm text-stone-500 mb-3">Nothing on the list yet.</p>
+      {% endif %}
+      {% if food_open %}
+      <form method="POST" action="{{ url_for('food.add_item', game_night_id=game_night.id) }}" class="flex flex-wrap items-end gap-2">
+        <label class="text-sm font-medium text-stone-700">{{ 'Add an item' if is_admin else "Add what you're bringing" }}
+          <input name="name" required maxlength="80" placeholder="e.g. chips, a 12-pack, dessert" class="mt-1 block w-64 max-w-full rounded-lg border border-stone-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent">
+        </label>
+        {% if is_admin %}<label class="flex items-center gap-1 text-xs text-stone-600 pb-2"><input type="checkbox" name="claim" value="1" class="h-4 w-4 rounded border-stone-300 accent-red-600"> I'm bringing it</label>{% endif %}
+        <button class="rounded-lg border border-stone-300 px-3 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50">Add</button>
+      </form>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    {% if game_night.food_split %}
+    <div>
+      <h3 class="text-sm font-semibold text-stone-700 mb-1">Split costs</h3>
+      <p class="text-xs text-stone-500 mb-2">Whoever buys logs it here; it's split evenly and everyone pays the buyer back.</p>
+      {% if food_rows %}
+      <ul class="space-y-4 mb-4">
+        {% for row in food_rows %}
+        {% set expense = row.expense %}
+        <li class="rounded-lg border border-stone-200 p-3">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <span class="text-sm"><strong>{{ expense.description }}</strong> · {{ expense.amount_cents|money }} paid by {{ 'you' if expense.paid_by == current_user.id else expense.payer.first_name }}
+              {% if expense.receipt_path %} · <a class="underline text-stone-600" href="{{ url_for('food.receipt', game_night_id=game_night.id, expense_id=expense.id) }}" target="_blank" rel="noopener">receipt</a>{% endif %}</span>
+            {% if food_open and (is_admin or expense.created_by == current_user.id) %}
+            <form method="POST" action="{{ url_for('food.delete_expense', game_night_id=game_night.id, expense_id=expense.id) }}" data-confirm="Remove {{ expense.description }}?"><button class="text-xs text-red-600 underline">Remove</button></form>
+            {% endif %}
+          </div>
+          <p class="text-xs text-stone-500 mt-0.5">Split {{ expense.shares|length }} ways{% if row.outstanding %} · {{ row.outstanding|money }} still owed{% else %} · all paid up{% endif %}</p>
+          <ul class="mt-2 divide-y divide-stone-100">
+            {% for s in row.shares %}
+            <li class="py-1.5 text-sm {{ 'bg-amber-50 -mx-3 px-3' if s.mine and not s.share.paid and not s.is_buyer else '' }}">
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <span>{{ 'You' if s.mine else s.share.person.first_name + ' ' + s.share.person.last_name }} · {{ s.share.amount_cents|money }}
+                  {% if s.is_buyer %}<span class="text-xs text-stone-400">(bought it)</span>
+                  {% elif s.share.paid %}<span class="rounded-full bg-green-100 px-1.5 text-xs text-green-800">paid</span>
+                  {% else %}<span class="rounded-full bg-amber-100 px-1.5 text-xs text-amber-800">owes {{ 'you' if expense.paid_by == current_user.id else expense.payer.first_name }}</span>{% endif %}
+                </span>
+                {% if s.can_toggle %}
+                <form method="POST" action="{{ url_for('food.share_paid', game_night_id=game_night.id, share_id=s.share.id) }}">
+                  <input type="hidden" name="paid" value="{{ '0' if s.share.paid else '1' }}">
+                  <button class="text-xs underline text-stone-600">{{ 'Mark unpaid' if s.share.paid else ('I paid' if s.mine else 'Mark paid') }}</button>
+                </form>
+                {% endif %}
+              </div>
+              {% if s.pay_options %}
+              <div class="mt-1.5 flex flex-wrap items-center gap-2">
+                {% for opt in s.pay_options %}
+                  {% if opt.url %}
+                  <a href="{{ opt.url }}" target="_blank" rel="noopener" class="inline-flex items-center rounded-lg bg-red-600 px-3 py-1 text-xs font-medium text-white hover:bg-red-700">{% if opt.preferred %}★ {% endif %}Pay with {{ opt.label }}</a>
+                  {% else %}
+                  <span class="inline-flex items-center gap-1 rounded-lg border border-stone-300 px-2 py-1 text-xs text-stone-700">{% if opt.preferred %}★ {% endif %}{{ opt.label }}: {{ opt.display }}
+                    <button type="button" data-copy="{{ opt.copy_text }}" class="underline text-stone-500">Copy</button></span>
+                  {% endif %}
+                {% endfor %}
+                <span class="text-xs text-stone-400">then tap "I paid"</span>
+              </div>
+              {% elif s.mine and not s.share.paid and not s.is_buyer %}
+              <p class="mt-1 text-xs text-stone-500">{{ expense.payer.first_name }} hasn't added a payment method yet; ask how they'd like to be paid.</p>
+              {% endif %}
+            </li>
+            {% endfor %}
+          </ul>
+          {% if food_open and (is_admin or expense.created_by == current_user.id) %}
+          <details class="mt-2">
+            <summary class="cursor-pointer text-xs text-stone-600 underline">Change who it's split between</summary>
+            <form method="POST" action="{{ url_for('food.covered', game_night_id=game_night.id, expense_id=expense.id) }}" class="mt-2">
+              <div class="grid grid-cols-2 sm:grid-cols-3 gap-1">
+                {% for p in food_coverable %}<label class="flex items-center gap-1 text-xs"><input type="checkbox" name="covered" value="{{ p.id }}" {% if p.id in expense.covered_ids %}checked{% endif %} class="h-4 w-4 rounded border-stone-300 accent-red-600"> {{ p.first_name }} {{ p.last_name }}</label>{% endfor %}
+              </div>
+              <button class="mt-2 rounded-lg border border-stone-300 px-3 py-1 text-xs hover:bg-stone-50">Save</button>
+            </form>
+          </details>
+          {% endif %}
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p class="text-sm text-stone-500 mb-3">No food costs logged yet.</p>
+      {% endif %}
+
+      {% if food_open and food_coverable %}
+      <details class="rounded-lg border border-stone-200 p-3" {% if not food_rows %}open{% endif %}>
+        <summary class="cursor-pointer text-sm font-medium text-stone-700">Log a food cost</summary>
+        <form method="POST" action="{{ url_for('food.add_expense', game_night_id=game_night.id) }}" enctype="multipart/form-data" class="mt-3 space-y-3">
+          <div class="grid sm:grid-cols-2 gap-3">
+            <label class="text-sm font-medium text-stone-700">What was it?
+              <input name="description" required maxlength="120" placeholder="e.g. pizza" class="mt-1 block w-full rounded-lg border border-stone-300 px-3 py-2 text-sm">
+            </label>
+            <label class="text-sm font-medium text-stone-700">Amount
+              <span class="mt-1 flex items-center gap-2"><span class="text-stone-500">$</span><input name="amount" required inputmode="decimal" placeholder="45.00" class="block w-full rounded-lg border border-stone-300 px-3 py-2 text-sm"></span>
+            </label>
+            <label class="text-sm font-medium text-stone-700">Who paid?
+              <select name="paid_by" class="mt-1 block w-full rounded-lg border border-stone-300 px-3 py-2 text-sm">
+                {% for p in food_coverable %}<option value="{{ p.id }}" {% if p.id == current_user.id %}selected{% endif %}>{{ p.first_name }} {{ p.last_name }}</option>{% endfor %}
+              </select>
+            </label>
+            <label class="text-sm font-medium text-stone-700">Receipt photo <span class="font-normal text-stone-500">(optional)</span>
+              <input type="file" name="receipt" accept="image/jpeg,image/png,image/heic,image/heif,.heic,.heif" class="mt-1 block w-full text-sm">
+            </label>
+          </div>
+          <fieldset>
+            <legend class="text-sm font-medium text-stone-700">Split between</legend>
+            <p class="text-xs text-stone-500 mb-1">Starts with the players who said they can make it (everyone, if nobody has answered yet).</p>
+            <input type="hidden" name="covered_set" value="1">
+            <div class="grid grid-cols-2 sm:grid-cols-3 gap-1">
+              {% for p in food_coverable %}<label class="flex items-center gap-1 text-xs"><input type="checkbox" name="covered" value="{{ p.id }}" {% if p.id in food_default_covered %}checked{% endif %} class="h-4 w-4 rounded border-stone-300 accent-red-600"> {{ p.first_name }} {{ p.last_name }}</label>{% endfor %}
+            </div>
+          </fieldset>
+          <button class="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 transition-colors">Log it</button>
+        </form>
+      </details>
+      {% endif %}
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  <!-- Polls linked to this night -->
+  {% set can_add_availability = (current_user.admin or current_user.owner) and not availability_poll and not game_night.closed %}
+  {% if night_polls or can_add_availability %}
+  <div id="polls" class="bg-white rounded-xl border border-stone-200 shadow-sm p-5">
+    <h2 class="text-lg font-semibold text-stone-800 mb-3">Polls</h2>
+    <div class="space-y-6">
+      {% for ctx in night_polls %}
+      <div class="{{ 'border-t border-stone-100 pt-5' if not loop.first else '' }}">
+        <div class="flex items-start justify-between gap-2 mb-2">
+          <div>
+            <h3 class="text-sm font-semibold text-stone-800">{{ ctx.poll.title }}</h3>
+            {% if ctx.poll.availability %}<p class="text-xs text-stone-500">Your answer is your RSVP for this night.</p>{% endif %}
+            {% if ctx.poll.description %}<p class="text-xs text-stone-500">{{ ctx.poll.description }}</p>{% endif %}
+          </div>
+          {% if current_user.admin or current_user.owner %}
+          <a href="{{ url_for('polls.poll_results', poll_id=ctx.poll.id) }}" class="text-xs text-stone-500 hover:text-red-600 underline whitespace-nowrap">Who answered</a>
+          {% endif %}
+        </div>
+        {% with poll=ctx.poll, active=ctx.active, user_votes=ctx.user_votes, results=ctx.results, message=None %}
+          {% include "_poll_widget.html" %}
+        {% endwith %}
+      </div>
+      {% endfor %}
+    </div>
+    {% if current_user.admin or current_user.owner %}
+    <div class="flex flex-wrap gap-3 {{ 'mt-5 pt-4 border-t border-stone-100' if night_polls else '' }}">
+      {% if can_add_availability %}
+      <form action="{{ url_for('game_night.create_availability_poll', game_night_id=game_night.id) }}" method="POST">
+        <button type="submit"
+                class="inline-flex items-center rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 transition-colors">
+          Create Availability Poll
+        </button>
+      </form>
+      {% endif %}
+      {% if not game_night.final %}
+      <a href="{{ url_for('polls.poll_create', game_night_id=game_night.id) }}"
+         class="inline-flex items-center rounded-lg border border-stone-300 px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50 transition-colors">
+        New Poll for This Night
+      </a>
+      {% endif %}
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
+
+{% else %}
   <!-- Players -->
   <div class="bg-white rounded-xl border border-stone-200 shadow-sm p-5">
     <div class="flex items-baseline justify-between gap-2 mb-3">
@@ -83,6 +534,158 @@
       {% endif %}
     </div>
     {% endif %}
+  </div>
+  {% endif %}
+
+  <!-- Choosing games: nominate + rank -->
+  {% if not game_night.closed %}
+  <div id="games" class="bg-white rounded-xl border border-stone-200 shadow-sm p-5">
+    <div class="flex items-start justify-between gap-2">
+      <div>
+        <h2 class="text-lg font-semibold text-stone-800">What should we play?</h2>
+        <p class="text-xs text-stone-500">Each player nominates one game, then ranks their top 3. 1st = 3 points, 2nd = 2, 3rd = 1.</p>
+      </div>
+      {% if current_player_id %}
+      <a href="{{ url_for('voting.nominate_game_page', game_night_id=game_night.id) }}"
+         class="shrink-0 inline-flex items-center rounded-lg {{ 'border border-stone-300 text-stone-700 hover:bg-stone-50' if user_nomination else 'bg-red-600 text-white hover:bg-red-700' }} px-3 py-1.5 text-sm font-medium">
+        {{ 'Change nomination' if user_nomination else '+ Nominate' }}</a>
+      {% endif %}
+    </div>
+    {% if not nominations %}
+    <p class="mt-3 text-sm text-stone-500">Nothing nominated yet.</p>
+    {% else %}
+    <form method="POST" action="{{ url_for('voting.vote_game', game_night_id=game_night.id) }}" data-rank-form class="mt-4">
+      <ul class="space-y-2">
+        {% for n in nominations %}
+        {% set mine = user_votes.get(n.game_id) %}
+        <li class="flex flex-wrap items-center gap-3 rounded-lg border border-stone-200 p-3">
+          <a href="{{ url_for('games.view_game', game_id=n.game_id) }}" class="shrink-0">
+            {% if n.image_url %}<img src="{{ n.image_url }}" alt="" class="h-12 w-12 rounded-lg object-cover border border-stone-200">{% else %}<span class="flex h-12 w-12 items-center justify-center rounded-lg bg-stone-100 text-xl">🎲</span>{% endif %}
+          </a>
+          <div class="min-w-0 flex-1">
+            <p class="text-sm font-semibold text-stone-800">{% if loop.first and n.vote_score %}🥇 {% endif %}{{ n.game_name }}</p>
+            <p class="text-xs text-stone-500">{% if n.nominated_by %}{{ n.nominated_by }}'s pick · {% endif %}{{ n.vote_score or 0 }} pts{% if n.avg_rating %} · ★ {{ n.avg_rating }}{% endif %}</p>
+            <div class="mt-1 h-1.5 rounded-full bg-stone-100"><div class="h-full rounded-full bg-red-500" style="width: {{ n.vote_pct }}%"></div></div>
+          </div>
+          {% if current_player_id %}
+          <div class="flex w-full justify-end gap-1 sm:w-auto" role="radiogroup" aria-label="Your rank for {{ n.game_name }}">
+            {% for value, label in [('1', '1st'), ('2', '2nd'), ('3', '3rd'), ('', '–')] %}
+            <label class="cursor-pointer">
+              <input type="radio" name="votes[{{ n.game_id }}]" value="{{ value }}" data-rank="{{ value }}"
+                     {% if (mine|string if mine else '') == value %}checked{% endif %} class="peer sr-only">
+              <span class="inline-flex h-9 min-w-[2.5rem] items-center justify-center rounded-lg border border-stone-300 px-2 text-xs font-medium text-stone-600 peer-checked:border-red-600 peer-checked:bg-red-600 peer-checked:text-white peer-focus-visible:ring-2 peer-focus-visible:ring-red-400">{{ label }}</span>
+            </label>
+            {% endfor %}
+          </div>
+          {% endif %}
+        </li>
+        {% endfor %}
+      </ul>
+      {% if current_player_id %}
+      <button type="submit" class="mt-3 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700">Save my ranking</button>
+      {% endif %}
+    </form>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  <!-- Games Played -->
+  {% set can_add_game = not game_night.final and (current_user.admin or current_user.owner) %}
+  {% if game_night_games or can_add_game %}
+  <div id="played" class="bg-white rounded-xl border border-stone-200 shadow-sm p-5">
+    <div class="flex items-center justify-between gap-2 mb-4">
+      <h2 class="text-lg font-semibold text-stone-800">Games played</h2>
+      {% if can_add_game %}
+      <a href="{{ url_for('game_night.add_game_to_night', game_night_id=game_night.id) }}"
+         class="inline-flex items-center rounded-lg bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700">+ Add a game</a>
+      {% endif %}
+    </div>
+    {% if not game_night_games %}<p class="text-sm text-stone-500">No games added yet. Add one when you sit down to play.</p>{% endif %}
+    <ul class="space-y-6">
+      {% for gng in game_night_games %}
+      <li class="border-b border-stone-100 last:border-0 pb-6 last:pb-0">
+        <div class="flex gap-4">
+          <a href="{{ url_for('games.view_game', game_id=gng.game_id) }}" class="flex-shrink-0">
+            <img src="{{ gng.game_image_url }}" alt="{{ gng.game_name }}" class="h-16 w-16 rounded-lg object-cover border border-stone-200">
+          </a>
+          <div class="flex-1 min-w-0">
+            <div class="flex items-start justify-between gap-2 mb-1">
+              <strong class="text-sm font-semibold text-stone-800">{{ gng.game_name }}</strong>
+              <span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-stone-100 text-stone-600 whitespace-nowrap">Round {{ gng.round }}</span>
+            </div>
+            <p class="text-xs text-stone-500 mb-3 flex flex-wrap items-center gap-x-3 gap-y-1">
+              <span>Your rating: {{ user_ratings_by_game_id.get(gng.game_id, 'not rated') }}</span>
+              {% if gng.game_id not in owned_game_ids %}
+              <form action="{{ url_for('games.toggle_wishlist', game_id=gng.game_id) }}" method="POST" class="inline">
+                <button type="submit" class="underline hover:text-red-600">{% if gng.game_id in wishlist_game_ids %}♥ On your wishlist{% else %}♡ Add to wishlist{% endif %}</button>
+              </form>
+              {% endif %}
+            </p>
+
+            {% if not game_night.final and (current_user.admin or current_user.owner) %}
+            <div class="flex flex-wrap gap-2 mb-3">
+              <form action="{{ url_for('game_night.log_results', game_night_id=game_night.id, game_night_game_id=gng.game_night_game_id) }}" method="GET">
+                <button type="submit"
+                        class="inline-flex items-center rounded-lg bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700 transition-colors">
+                  Log results
+                </button>
+              </form>
+
+              {% set tracker_session = tracker_sessions.get(gng.game_night_game_id) %}
+              {% if tracker_session and tracker_session.status == 'active' %}
+              <a href="{{ url_for('tracker.live_tracker', session_id=tracker_session.id) }}"
+                 class="inline-flex items-center rounded-lg border border-blue-300 px-3 py-1.5 text-xs font-medium text-blue-600 hover:bg-blue-50 transition-colors">
+                &#9654; Resume Tracker
+              </a>
+              {% else %}
+              <a href="{{ url_for('tracker.setup_tracker', gng_id=gng.game_night_game_id) }}"
+                 class="inline-flex items-center rounded-lg border border-stone-300 px-3 py-1.5 text-xs font-medium text-stone-600 hover:bg-stone-50 transition-colors">
+                &#128202; Track
+              </a>
+              {% endif %}
+
+              <form action="{{ url_for('game_night.manage_game_in_night', game_night_id=game_night.id) }}" method="POST" data-confirm="Remove {{ gng.game_name }} and any results logged for it?">
+                <input type="hidden" name="action" value="remove">
+                <input type="hidden" name="game_night_game_id" value="{{ gng.game_night_game_id }}">
+                <button type="submit"
+                        class="inline-flex items-center rounded-lg border border-stone-300 px-3 py-1.5 text-xs font-medium text-stone-700 hover:bg-stone-50 transition-colors">
+                  Remove
+                </button>
+              </form>
+
+            </div>
+            {% endif %}
+
+            <!-- Results table -->
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm">
+                <thead>
+                  <tr class="border-b border-stone-200">
+                    <th class="text-left py-1.5 pr-4 text-xs font-medium text-stone-500">Player</th>
+                    <th class="text-left py-1.5 pr-4 text-xs font-medium text-stone-500">Place</th>
+                    <th class="text-left py-1.5 text-xs font-medium text-stone-500">Score</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for result in gng.results %}
+                  <tr class="border-b border-stone-100 last:border-0 {{ 'bg-amber-50/60' if result.position == 1 else '' }}">
+                    <td class="py-1.5 pr-4 text-sm text-stone-700">{% if result.position == 1 %}🏆 {% endif %}{{ result.first_name }} {{ result.last_name }}</td>
+                    <td class="py-1.5 pr-4 text-sm text-stone-700">{% if result.position is not none %}{{ result.position }}{% else %}-{% endif %}</td>
+                    <td class="py-1.5 text-sm text-stone-700">{% if result.score is not none %}{{ result.score }}{% else %}-{% endif %}</td>
+                  </tr>
+                  {% else %}
+                  <tr>
+                    <td colspan="3" class="py-2 text-sm text-stone-500">No results logged.</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
   </div>
   {% endif %}
 
@@ -245,213 +848,6 @@
   </div>
   {% endif %}
 
-  <!-- Games Played -->
-  {% if game_night_games %}
-  <div class="bg-white rounded-xl border border-stone-200 shadow-sm p-5">
-    <h2 class="text-lg font-semibold text-stone-800 mb-4">Games Played</h2>
-    <ul class="space-y-6">
-      {% for gng in game_night_games %}
-      <li class="border-b border-stone-100 last:border-0 pb-6 last:pb-0">
-        <div class="flex gap-4">
-          <a href="{{ url_for('games.view_game', game_id=gng.game_id) }}" class="flex-shrink-0">
-            <img src="{{ gng.game_image_url }}" alt="{{ gng.game_name }}" class="h-16 w-16 rounded-lg object-cover border border-stone-200">
-          </a>
-          <div class="flex-1 min-w-0">
-            <div class="flex items-start justify-between gap-2 mb-1">
-              <strong class="text-sm font-semibold text-stone-800">{{ gng.game_name }}</strong>
-              <span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-stone-100 text-stone-600 whitespace-nowrap">Round {{ gng.round }}</span>
-            </div>
-            <p class="text-xs text-stone-500 mb-3">Your Rating: {{ user_ratings_by_game_id.get(gng.game_id, 'Not Rated') }}</p>
-
-            {% if not game_night.final and (current_user.admin or current_user.owner) %}
-            <div class="flex flex-wrap gap-2 mb-3">
-              <form action="{{ url_for('game_night.log_results', game_night_id=game_night.id, game_night_game_id=gng.game_night_game_id) }}" method="GET">
-                <button type="submit"
-                        class="inline-flex items-center rounded-lg bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700 transition-colors">
-                  Log Results
-                </button>
-              </form>
-
-              {% set tracker_session = tracker_sessions.get(gng.game_night_game_id) %}
-              {% if tracker_session and tracker_session.status == 'active' %}
-              <a href="{{ url_for('tracker.live_tracker', session_id=tracker_session.id) }}"
-                 class="inline-flex items-center rounded-lg border border-blue-300 px-3 py-1.5 text-xs font-medium text-blue-600 hover:bg-blue-50 transition-colors">
-                &#9654; Resume Tracker
-              </a>
-              {% else %}
-              <a href="{{ url_for('tracker.setup_tracker', gng_id=gng.game_night_game_id) }}"
-                 class="inline-flex items-center rounded-lg border border-stone-300 px-3 py-1.5 text-xs font-medium text-stone-600 hover:bg-stone-50 transition-colors">
-                &#128202; Track
-              </a>
-              {% endif %}
-
-              <form action="{{ url_for('game_night.manage_game_in_night', game_night_id=game_night.id) }}" method="POST">
-                <input type="hidden" name="action" value="remove">
-                <input type="hidden" name="game_night_game_id" value="{{ gng.game_night_game_id }}">
-                <button type="submit"
-                        class="inline-flex items-center rounded-lg border border-stone-300 px-3 py-1.5 text-xs font-medium text-stone-700 hover:bg-stone-50 transition-colors">
-                  Remove Game
-                </button>
-              </form>
-
-              {% if gng.game_id not in owned_game_ids %}
-              <form action="{{ url_for('games.toggle_wishlist', game_id=gng.game_id) }}" method="POST">
-                <button type="submit"
-                        class="inline-flex items-center rounded-lg border border-stone-300 px-3 py-1.5 text-xs font-medium text-stone-700 hover:bg-stone-50 transition-colors">
-                  {% if gng.game_id in wishlist_game_ids %}Remove from Wishlist{% else %}Add to Wishlist{% endif %}
-                </button>
-              </form>
-              {% endif %}
-            </div>
-            {% endif %}
-
-            <!-- Results table -->
-            <div class="overflow-x-auto">
-              <table class="w-full text-sm">
-                <thead>
-                  <tr class="border-b border-stone-200">
-                    <th class="text-left py-1.5 pr-4 text-xs font-medium text-stone-500">Player</th>
-                    <th class="text-left py-1.5 pr-4 text-xs font-medium text-stone-500">Place</th>
-                    <th class="text-left py-1.5 text-xs font-medium text-stone-500">Score</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {% for result in gng.results %}
-                  <tr class="border-b border-stone-100 last:border-0">
-                    <td class="py-1.5 pr-4 text-sm text-stone-700">{{ result.first_name }} {{ result.last_name }}</td>
-                    <td class="py-1.5 pr-4 text-sm text-stone-700">{% if result.position is not none %}{{ result.position }}{% else %}-{% endif %}</td>
-                    <td class="py-1.5 text-sm text-stone-700">{% if result.score is not none %}{{ result.score }}{% else %}-{% endif %}</td>
-                  </tr>
-                  {% else %}
-                  <tr>
-                    <td colspan="3" class="py-2 text-sm text-stone-500">No results logged.</td>
-                  </tr>
-                  {% endfor %}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      </li>
-      {% endfor %}
-    </ul>
-  </div>
-  {% endif %}
-
-  <!-- Add a Game (admin) -->
-  {% if not game_night.final and (current_user.admin or current_user.owner) %}
-  <div class="bg-white rounded-xl border border-stone-200 shadow-sm p-5">
-    <h2 class="text-lg font-semibold text-stone-800 mb-3">Add a Game</h2>
-    <a href="{{ url_for('game_night.add_game_to_night', game_night_id=game_night.id) }}"
-       class="inline-flex items-center rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 transition-colors">
-      Add a Game
-    </a>
-  </div>
-  {% endif %}
-
-  <!-- Nominations & Voting -->
-  {% if not game_night.closed %}
-  <div class="bg-white rounded-xl border border-stone-200 shadow-sm p-5">
-    <h2 class="text-lg font-semibold text-stone-800 mb-3">Nominate a Game</h2>
-    <a href="{{ url_for('voting.nominate_game_page', game_night_id=game_night.id) }}"
-       class="inline-flex items-center rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 transition-colors">
-      Nominate a Game
-    </a>
-  </div>
-
-  <div class="bg-white rounded-xl border border-stone-200 shadow-sm p-5">
-    <h2 class="text-lg font-semibold text-stone-800 mb-4">Vote for Games</h2>
-    {% if not nominations %}
-    <p class="text-sm text-stone-500">Nothing nominated yet.</p>
-    {% else %}
-    <form method="POST" action="{{ url_for('voting.vote_game', game_night_id=game_night.id) }}">
-      <div class="space-y-4 mb-4">
-        {% for nomination in nominations %}
-        <div class="flex gap-4 items-start p-3 rounded-lg border border-stone-100 hover:border-stone-200 transition-colors">
-          <a href="{{ url_for('games.view_game', game_id=nomination.game_id) }}" class="flex-shrink-0">
-            <img src="{{ nomination.image_url }}" alt="{{ nomination.game_name }}" class="h-14 w-14 rounded-lg object-cover border border-stone-200">
-          </a>
-          <div class="flex-1 min-w-0">
-            <strong class="text-sm font-semibold text-stone-800 block mb-1">{{ nomination.game_name }}</strong>
-            <p class="text-xs text-stone-500">Your Rating: {{ user_ratings_by_game_id.get(nomination.game_id, 'Not Rated') }}</p>
-            <p class="text-xs text-stone-500">Avg Rating: {{ nomination.avg_rating or 'No ratings yet' }}</p>
-            <p class="text-xs text-stone-500 mb-2">Votes: {{ nomination.vote_score or 0 }}</p>
-            <div class="flex items-center gap-2">
-              <label for="votes[{{ nomination.game_id }}]" class="text-xs font-medium text-stone-700">Your Rank:</label>
-              <select name="votes[{{ nomination.game_id }}]"
-                      class="rounded-lg border border-stone-300 px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent">
-                <option value="">No Vote</option>
-                {% for i in range(1, 4) %}
-                <option value="{{ i }}" {% if user_votes.get(nomination.game_id) == i %}selected{% endif %}>{{ i }}</option>
-                {% endfor %}
-              </select>
-            </div>
-          </div>
-        </div>
-        {% endfor %}
-      </div>
-      <button type="submit"
-              class="inline-flex items-center rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 transition-colors">
-        Submit Votes
-      </button>
-    </form>
-    {% endif %}
-  </div>
-  {% endif %}
-
-  <!-- Top Places (finalized) -->
-  {% if game_night.final %}
-  <div class="bg-white rounded-xl border border-stone-200 shadow-sm p-5">
-    <h2 class="text-lg font-semibold text-stone-800 mb-4">Top Places</h2>
-    {% if top_places %}
-    <div class="flex flex-wrap gap-4">
-      {% for place, player_ids in top_places %}
-      {% if player_ids %}
-      <div class="flex-1 min-w-[120px] text-center p-4 rounded-xl border border-stone-200 bg-stone-50">
-        {% if place == 1 %}<div class="text-2xl mb-1">👑</div>{% endif %}
-        <h3 class="text-sm font-semibold text-stone-800 mb-2">
-          {{ place }}{{ 'st' if place == 1 else 'nd' if place == 2 else 'rd' if place == 3 else 'th' }} Place
-        </h3>
-        <ul class="space-y-0.5">
-          {% for player_id in player_ids %}
-          {% set player = players | selectattr("id", "equalto", player_id) | first %}
-          {% if player and player.person %}
-          <li class="text-xs text-stone-700">{{ player.person.first_name }} {{ player.person.last_name }}</li>
-          {% else %}
-          <li class="text-xs text-stone-500">Unknown Player (ID: {{ player_id }})</li>
-          {% endif %}
-          {% endfor %}
-        </ul>
-      </div>
-      {% endif %}
-      {% endfor %}
-    </div>
-    {% else %}
-    <p class="text-sm text-stone-500">No results to display.</p>
-    {% endif %}
-  </div>
-  {% endif %}
-
-  <!-- Badges earned this night -->
-  {% if night_badges %}
-  <div id="badges" class="bg-white rounded-xl border border-stone-200 shadow-sm p-5">
-    <h2 class="text-lg font-semibold text-stone-800 mb-3">🏅 Badges earned this night</h2>
-    <ul class="grid gap-2 sm:grid-cols-2">
-      {% for pb in night_badges %}
-      <li class="flex items-start gap-3 rounded-lg px-3 py-2 {{ 'bg-green-50 ring-1 ring-green-200' if pb.person_id == current_user.id else 'bg-stone-50' }}">
-        <span class="text-2xl leading-none" aria-hidden="true">{{ pb.badge.icon }}</span>
-        <span class="text-sm">
-          <strong class="text-stone-800">{{ 'You' if pb.person_id == current_user.id else pb.person.first_name }}</strong>
-          <span class="text-stone-500">earned</span> <strong class="text-stone-800">{{ pb.badge.name }}</strong>
-          <span class="block text-xs text-stone-500">{{ pb.badge.description }}</span>
-        </span>
-      </li>
-      {% endfor %}
-    </ul>
-    <a href="{{ url_for('games.badges') }}" class="mt-3 inline-block text-xs text-stone-500 underline hover:text-red-600">All badges</a>
-  </div>
-  {% endif %}
-
   <!-- Photos -->
   {% set photos = game_night.photos %}
   {% if photos or can_upload_photos %}
@@ -501,34 +897,22 @@
   </dialog>
   {% endif %}
 
-  <!-- Admin Controls -->
-  {% if current_user.admin or current_user.owner %}
-  <div class="bg-white rounded-xl border border-stone-200 shadow-sm p-5">
-    <h2 class="text-lg font-semibold text-stone-800 mb-3">Admin Controls</h2>
-    <div class="flex flex-wrap gap-3">
-      <form action="{{ url_for('game_night.toggle_game_night_field', game_night_id=game_night.id, field='closed') }}" method="POST">
-        <button type="submit"
-                class="inline-flex items-center rounded-lg border border-stone-300 px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50 transition-colors">
-          {% if game_night.closed %}Open Voting{% else %}Close Voting{% endif %}
-        </button>
-      </form>
-      <form action="{{ url_for('game_night.toggle_game_night_field', game_night_id=game_night.id, field='final') }}" method="POST">
-        <button type="submit"
-                class="inline-flex items-center rounded-lg border border-stone-300 px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50 transition-colors">
-          {% if game_night.final %}Open Results{% else %}Finalize Results{% endif %}
-        </button>
-      </form>
-      <a href="{{ url_for('game_night.edit_game_night', game_night_id=game_night.id) }}"
-         class="inline-flex items-center rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 transition-colors">
-        Edit Game Night
-      </a>
-    </div>
-  </div>
-  {% endif %}
-
+{% endif %}
 </div>
 {% endblock %}
 
 {% block scripts %}
 {% if game_night.photos %}<script src="{{ url_for('static', filename='js/gallery.js') }}"></script>{% endif %}
+<script>
+  // Each rank (1st/2nd/3rd) can go to only one game: picking it elsewhere clears it here.
+  document.querySelectorAll('[data-rank-form]').forEach(function (form) {
+    form.addEventListener('change', function (e) {
+      const rank = e.target.dataset.rank;
+      if (!rank) return;
+      form.querySelectorAll('input[data-rank="' + rank + '"]:checked').forEach(function (other) {
+        if (other !== e.target) form.querySelector('input[name="' + other.name + '"][data-rank=""]').checked = true;
+      });
+    });
+  });
+</script>
 {% endblock %}

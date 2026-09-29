@@ -314,6 +314,17 @@ def get_view_game_night_details(game_night_id, current_user_id):
         .all()
     ]
 
+    nominators = {
+        n.game_id: n.player.person.first_name
+        for n in GameNominations.query.filter_by(game_night_id=game_night_id)
+    }
+    max_score = max((n["vote_score"] or 0 for n in nominations), default=0)
+    for nomination in nominations:
+        nomination["nominated_by"] = nominators.get(nomination["game_id"])
+        nomination["vote_pct"] = (
+            round((nomination["vote_score"] or 0) * 100 / max_score) if max_score else 0
+        )
+
     # Get eligible games for nomination (exclude already nominated games)
     nominated_game_ids = {n["game_id"] for n in nominations}
     eligible_games = (
@@ -371,6 +382,7 @@ def get_view_game_night_details(game_night_id, current_user_id):
         "nominations": nominations,
         "eligible_games": eligible_games,
         "user_nomination": user_nomination,
+        "current_player_id": current_player.id if current_player else None,
         "user_votes": user_votes,
         "top_places": None
         if not results_logged
@@ -387,40 +399,6 @@ def get_view_game_night_details(game_night_id, current_user_id):
         "rsvps": rsvps,
         "rsvp_in_count": sum(1 for p in players if rsvps.get(p.people_id) == "Can Make It"),
     }
-
-
-def get_filtered_games_for_game_night(
-    game_night_id, name_filter=None, players_filter=None, playtime_filter=None, current_user_id=None
-):
-    """Retrieve filtered games based on ownership by game night attendees, including wishlist status."""
-    game_night = GameNight.query.get_or_404(game_night_id)
-    player_ids = [player.people_id for player in game_night.players]  # Get attendees
-
-    # Get games owned by attendees
-    owned_game_ids = (
-        db.session.query(OwnedBy.game_id).filter(OwnedBy.person_id.in_(player_ids)).subquery()
-    )
-
-    query = Game.query.filter(Game.id.in_(owned_game_ids))
-
-    # Apply filters
-    if name_filter:
-        query = query.filter(Game.name.ilike(f"%{name_filter}%"))
-    if players_filter is not None:
-        query = query.filter(Game.min_players <= players_filter, Game.max_players >= players_filter)
-    if playtime_filter is not None:
-        query = query.filter(Game.playtime <= playtime_filter)
-
-    games = query.order_by(Game.name).all()
-
-    # Get wishlist status
-    wishlist_game_ids = set()
-    if current_user_id:
-        wishlist_game_ids = {
-            w.game_id for w in Wishlist.query.filter_by(person_id=current_user_id).all()
-        }
-
-    return [{"game": game, "in_wishlist": game.id in wishlist_game_ids} for game in games]
 
 
 def night_badges(game_night_id):

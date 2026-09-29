@@ -3,11 +3,12 @@
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 
-from app.models import GameNightGame, TrackerSession
+from app.models import TrackerSession
 from app.services import (
     admin_services,
     food_services,
     game_night_services,
+    game_picker_services,
     photo_services,
     poll_services,
 )
@@ -188,39 +189,20 @@ def add_game_to_night(game_night_id):
         flash(message, "success" if success else "danger")
         return redirect(url_for("game_night.view_game_night", game_night_id=game_night_id))
 
-    """Render the page for selecting a game and round to add to the game night."""
-    game_night = game_night_services.get_game_night_by_id(game_night_id)  # Fetch game night details
-
-    # Capture filters from request args
-    name_filter = request.args.get("name", "").strip()
-    players_filter = request.args.get("players", type=int)
-    playtime_filter = request.args.get("playtime", type=int)
-
-    # Fetch games that match criteria
-    games = game_night_services.get_filtered_games_for_game_night(
-        game_night_id, name_filter, players_filter, playtime_filter, current_user_id=current_user.id
+    game_night = game_night_services.get_game_night_by_id(game_night_id)
+    items, player_count = game_picker_services.picker_items(game_night, current_user.id)
+    nominated = sorted(
+        (i for i in items if i["nominated_by"]), key=lambda i: (-i["vote_score"], i["game"].name)
     )
-
-    # ✅ Get the next round number
-    existing_rounds = [
-        gng.round for gng in GameNightGame.query.filter_by(game_night_id=game_night_id).all()
-    ]
-    next_round = max(existing_rounds, default=0) + 1
-
-    attending_person_ids = {player.people_id for player in game_night.players}
-
-    context = {
-        "game_night": game_night,
-        "games": games,
-        "filters": {
-            "name": name_filter,
-            "players": players_filter,
-            "playtime": playtime_filter,
-        },
-        "next_round": next_round,
-        "attending_person_ids": attending_person_ids,
-    }
-    return render_template("add_game_to_night.html", **context)
+    others = [i for i in items if not i["nominated_by"]]
+    existing_rounds = [gng.round for gng in game_night.game_night_games]
+    return render_template(
+        "add_game_to_night.html",
+        game_night=game_night,
+        sections=[("Nominated", nominated), ("Everything else" if nominated else None, others)],
+        player_count=player_count,
+        next_round=max(existing_rounds, default=0) + 1,
+    )
 
 
 @game_night_bp.route("/game_night/<int:game_night_id>/delete", methods=["POST"])

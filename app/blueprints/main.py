@@ -73,8 +73,9 @@ def index():
 @login_required
 def all_game_nights():
     """Displays all game nights based on user role."""
-    game_nights = index_services.get_game_nights(current_user)
-
-    # Create context dictionary
-    context = {"game_nights": game_nights}
-    return render_template("all_game_nights.html", **context)
+    tz = pytz.timezone(current_app.config["APP_TIMEZONE"])
+    return render_template(
+        "all_game_nights.html",
+        cards=index_services.get_all_night_cards(current_user),
+        today=datetime.now(tz).date(),
+    )

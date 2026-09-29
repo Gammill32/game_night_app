@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Game Night Recap — {{ game_night.date.strftime('%B %d, %Y') }}{% endblock %}
+{% block title %}Game Night Recap — {{ game_night.date.strftime('%A, %B %-d, %Y') }}{% endblock %}
 
 {% block head %}<meta name="robots" content="noindex">{% endblock %}
 
@@ -14,7 +14,7 @@
        class="text-sm text-stone-500 hover:text-red-600 inline-block mb-3">&larr; Back to Game Night</a>
     {% endif %}
     <h1 class="text-2xl font-bold text-stone-800 mb-1">Game Night Recap</h1>
-    <p class="text-stone-500 text-sm">{{ game_night.date.strftime('%B %d, %Y') }}</p>
+    <p class="text-stone-500 text-sm">{{ game_night.date.strftime('%A, %B %-d, %Y') }}</p>
     {% if game_night.notes %}
     <p class="text-stone-600 text-sm mt-1">{{ game_night.notes }}</p>
     {% endif %}
@@ -65,19 +65,19 @@
   {% if badges_earned %}
   <div class="mb-8">
     <h2 class="text-xl font-semibold text-gray-800 mb-4">🏅 Badges Earned Tonight</h2>
-    <div class="space-y-2">
-      {% for b in badges_earned %}
-      <div class="flex items-center gap-3 bg-white rounded-lg shadow px-4 py-3">
-        <span class="text-2xl">{{ b.badge_icon }}</span>
-        <div>
-          <span class="font-semibold text-gray-800">{{ b.person_name }}</span>
-          <span class="text-gray-500 text-sm ml-1">earned</span>
-          <span class="font-semibold text-gray-800 text-sm">{{ b.badge_name }}</span>
-          <p class="text-xs text-gray-500">{{ b.badge_rule }}</p>
-        </div>
-      </div>
+    <ul class="space-y-2">
+      {% for name, awards in badges_earned | groupby('person_name') %}
+      <li class="rounded-lg bg-white px-4 py-3 shadow">
+        <p class="font-semibold text-gray-800">{{ name }}</p>
+        <ul class="mt-1 space-y-1">
+          {% for b in awards %}
+          <li class="flex items-start gap-2 text-sm"><span aria-hidden="true">{{ b.badge_icon }}</span>
+            <span><strong class="text-gray-800">{{ b.badge_name }}</strong> <span class="text-xs text-gray-500">— {{ b.badge_rule }}</span></span></li>
+          {% endfor %}
+        </ul>
+      </li>
       {% endfor %}
-    </div>
+    </ul>
   </div>
   {% endif %}
 

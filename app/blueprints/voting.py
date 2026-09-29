@@ -25,8 +25,25 @@ def nominate_game(game_night_id):
 @game_night_access_required
 def nominate_game_page(game_night_id):
     """Show a page where user can visually nominate a game."""
-    context = voting_services.get_nominate_game_page_context(game_night_id, current_user.id)
-    return render_template("nominate_game.html", **context)
+    from app.models import GameNight, GameNominations, Player
+    from app.services import game_picker_services
+
+    game_night = GameNight.query.get_or_404(game_night_id)
+    items, player_count = game_picker_services.picker_items(game_night, current_user.id)
+    me = Player.query.filter_by(game_night_id=game_night_id, people_id=current_user.id).first()
+    mine = (
+        me and GameNominations.query.filter_by(game_night_id=game_night_id, player_id=me.id).first()
+    )
+    my_game_id = mine.game_id if mine else None
+    # Games someone else nominated can't be nominated again.
+    available = [i for i in items if not i["nominated_by"] or i["game"].id == my_game_id]
+    return render_template(
+        "nominate_game.html",
+        game_night=game_night,
+        sections=[(None, available)],
+        player_count=player_count,
+        my_nomination=mine.game if mine else None,
+    )
 
 
 @voting_bp.route("/game_night/<int:game_night_id>/vote", methods=["POST"])
