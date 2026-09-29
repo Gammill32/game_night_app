@@ -34,6 +34,7 @@ def start_game_night():
                 form.getlist("attendees"),
                 food,
                 host_id=current_user.id,
+                address=form.get("address"),
             )
             if success and form.get("rsvp_poll"):
                 poll_services.create_availability_poll(game_night.id, current_user.id)
@@ -135,6 +136,7 @@ def edit_game_night(game_night_id):
                 form.getlist("attendees"),
                 food,
                 host_id=host_id,
+                address=form.get("address"),
             )
             flash(message, "success" if success else "error")
             if success:

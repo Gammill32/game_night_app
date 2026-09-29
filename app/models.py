@@ -18,6 +18,9 @@ class GameNight(db.Model):
     closed = db.Column(db.Boolean, default=False)
     # Food: none / provided (someone has it covered) / signup (who's bringing
     # what) / split (someone buys, everyone chips in) / both (signup + split).
+    # Where it's happening. Private: only people who can open the night see it,
+    # and it's deleted (set to NULL) once the night is finalized or has passed.
+    address = db.Column(db.String, nullable=True)
     food_mode = db.Column(db.String, nullable=False, default="none", server_default="none")
     food_provider_id = db.Column(db.Integer, db.ForeignKey("people.id", ondelete="SET NULL"))
     food_note = db.Column(db.String)

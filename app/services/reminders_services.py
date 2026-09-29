@@ -36,6 +36,10 @@ def check_and_send_reminders():
 
     tz = _get_timezone()
     today = datetime.now(tz).date()
+    # Addresses are only kept until the night is over.
+    from app.services.game_night_services import clear_past_addresses
+
+    clear_past_addresses(today)
     base_url = current_app.config.get("APP_BASE_URL", "https://gamenight.sgammill.com")
 
     for game_night in GameNight.query.filter(

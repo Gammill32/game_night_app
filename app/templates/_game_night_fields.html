@@ -6,6 +6,15 @@
            value="{{ game_night.date.strftime('%Y-%m-%d') if game_night else request.form.get('date', '') }}"
            class="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent" />
   </div>
+  {% if not (game_night and game_night.final) %}
+  <div>
+    <label for="addressInput" class="block text-sm font-medium text-stone-700 mb-1">Address <span class="font-normal text-stone-500">(optional)</span></label>
+    <input type="text" name="address" id="addressInput" maxlength="300" autocomplete="off"
+           value="{{ game_night.address or '' if game_night else request.form.get('address', '') }}" placeholder="e.g. 123 Elm St, Apt 4"
+           class="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent" />
+    <p class="mt-1 text-xs text-stone-500">🔒 Only this night's players, host and admins see it. It's deleted for good once the night is finalized (or the day after, if nobody finalizes it).</p>
+  </div>
+  {% endif %}
   <div>
     <label for="notesInput" class="block text-sm font-medium text-stone-700 mb-1">Notes</label>
     <textarea name="notes" id="notesInput" rows="3" placeholder="Time, place, anything people should know"

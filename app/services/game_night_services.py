@@ -63,13 +63,15 @@ def manage_attendees(game_night, attendees_ids):
     return None
 
 
-def start_game_night(date_str, notes, attendees_ids, food=("none", None, None), host_id=None):
+def start_game_night(
+    date_str, notes, attendees_ids, food=("none", None, None), host_id=None, address=None
+):
     """Create a new game night and add attendees. Returns (success, message, game_night)."""
     date = parse_date(date_str)
     if not date:
         return False, "Invalid date format. Please use YYYY-MM-DD.", None
 
-    game_night = GameNight(date=date, notes=notes, host_id=host_id)
+    game_night = GameNight(date=date, notes=notes, host_id=host_id, address=clean_address(address))
     food_services.apply_food_settings(game_night, *food)
     db.session.add(game_night)
     db.session.flush()  # get game_night.id without committing
@@ -91,7 +93,9 @@ def get_game_night_details(game_night_id):
     return game_night, people, current_attendees
 
 
-def edit_game_night(game_night_id, date_str, notes, attendees_ids, food=None, host_id=None):
+def edit_game_night(
+    game_night_id, date_str, notes, attendees_ids, food=None, host_id=None, address=None
+):
     """Edit an existing game night. host_id (admins only) changes the host."""
     game_night = GameNight.query.get_or_404(game_night_id)
 
@@ -101,6 +105,8 @@ def edit_game_night(game_night_id, date_str, notes, attendees_ids, food=None, ho
 
     game_night.date = date
     game_night.notes = notes
+    if address is not None and not game_night.final:
+        game_night.address = clean_address(address)
     if game_night.availability_poll is not None:
         game_night.availability_poll.title = poll_services.availability_title(date)
     if food is not None:
@@ -114,6 +120,23 @@ def edit_game_night(game_night_id, date_str, notes, attendees_ids, food=None, ho
 
     db.session.commit()
     return True, "Game night updated successfully."
+
+
+def clean_address(raw):
+    """Trimmed address, or None when blank."""
+    return (raw or "").strip()[:300] or None
+
+
+def clear_past_addresses(today):
+    """Delete addresses of nights that have passed (a day's grace, in case
+    nobody finalized them). Returns how many were cleared."""
+    from datetime import timedelta
+
+    count = GameNight.query.filter(
+        GameNight.address.isnot(None), GameNight.date < today - timedelta(days=1)
+    ).update({GameNight.address: None}, synchronize_session=False)
+    db.session.commit()
+    return count
 
 
 def delete_game_night(game_night_id):
@@ -209,6 +232,8 @@ def toggle_game_night_field(game_night_id, field):
 
     game_night = GameNight.query.get_or_404(game_night_id)
     setattr(game_night, field, not getattr(game_night, field))
+    if field == "final" and game_night.final:
+        game_night.address = None  # the night is over: don't keep where it was
 
     if field == "final" and getattr(game_night, field) is False:
         # Clear night-triggered badges so re-finalization starts clean

@@ -235,6 +235,9 @@ def make_night(app, db):
     for gid in made:
         gn = _db.session.get(GameNight, gid)
         if gn is not None:
+            from app.models import PersonBadge
+
+            PersonBadge.query.filter_by(game_night_id=gid).delete()  # finalizing awards badges
             for poll in gn.polls:
                 _db.session.delete(poll)
             _db.session.delete(gn)

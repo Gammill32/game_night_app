@@ -16,6 +16,16 @@
     </div>
     <p class="mt-1 text-sm text-stone-500">{% if game_night.host %}Hosted by <strong class="text-stone-700">{{ 'you' if game_night.host_id == current_user.id else game_night.host.first_name ~ ' ' ~ game_night.host.last_name }}</strong>{% else %}No host yet{% endif %}</p>
     {% if game_night.notes %}<p class="mt-1 text-sm text-stone-600 whitespace-pre-line">{{ game_night.notes }}</p>{% endif %}
+    {% if game_night.address and not game_night.final %}
+    <div class="mt-2 flex flex-wrap items-center gap-2 rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm">
+      <span aria-hidden="true">📍</span>
+      <span class="min-w-0 flex-1 font-medium text-stone-800">{{ game_night.address }}</span>
+      <a href="https://www.google.com/maps/search/?api=1&query={{ game_night.address | urlencode }}" target="_blank" rel="noopener"
+         class="rounded-lg bg-red-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-red-700">Open in Maps</a>
+      <button type="button" data-copy="{{ game_night.address }}" class="text-xs text-stone-600 underline">Copy</button>
+      <span class="w-full text-[11px] text-stone-400">Only players can see this; it's deleted when the night is finalized.</span>
+    </div>
+    {% endif %}
     <div class="mt-3 flex flex-wrap gap-2">
       {% if game_night.final %}
       <a href="{{ url_for('game_night.recap_game_night', game_night_id=game_night.id) }}" class="rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm font-medium text-stone-700 hover:bg-stone-50">Share recap</a>
