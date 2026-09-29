@@ -61,6 +61,12 @@ class GameNight(db.Model):
         return self.food_mode in ("signup", "both")
 
     @property
+    def food_list(self):
+        """Whether the night has a 'who's bringing what' list. On a night where
+        food is provided it's just for extras people are bringing."""
+        return self.food_mode in ("signup", "both", "provided")
+
+    @property
     def food_split(self):
         return self.food_mode in ("split", "both")
 

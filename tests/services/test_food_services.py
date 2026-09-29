@@ -197,3 +197,45 @@ def test_pay_back_flow_on_the_page(client, make_person, make_night):
     from app.services import food_services as fs
 
     assert fs.owed_to(gn, ann) == []
+
+
+def test_provided_night_takes_extras_without_splitting(
+    app, client, make_person, make_night, monkeypatch
+):
+    import datetime
+
+    import pytz
+
+    from app.services import reminders_services
+
+    adm, ann = make_person("Adm", admin=True), make_person("Ann")
+    today = datetime.datetime.now(pytz.timezone(app.config["APP_TIMEZONE"])).date()
+    gn = make_night(adm, ann, date=today, food_mode="provided", food_note="Chili")
+    gn.food_provider_id = adm.id
+    _db.session.commit()
+
+    assert food_services.add_item(gn, ann, "Cornbread")[0]
+    assert food_services.add_item(gn, adm, "Beer")[0]  # even the host's extras are theirs
+    items = {i.name: i.claimed_by for i in FoodItem.query.filter_by(game_night_id=gn.id)}
+    assert items == {"Cornbread": ann.id, "Beer": adm.id}
+    # no split costs on a provided night
+    ok, msg = food_services.add_expense(gn, ann, MultiDict({"description": "x", "amount": "5"}))
+    assert not ok
+
+    login(client, ann)
+    page = " ".join(client.get(f"/game_night/{gn.id}").get_data(as_text=True).split())
+    assert "<strong>Adm</strong> is providing food: Chili" in page
+    assert (
+        "Bringing something too?" in page
+        and "Cornbread" in page
+        and "Nothing here gets split" in page
+    )
+    assert "I&#39;ll bring it" not in page and "I'll bring it" not in page
+    assert "Splitting the cost" not in page
+
+    sent = {}
+    monkeypatch.setattr(
+        reminders_services, "send_email", lambda to, s, body: sent.__setitem__(to, body)
+    )
+    reminders_services.check_and_send_reminders()
+    assert "Ann is also bringing Cornbread" in sent[adm.email]

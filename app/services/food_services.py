@@ -105,8 +105,8 @@ def apply_food_settings(game_night, mode, provider_id, note):
 
 
 def add_item(game_night, user, name, claim=False):
-    if not game_night.food_signup:
-        return False, "This night doesn't have a food sign-up list."
+    if not game_night.food_list:
+        return False, "This night doesn't have a food list."
     if not food_open(game_night):
         return False, "This game night is finalized."
     name = (name or "").strip()[:80]
@@ -114,8 +114,9 @@ def add_item(game_night, user, name, claim=False):
         return False, "Say what the item is, e.g. chips or a 12-pack."
     item = FoodItem(game_night_id=game_night.id, name=name, added_by=user.id)
     # Players adding something are bringing it; admins adding items build a
-    # list for others to claim unless they tick "I'm bringing it".
-    if claim or not user.is_admin_or_owner:
+    # list for others to claim unless they tick "I'm bringing it". When the
+    # food is provided the list is only for extras, so it's always the adder's.
+    if claim or not user.is_admin_or_owner or game_night.food_mode == "provided":
         item.claimed_by = user.id
     db.session.add(item)
     db.session.commit()
@@ -363,7 +364,11 @@ def reminder_lines(game_night):
         )
     elif game_night.food_mode != "none" and game_night.food_note:
         lines.append(game_night.food_note)
-    if game_night.food_signup:
+    if game_night.food_mode == "provided":
+        for item in game_night.food_items:
+            if item.claimer:
+                lines.append(f"{item.claimer.first_name} is also bringing {item.name}")
+    elif game_night.food_signup:
         for item in game_night.food_items:
             who = item.claimer.first_name if item.claimer else "nobody yet — can you bring it?"
             lines.append(f"{item.name}: {who}")
