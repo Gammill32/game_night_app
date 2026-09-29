@@ -3,8 +3,7 @@ services:
   postgres:
     image: postgres:16
     container_name: game_night_postgres
-    ports:
-      - "5434:5432"
+    # No host port: the app reaches it over web_network as game_night_postgres:5432.
     environment:
       - POSTGRES_USER
       - POSTGRES_PASSWORD
