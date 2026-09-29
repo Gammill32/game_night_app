@@ -54,7 +54,7 @@ def test_past_addresses_are_cleared_by_the_daily_job(app, make_person, make_nigh
     _db.session.refresh(old)
     _db.session.refresh(soon)
     assert old.address is None and soon.address == "1 Soon St"
-    assert "1 Soon St" in sent[ann.email] and "Open in Maps" in sent[ann.email]
+    assert "1 Soon St" not in sent[ann.email]  # addresses never go out by email
 
 
 def test_host_sets_address_when_starting(client, make_person):

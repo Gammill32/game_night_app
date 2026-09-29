@@ -2,7 +2,6 @@
   <p>Hi {{ user.first_name }},</p>
   <p>Game night is <strong>{{ when }}</strong>, {{ game_night.date.strftime('%A, %B %-d') }}.</p>
   {% if game_night.notes %}<p style="white-space: pre-line; color: #555555;">{{ game_night.notes }}</p>{% endif %}
-  {% if game_night.address %}<p>📍 <strong>{{ game_night.address }}</strong> · <a href="https://www.google.com/maps/search/?api=1&query={{ game_night.address | urlencode }}" style="color: #dc2626;">Open in Maps</a></p>{% endif %}
 
   {% if needs_rsvp or maybe or needs_nomination or needs_votes %}
   <div style="margin: 18px 0; padding: 12px 16px; border-radius: 8px; background: #fef3c7; color: #78350f;">
