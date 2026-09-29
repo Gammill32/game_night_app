@@ -5,14 +5,23 @@
 <div class="max-w-5xl mx-auto">
   {% with active = 'mine' %}{% include "_wishlist_header.html" %}{% endwith %}
   <ul class="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-    {% for game in games %}
+    {% for item in games %}
+    {% set game = item.game %}
     {% call wishlist_row(game, None, game.owners | map(attribute='person') | list) %}
+      {% if item.me_too %}<span class="rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-blue-700">Me too</span>{% endif %}
       <form action="{{ url_for('games.claim_game', game_id=game.id) }}" method="POST">
         <button class="rounded-full bg-red-600 px-2.5 py-0.5 text-[11px] font-medium text-white hover:bg-red-700">I bought it</button>
       </form>
+      {% if item.me_too %}
+      <form action="{{ url_for('games.vote_wishlist', game_id=game.id) }}" method="POST">
+        <input type="hidden" name="next" value="mine">
+        <button class="rounded-full border border-stone-300 px-2.5 py-0.5 text-[11px] font-medium text-stone-700 hover:bg-stone-50">Remove</button>
+      </form>
+      {% else %}
       <form action="{{ url_for('games.remove_from_wishlist', game_id=game.id) }}" method="POST" data-confirm="Take {{ game.name }} off your wishlist?">
         <button class="rounded-full border border-stone-300 px-2.5 py-0.5 text-[11px] font-medium text-stone-700 hover:bg-stone-50">Remove</button>
       </form>
+      {% endif %}
     {% endcall %}
     {% else %}
     <li class="col-span-full rounded-xl border border-dashed border-stone-300 p-8 text-center text-sm text-stone-500">Nothing on your wishlist yet. <a href="{{ url_for('games.add_to_wishlist') }}" class="text-red-600 underline">Add a game</a>, or tap <em>Me too</em> on <a href="{{ url_for('games.wishlist') }}" class="underline">everyone's list</a>.</li>

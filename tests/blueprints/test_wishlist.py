@@ -142,6 +142,8 @@ def test_group_wishlist_shows_who_wants_it(client, make_person):
     client.post(f"/wishlist/vote/{game.id}")
     page = " ".join(client.get("/wishlist").get_data(as_text=True).split())
     assert "<strong>2</strong> want it: Ann, you" in page and "✓ You want it too" in page
+    mine = client.get("/wishlist/mine").get_data(as_text=True)
+    assert game.name in mine and "Me too" in mine  # shows under Mine as well
 
     client.post(f"/game/{game.id}/claim")  # Bo bought it
     page = " ".join(client.get("/wishlist").get_data(as_text=True).split())

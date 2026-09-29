@@ -344,8 +344,13 @@ def get_game_details(game_id, user_id):
 
 
 def get_wishlist(user_id):
-    """Displays the user's wishlist."""
-    return Game.query.join(Wishlist).filter(Wishlist.person_id == user_id).order_by(Game.name).all()
+    """Your wishlist: games you added, plus others' picks you said 'Me too' to.
+    Returns [{"game", "me_too"}] by name."""
+    added = Game.query.join(Wishlist).filter(Wishlist.person_id == user_id).all()
+    seconded = Game.query.join(WishlistVote).filter(WishlistVote.person_id == user_id).all()
+    items = [{"game": g, "me_too": False} for g in added]
+    items += [{"game": g, "me_too": True} for g in seconded if g not in added]
+    return sorted(items, key=lambda i: i["game"].name.lower())
 
 
 def get_play_stats():

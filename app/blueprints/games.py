@@ -152,7 +152,9 @@ def remove_from_wishlist(game_id):
 def vote_wishlist(game_id):
     success, message = games_services.toggle_wishlist_vote(current_user.id, game_id)
     flash(message, "success" if success else "info")
-    return redirect(url_for("games.wishlist"))
+    return redirect(
+        url_for("games.my_wishlist" if request.form.get("next") == "mine" else "games.wishlist")
+    )
 
 
 @games_bp.route("/wishlist/toggle/<int:game_id>", methods=["POST"])
