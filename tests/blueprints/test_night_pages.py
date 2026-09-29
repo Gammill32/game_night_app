@@ -102,3 +102,38 @@ def test_changing_nomination_keeps_other_rankings(client, make_person, make_nigh
     GameNominations.query.filter_by(game_night_id=gn.id).delete()
     _db.session.commit()
     _cleanup(a, b, c)
+
+
+def test_votes_never_outlive_a_nomination(admin_client, client, make_person, make_night):
+    from app.models import GameVotes
+    from app.services import game_night_services, voting_services
+
+    ann, bo, cy = make_person("Ann"), make_person("Bo"), make_person("Cy")
+    gn = make_night(ann, bo, cy, date=dt.date(2031, 8, 22))
+    a, b, c = _games(ann, "GhostA", "GhostB", "GhostC")
+    voting_services.nominate_game(gn.id, ann.id, a.id)
+    voting_services.nominate_game(gn.id, bo.id, b.id)
+    voting_services.vote_game(gn.id, cy.id, {a.id: 1, b.id: 2})
+
+    # 1. Ann switches from GhostA to GhostC: Cy's vote for GhostA goes.
+    voting_services.nominate_game(gn.id, ann.id, c.id)
+    assert {v.game_id for v in GameVotes.query.filter_by(game_night_id=gn.id)} == {b.id}
+
+    # 2. Bo is taken off the night: his nomination and everyone's votes for it go.
+    ok, _ = game_night_services.edit_game_night(gn.id, str(gn.date), "", [str(ann.id), str(cy.id)])
+    assert ok
+    assert GameVotes.query.filter_by(game_night_id=gn.id).count() == 0
+
+    # 3. Even a stray vote left in the table isn't shown as a nomination.
+    cy_player = Player.query.filter_by(game_night_id=gn.id, people_id=cy.id).one()
+    _db.session.add(GameVotes(game_night_id=gn.id, player_id=cy_player.id, game_id=a.id, rank=1))
+    _db.session.commit()
+    login(client, cy)
+    page = client.get(f"/game_night/{gn.id}").get_data(as_text=True)
+    assert "GhostC" in page and "GhostA" not in page
+    assert "You've ranked" not in page  # the stray vote doesn't count as Cy's ranking
+
+    GameVotes.query.filter_by(game_night_id=gn.id).delete()
+    GameNominations.query.filter_by(game_night_id=gn.id).delete()
+    _db.session.commit()
+    _cleanup(a, b, c)

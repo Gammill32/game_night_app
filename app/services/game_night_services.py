@@ -50,6 +50,11 @@ def manage_attendees(game_night, attendees_ids):
         return f"{names} already {'has' if len(with_results) == 1 else 'have'} results logged for this night; remove those results before removing them."
 
     for player in removing:
+        # Their nomination goes with them, so nobody's votes for it count any more.
+        for nomination in player.nominations:
+            GameVotes.query.filter_by(
+                game_night_id=game_night.id, game_id=nomination.game_id
+            ).delete()
         db.session.delete(player)  # ORM cascade removes their nominations and votes
 
     current_attendees = {p.people_id for p in game_night.players}
@@ -293,7 +298,10 @@ def get_view_game_night_details(game_night_id, current_user_id):
         user_votes_query = GameVotes.query.filter_by(
             game_night_id=game_night_id, player_id=current_player.id
         ).all()
-        user_votes = {vote.game_id: vote.rank for vote in user_votes_query}
+        nominated_ids = {
+            n.game_id for n in GameNominations.query.filter_by(game_night_id=game_night_id)
+        }
+        user_votes = {v.game_id: v.rank for v in user_votes_query if v.game_id in nominated_ids}
 
     # Fetch nominations and vote scores using the SQL View
     nominations = [
@@ -306,6 +314,9 @@ def get_view_game_night_details(game_night_id, current_user_id):
             "user_vote": user_votes.get(nomination.game_id, None),  # ✅ Added user_vote
         }
         for nomination in GameNightNominationsVotes.query.filter_by(game_night_id=game_night_id)
+        # Only games that are actually nominated (votes can't outlive a nomination,
+        # but the view would list them if any did).
+        .filter(GameNightNominationsVotes.total_nominations > 0)
         .order_by(
             GameNightNominationsVotes.vote_score.desc(),
             GameNightNominationsVotes.total_nominations.desc(),

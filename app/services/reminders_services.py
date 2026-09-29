@@ -40,6 +40,11 @@ def check_and_send_reminders():
                 func.count(GameVotes.id).label("vote_count"),
             )
             .join(GameVotes, Game.id == GameVotes.game_id)
+            .join(
+                GameNominations,
+                (GameNominations.game_id == Game.id)
+                & (GameNominations.game_night_id == GameVotes.game_night_id),
+            )
             .filter(GameVotes.game_night_id == game_night.id)
             .group_by(Game.id)
             .order_by(
