@@ -199,6 +199,18 @@ def submit_response(poll: Poll, option_ids: list[int], person_id: int) -> tuple[
 def view_context(poll: Poll, person_id: int) -> dict:
     """Everything the poll widget needs for one viewer."""
     active = poll_is_active(poll)
+    if poll.date_poll:
+        from app.services import date_poll_services
+
+        answers = date_poll_services.my_answers(poll, person_id)
+        return {
+            "poll": poll,
+            "active": active,
+            "user_votes": set(answers),
+            "date_answers": answers,
+            "date_rows": date_poll_services.summary(poll) if answers or not active else None,
+            "results": None,
+        }
     user_votes = get_user_responses(poll, person_id)
     return {
         "poll": poll,

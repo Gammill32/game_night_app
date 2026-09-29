@@ -49,7 +49,12 @@ class GameNight(db.Model):
         cascade="all, delete-orphan",
         order_by="GameNightPhoto.created_at",
     )
-    polls = db.relationship("Poll", back_populates="game_night", order_by="Poll.created_at")
+    polls = db.relationship(
+        "Poll",
+        back_populates="game_night",
+        order_by="Poll.created_at",
+        foreign_keys="Poll.game_night_id",
+    )
 
     @property
     def food_signup(self):
@@ -368,9 +373,16 @@ class Poll(db.Model):
     # The night's RSVP poll (created from the night page), as opposed to any
     # other poll that's merely linked to the night.
     availability = db.Column(db.Boolean, default=False, nullable=False, server_default="false")
+    # A date poll: one option per date in a range; people answer yes / maybe
+    # / no for each date, and an admin picks one to create the game night.
+    date_poll = db.Column(db.Boolean, default=False, nullable=False, server_default="false")
+    picked_game_night_id = db.Column(
+        db.Integer, db.ForeignKey("gamenights.id", ondelete="SET NULL"), nullable=True
+    )
 
     creator = db.relationship("Person", foreign_keys=[created_by])
-    game_night = db.relationship("GameNight", back_populates="polls")
+    game_night = db.relationship("GameNight", back_populates="polls", foreign_keys=[game_night_id])
+    picked_game_night = db.relationship("GameNight", foreign_keys=[picked_game_night_id])
     options = db.relationship(
         "PollOption",
         back_populates="poll",
@@ -392,6 +404,7 @@ class PollOption(db.Model):
     poll_id = db.Column(db.Integer, db.ForeignKey("polls.id"), nullable=False)
     label = db.Column(db.Text, nullable=False)
     display_order = db.Column(db.Integer, default=0, nullable=False)
+    option_date = db.Column(db.Date, nullable=True)  # date polls only
 
     poll = db.relationship("Poll", back_populates="options")
     responses = db.relationship(
@@ -407,6 +420,7 @@ class PollResponse(db.Model):
     option_id = db.Column(db.Integer, db.ForeignKey("poll_options.id"), nullable=False)
     person_id = db.Column(db.Integer, db.ForeignKey("people.id"), nullable=True)
     respondent_name = db.Column(db.Text, nullable=True)
+    answer = db.Column(db.String, nullable=True)  # date polls: yes / maybe / no
     created_at = db.Column(db.DateTime, default=func.current_timestamp())
 
     poll = db.relationship("Poll", back_populates="responses")

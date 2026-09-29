@@ -1,0 +1,53 @@
+{# Date poll answer grid + summary. Included from _poll_widget.html. #}
+{% set answer_styles = {'yes': 'peer-checked:bg-green-600 peer-checked:border-green-600', 'maybe': 'peer-checked:bg-amber-500 peer-checked:border-amber-500', 'no': 'peer-checked:bg-stone-500 peer-checked:border-stone-500'} %}
+{% if active %}
+<form hx-post="{{ url_for('polls.poll_submit', token=poll.token) }}" hx-target="#poll-{{ poll.id }}" hx-swap="outerHTML">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+  <ul class="divide-y divide-stone-100 rounded-lg border border-stone-200">
+    {% for option in poll.options %}
+    {% set mine = date_answers.get(option.id) %}
+    <li class="flex flex-wrap items-center justify-between gap-2 px-3 py-2">
+      <span class="text-sm font-medium text-stone-800">{{ option.label }}</span>
+      <span class="flex gap-1" role="radiogroup" aria-label="{{ option.label }}">
+        {% for value, label in [('yes', 'Yes'), ('maybe', 'If needed'), ('no', 'No')] %}
+        <label class="cursor-pointer">
+          <input type="radio" name="answer_{{ option.id }}" value="{{ value }}" {% if mine == value %}checked{% endif %} class="peer sr-only">
+          <span class="inline-block rounded-full border border-stone-300 px-2.5 py-1 text-xs font-medium text-stone-600 peer-checked:text-white peer-focus-visible:ring-2 peer-focus-visible:ring-red-400 {{ answer_styles[value] }}">{{ label }}</span>
+        </label>
+        {% endfor %}
+      </span>
+    </li>
+    {% endfor %}
+  </ul>
+  <div class="flex flex-wrap items-center gap-3 mt-3">
+    <button type="submit" class="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 transition-colors">
+      {{ 'Update my dates' if date_answers else 'Submit' }}
+    </button>
+    {% if poll.closes_at %}<span class="text-xs text-stone-400">Closes {{ (poll.closes_at|local_dt).strftime('%b %-d at %-I:%M %p') }}</span>{% endif %}
+  </div>
+</form>
+{% else %}
+<p class="text-sm text-stone-500">
+  This poll is closed.
+  {% if poll.picked_game_night %}We picked <a class="underline" href="{{ url_for('game_night.view_game_night', game_night_id=poll.picked_game_night_id) }}">{{ poll.picked_game_night.date.strftime('%A, %B %-d') }}</a>.{% endif %}
+</p>
+{% endif %}
+
+{% if date_rows %}
+<div class="mt-4">
+  <h3 class="text-sm font-semibold text-stone-700 mb-2">Who's free</h3>
+  <ul class="space-y-1.5">
+    {% for row in date_rows %}
+    <li class="rounded-lg px-3 py-2 text-sm {{ 'bg-green-50 ring-1 ring-green-200' if row.best else 'bg-stone-50' }}">
+      <div class="flex items-center justify-between gap-2">
+        <span class="font-medium text-stone-800">{{ row.option.label }}{% if row.best %} <span class="ml-1 text-xs text-green-700">★ best so far</span>{% endif %}</span>
+        <span class="text-xs text-stone-600"><span class="text-green-700 font-semibold">{{ row.yes|length }} yes</span>{% if row.maybe %} · <span class="text-amber-700">{{ row.maybe|length }} if needed</span>{% endif %}</span>
+      </div>
+      {% if row.yes or row.maybe %}
+      <p class="text-xs text-stone-500 mt-0.5">{{ row.yes|map(attribute='first_name')|join(', ') }}{% if row.yes and row.maybe %}, {% endif %}{% for p in row.maybe %}{{ p.first_name }} (if needed){% if not loop.last %}, {% endif %}{% endfor %}</p>
+      {% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}

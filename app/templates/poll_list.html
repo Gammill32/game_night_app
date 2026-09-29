@@ -3,10 +3,16 @@
 {% block content %}
 <div class="flex items-center justify-between mb-6">
   <h1 class="text-2xl font-bold text-stone-800">Polls</h1>
-  <a href="{{ url_for('polls.poll_create') }}"
-     class="inline-flex items-center rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 transition-colors">
-    New Poll
-  </a>
+  <div class="flex gap-2">
+    <a href="{{ url_for('polls.poll_create', kind='dates') }}"
+       class="inline-flex items-center rounded-lg border border-stone-300 px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50 transition-colors">
+      Find a Date
+    </a>
+    <a href="{{ url_for('polls.poll_create') }}"
+       class="inline-flex items-center rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 transition-colors">
+      New Poll
+    </a>
+  </div>
 </div>
 
 {% if polls %}
@@ -20,7 +26,8 @@
         <p class="text-sm text-stone-500 mt-0.5">{{ poll.description }}</p>
         {% endif %}
         <div class="flex gap-3 mt-2 text-xs text-stone-400">
-          <span>{{ poll.options | length }} options</span>
+          <span>{% if poll.date_poll %}Find a date · {{ poll.options | length }} dates{% else %}{{ poll.options | length }} options{% endif %}</span>
+          {% if poll.picked_game_night %}<a href="{{ url_for('game_night.view_game_night', game_night_id=poll.picked_game_night_id) }}" class="text-green-700 underline">Picked {{ poll.picked_game_night.date.strftime('%b %-d') }}</a>{% endif %}
           {% if poll.closes_at %}<span>Closes {{ (poll.closes_at|local_dt).strftime('%b %-d, %-I:%M %p') }}</span>{% endif %}
           {% if poll.game_night %}<a href="{{ url_for('game_night.view_game_night', game_night_id=poll.game_night_id) }}" class="text-stone-500 underline">{{ 'RSVP for' if poll.availability else 'Linked to' }} {{ poll.game_night.date.strftime('%b %-d') }} night</a>{% endif %}
           {% if poll.closed %}<span class="text-amber-600 font-medium">Closed</span>{% endif %}

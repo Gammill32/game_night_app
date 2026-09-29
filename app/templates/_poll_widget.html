@@ -5,7 +5,9 @@
   <div class="rounded-lg px-4 py-2 mb-3 text-sm {{ 'bg-green-50 text-green-800 border border-green-200' if success else 'bg-red-50 text-red-800 border border-red-200' }}">{{ message }}</div>
   {% endif %}
 
-  {% if active %}
+  {% if poll.date_poll %}
+  {% include "_date_poll_form.html" %}
+  {% elif active %}
   <form hx-post="{{ url_for('polls.poll_submit', token=poll.token) }}"
         hx-target="#poll-{{ poll.id }}"
         hx-swap="outerHTML">

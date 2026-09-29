@@ -1,8 +1,14 @@
 {% extends "base.html" %}
 {% block title %}New Poll — Game Night{% endblock %}
+{% set f = request.form %}
+{% set kind = f.get('kind') or request.args.get('kind', 'choice') %}
+{% set selected_night = f.get('game_night_id', '')|int(0) if request.method == 'POST' else request.args.get('game_night_id', 0)|int %}
 {% block content %}
-<div class="max-w-lg">
-  <h1 class="text-2xl font-bold text-stone-800 mb-6">Create Poll</h1>
+<div class="max-w-lg mx-auto">
+  <div class="flex items-center gap-3 mb-6">
+    <a href="{{ url_for('polls.poll_list') }}" class="text-sm text-stone-500 hover:text-red-600 transition-colors">&larr; Polls</a>
+    <h1 class="text-2xl font-bold text-stone-800">New Poll</h1>
+  </div>
 
   {% if error %}
   <div class="mb-4 rounded-lg px-4 py-3 text-sm bg-red-50 text-red-800 border border-red-200">{{ error }}</div>
@@ -11,79 +17,126 @@
   <form method="POST" action="{{ url_for('polls.poll_create') }}">
     <div class="bg-white rounded-xl border border-stone-200 shadow-sm p-6 space-y-5">
 
+      <fieldset>
+        <legend class="block text-sm font-medium text-stone-700 mb-2">Kind of poll</legend>
+        <div class="grid grid-cols-2 gap-2">
+          <label class="flex items-start gap-2 rounded-lg border border-stone-200 p-3 cursor-pointer has-[:checked]:border-red-400 has-[:checked]:bg-red-50/50">
+            <input type="radio" name="kind" value="choice" {% if kind != 'dates' %}checked{% endif %} class="mt-0.5 accent-red-600">
+            <span><span class="block text-sm font-medium text-stone-800">Choice</span><span class="block text-xs text-stone-500">People pick from options you write.</span></span>
+          </label>
+          <label class="flex items-start gap-2 rounded-lg border border-stone-200 p-3 cursor-pointer has-[:checked]:border-red-400 has-[:checked]:bg-red-50/50">
+            <input type="radio" name="kind" value="dates" {% if kind == 'dates' %}checked{% endif %} class="mt-0.5 accent-red-600">
+            <span><span class="block text-sm font-medium text-stone-800">Find a date</span><span class="block text-xs text-stone-500">People say which dates work; you pick one to create the night.</span></span>
+          </label>
+        </div>
+      </fieldset>
+
       <div>
-        <label class="block text-sm font-medium text-stone-700 mb-1">Title <span class="text-red-600">*</span></label>
-        <input type="text" name="title" required
+        <label for="title" class="block text-sm font-medium text-stone-700 mb-1">Title <span class="text-red-600">*</span></label>
+        <input type="text" name="title" id="title" required value="{{ f.get('title', '') }}"
+               data-date-default="When should we play next?"
                class="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent" />
       </div>
 
       <div>
-        <label class="block text-sm font-medium text-stone-700 mb-1">Description</label>
-        <textarea name="description" rows="2"
-                  class="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"></textarea>
+        <label for="description" class="block text-sm font-medium text-stone-700 mb-1">Description</label>
+        <textarea name="description" id="description" rows="2"
+                  class="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent">{{ f.get('description', '') }}</textarea>
       </div>
 
-      <div>
-        <label class="block text-sm font-medium text-stone-700 mb-2">Options <span class="text-red-600">*</span></label>
-        <div id="options-list" class="space-y-2">
-          <div class="flex gap-2">
-            <input type="text" name="option_labels" placeholder="Option 1"
-                   class="flex-1 rounded-lg border border-stone-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent" />
+      <!-- Choice poll -->
+      <div data-kind="choice" class="space-y-5 {% if kind == 'dates' %}hidden{% endif %}">
+        <div>
+          <label class="block text-sm font-medium text-stone-700 mb-2">Options <span class="text-red-600">*</span></label>
+          <div id="options-list" class="space-y-2">
+            {% set labels = f.getlist('option_labels') or ['', ''] %}
+            {% for label in labels %}
+            <div class="flex gap-2">
+              <input type="text" name="option_labels" value="{{ label }}" placeholder="Option {{ loop.index }}"
+                     class="flex-1 rounded-lg border border-stone-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent" />
+            </div>
+            {% endfor %}
           </div>
-          <div class="flex gap-2">
-            <input type="text" name="option_labels" placeholder="Option 2"
-                   class="flex-1 rounded-lg border border-stone-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent" />
+          <button type="button"
+                  hx-get="{{ url_for('polls.poll_option_row') }}"
+                  hx-target="#options-list"
+                  hx-swap="beforeend"
+                  class="mt-2 text-sm text-red-600 hover:text-red-700 underline">
+            + Add option
+          </button>
+        </div>
+
+        <label class="flex items-center gap-3 text-sm font-medium text-stone-700">
+          <input type="checkbox" name="multi_select" value="true" {% if f.get('multi_select') %}checked{% endif %}
+                 class="rounded border-stone-300 accent-red-600" />
+          Allow multiple selections
+        </label>
+
+        <div>
+          <label for="game_night_id" class="block text-sm font-medium text-stone-700 mb-1">Game night (optional)</label>
+          <select name="game_night_id" id="game_night_id"
+                  class="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent">
+            <option value="">Not linked to a night</option>
+            {% for gn in nights %}
+            <option value="{{ gn.id }}" {% if selected_night == gn.id %}selected{% endif %}>{{ gn.date.strftime('%B %-d, %Y') }}</option>
+            {% endfor %}
+          </select>
+          <p class="text-xs text-stone-400 mt-1">A linked poll shows on that night's page and only its players can see it.</p>
+        </div>
+      </div>
+
+      <!-- Date poll -->
+      <div data-kind="dates" class="space-y-4 {% if kind != 'dates' %}hidden{% endif %}">
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label for="start_date" class="block text-sm font-medium text-stone-700 mb-1">From</label>
+            <input type="date" name="start_date" id="start_date" value="{{ f.get('start_date', '') }}"
+                   class="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent">
+          </div>
+          <div>
+            <label for="end_date" class="block text-sm font-medium text-stone-700 mb-1">To</label>
+            <input type="date" name="end_date" id="end_date" value="{{ f.get('end_date', '') }}"
+                   class="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent">
           </div>
         </div>
-        <button type="button"
-                hx-get="{{ url_for('polls.poll_option_row') }}"
-                hx-target="#options-list"
-                hx-swap="beforeend"
-                class="mt-2 text-sm text-red-600 hover:text-red-700 underline">
-          + Add option
-        </button>
+        <fieldset>
+          <legend class="block text-sm font-medium text-stone-700 mb-1">Only these days</legend>
+          {% set chosen = f.getlist('weekdays') if request.method == 'POST' else ['4', '5'] %}
+          <div class="flex flex-wrap gap-1.5">
+            {% for day in weekdays %}
+            <label class="cursor-pointer">
+              <input type="checkbox" name="weekdays" value="{{ loop.index0 }}" {% if loop.index0|string in chosen %}checked{% endif %} class="peer sr-only">
+              <span class="inline-block rounded-full border border-stone-300 px-3 py-1 text-xs font-medium text-stone-600 peer-checked:border-red-500 peer-checked:bg-red-600 peer-checked:text-white peer-focus-visible:ring-2 peer-focus-visible:ring-red-400">{{ day }}</span>
+            </label>
+            {% endfor %}
+          </div>
+          <p id="datePreview" class="text-xs text-stone-500 mt-2"></p>
+        </fieldset>
+        <p class="text-xs text-stone-500">People answer Yes / If needed / No for each date. The results page ranks the dates; pick one there to create the game night with everyone who's free, RSVPs filled in.</p>
       </div>
 
-{% set selected_night = request.form.get("game_night_id", "")|int(0) if request.method == "POST" else request.args.get("game_night_id", 0)|int %}
       <div>
-        <label class="block text-sm font-medium text-stone-700 mb-1">Game night (optional)</label>
-        <select name="game_night_id"
-                class="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent">
-          <option value="">Not linked to a night</option>
-          {% for gn in nights %}
-          <option value="{{ gn.id }}" {% if selected_night == gn.id %}selected{% endif %}>{{ gn.date.strftime('%B %-d, %Y') }}</option>
-          {% endfor %}
-        </select>
-        <p class="text-xs text-stone-400 mt-1">A linked poll shows on that night's page and only its players can see it.</p>
-      </div>
-
-      <div class="flex items-center gap-3">
-        <label class="text-sm font-medium text-stone-700">Allow multiple selections</label>
-        <input type="checkbox" name="multi_select" value="true"
-               class="rounded border-stone-300 text-red-600 focus:ring-red-500" />
-      </div>
-
-      <div class="flex items-center gap-3">
-        <label class="block text-sm font-medium text-stone-700">Close date (optional)</label>
-        <input type="datetime-local" name="closes_at"
+        <label for="closes_at" class="block text-sm font-medium text-stone-700 mb-1">Close date (optional)</label>
+        <input type="datetime-local" name="closes_at" id="closes_at" value="{{ f.get('closes_at', '') }}"
                class="rounded-lg border border-stone-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent" />
       </div>
 
       <!-- Private toggle -->
       <div class="border-t border-stone-100 pt-4 space-y-3">
         <div class="flex items-center gap-3">
-          <input type="checkbox" id="private-toggle" name="private" value="true"
-                 class="rounded border-stone-300 text-red-600 focus:ring-red-500" />
+          <input type="checkbox" id="private-toggle" name="private" value="true" {% if f.get('private') %}checked{% endif %}
+                 class="rounded border-stone-300 accent-red-600" />
           <label for="private-toggle" class="text-sm font-medium text-stone-700">Private poll</label>
           <span class="text-xs text-stone-400">Only invited people can see or answer it</span>
         </div>
 
-        <div id="invitee-section" class="hidden space-y-2">
+        <div id="invitee-section" class="{% if not f.get('private') %}hidden{% endif %} space-y-2">
           <label class="block text-sm font-medium text-stone-700">Invite people</label>
+          {% set invited = f.getlist('invitee_ids') %}
           <div class="max-h-48 overflow-y-auto border border-stone-200 rounded-lg divide-y divide-stone-100">
             {% for person in people %}
             <label class="flex items-center gap-2 px-3 py-2 hover:bg-stone-50 cursor-pointer text-sm text-stone-700">
-              <input type="checkbox" name="invitee_ids" value="{{ person.id }}"
+              <input type="checkbox" name="invitee_ids" value="{{ person.id }}" {% if person.id|string in invited %}checked{% endif %}
                      class="rounded border-stone-300 accent-red-600" />
               {{ person.first_name }} {{ person.last_name }}
             </label>
@@ -99,10 +152,36 @@
     </div>
   </form>
 </div>
+{% endblock %}
 
+{% block scripts %}
 <script>
-  document.getElementById('private-toggle').addEventListener('change', function () {
-    document.getElementById('invitee-section').classList.toggle('hidden', !this.checked);
-  });
+  (function () {
+    const title = document.getElementById('title');
+    function syncKind() {
+      const kind = document.querySelector('input[name="kind"]:checked').value;
+      document.querySelectorAll('[data-kind]').forEach(el => el.classList.toggle('hidden', el.dataset.kind !== kind));
+      if (kind === 'dates' && !title.value) title.value = title.dataset.dateDefault;
+      if (kind !== 'dates' && title.value === title.dataset.dateDefault) title.value = '';
+      preview();
+    }
+    function preview() {
+      const out = document.getElementById('datePreview');
+      const start = document.getElementById('start_date').value, end = document.getElementById('end_date').value;
+      const days = new Set([...document.querySelectorAll('input[name="weekdays"]:checked')].map(c => (+c.value + 1) % 7));
+      if (!start || !end) { out.textContent = ''; return; }
+      let n = 0;
+      for (let d = new Date(start + 'T12:00'); d <= new Date(end + 'T12:00'); d.setDate(d.getDate() + 1)) {
+        if (days.has(d.getDay())) n++;
+      }
+      out.textContent = n ? `${n} date${n === 1 ? '' : 's'} in the poll.` : 'No dates match yet.';
+    }
+    document.querySelectorAll('input[name="kind"]').forEach(r => r.addEventListener('change', syncKind));
+    document.querySelectorAll('#start_date, #end_date, input[name="weekdays"]').forEach(el => el.addEventListener('change', preview));
+    document.getElementById('private-toggle').addEventListener('change', function () {
+      document.getElementById('invitee-section').classList.toggle('hidden', !this.checked);
+    });
+    syncKind();
+  })();
 </script>
 {% endblock %}

@@ -2,6 +2,7 @@ from flask import Blueprint, abort, flash, redirect, render_template, request, u
 from flask_login import current_user, login_required
 from sqlalchemy.orm import selectinload
 
+from app.services import date_poll_services
 from app.services.poll_services import (
     can_view,
     create_poll,
@@ -77,6 +78,13 @@ def poll_results(poll_id: int):
     from app.models import Poll
 
     poll = Poll.query.get_or_404(poll_id)
+    if poll.date_poll:
+        return render_template(
+            "poll_date_results.html",
+            poll=poll,
+            rows=date_poll_services.summary(poll),
+            respondents=date_poll_services.respondent_count(poll),
+        )
     results = get_detailed_results(poll)
     total = sum(r["count"] for r in results)
     return render_template("poll_results_detail.html", poll=poll, results=results, total=total)
@@ -90,42 +98,57 @@ def poll_create():
 
     people = Person.query.filter_by(active=True).order_by(Person.first_name).all()
     nights = _linkable_nights()
+    form = request.form
+
+    def page(error=None):
+        return render_template(
+            "poll_create.html",
+            people=people,
+            nights=nights,
+            weekdays=date_poll_services.WEEKDAYS,
+            error=error,
+        )
 
     if request.method == "POST":
-        title = request.form.get("title", "").strip()
-        description = request.form.get("description", "").strip() or None
-        option_labels = [
-            label.strip() for label in request.form.getlist("option_labels") if label.strip()
-        ]
-        multi_select = request.form.get("multi_select") == "true"
-        private = request.form.get("private") == "true"
-        invitee_ids = [int(i) for i in request.form.getlist("invitee_ids") if i.isdigit()]
-
-        error = None
-        closes_at = None
+        title = form.get("title", "").strip()
+        description = form.get("description", "").strip() or None
+        private = form.get("private") == "true"
+        invitee_ids = [int(i) for i in form.getlist("invitee_ids") if i.isdigit()]
+        invitees = invitee_ids if private else None
         try:
-            closes_at = parse_closes_at(request.form.get("closes_at", ""))
+            closes_at = parse_closes_at(form.get("closes_at", ""))
         except ValueError:
-            error = "Invalid close date format. Please use the date picker."
-        if not title or len(option_labels) < 2:
-            error = "A title and at least two options are required."
-        if error:
-            return render_template("poll_create.html", people=people, nights=nights, error=error)
+            return page("Invalid close date format. Please use the date picker.")
+        if not title:
+            return page("A title is required.")
 
-        create_poll(
-            title,
-            description,
-            option_labels,
-            current_user.id,
-            multi_select,
-            closes_at=closes_at,
-            private=private,
-            invitee_ids=invitee_ids if private else None,
-            game_night_id=_form_night_id(),
-        )
+        if form.get("kind") == "dates":
+            dates, error = date_poll_services.parse_form(form)
+            if error:
+                return page(error)
+            date_poll_services.create_date_poll(
+                title, description, dates, current_user.id, closes_at, private, invitees
+            )
+        else:
+            option_labels = [
+                label.strip() for label in form.getlist("option_labels") if label.strip()
+            ]
+            if len(option_labels) < 2:
+                return page("A poll needs at least two options.")
+            create_poll(
+                title,
+                description,
+                option_labels,
+                current_user.id,
+                form.get("multi_select") == "true",
+                closes_at=closes_at,
+                private=private,
+                invitee_ids=invitees,
+                game_night_id=_form_night_id(),
+            )
         return redirect(url_for("polls.poll_list"))
 
-    return render_template("poll_create.html", people=people, nights=nights)
+    return page()
 
 
 @polls_bp.route("/polls/<int:poll_id>/edit", methods=["GET", "POST"])
@@ -191,6 +214,21 @@ def poll_edit(poll_id: int):
         return redirect(url_for("polls.poll_list"))
 
     return render_template("poll_edit.html", poll=poll, people=people, nights=nights)
+
+
+@polls_bp.route("/polls/<int:poll_id>/pick/<int:option_id>", methods=["POST"])
+@login_required
+@admin_required
+def poll_pick_date(poll_id: int, option_id: int):
+    """Date poll: create the game night on this date."""
+    from app.models import Poll
+
+    poll = Poll.query.get_or_404(poll_id)
+    success, message, night = date_poll_services.pick_date(poll, option_id, current_user.id)
+    flash(message, "success" if success else "error")
+    if night is None:
+        return redirect(url_for("polls.poll_results", poll_id=poll.id))
+    return redirect(url_for("game_night.edit_game_night", game_night_id=night.id))
 
 
 @polls_bp.route("/polls/<int:poll_id>/close", methods=["POST"])
@@ -301,13 +339,15 @@ def poll_page(token: str):
 def poll_submit(token: str):
     """HTMX: record the answer and return the refreshed poll widget."""
     poll = _viewable_poll(token)
-    try:
-        option_ids = [int(oid) for oid in request.form.getlist("option_ids")]
-    except (ValueError, TypeError):
-        option_ids = []
-        success, message = False, "Invalid submission."
+    if poll.date_poll:
+        success, message = date_poll_services.submit_answers(poll, current_user.id, request.form)
     else:
-        success, message = submit_response(poll, option_ids, current_user.id)
+        try:
+            option_ids = [int(oid) for oid in request.form.getlist("option_ids")]
+        except (ValueError, TypeError):
+            success, message = False, "Invalid submission."
+        else:
+            success, message = submit_response(poll, option_ids, current_user.id)
 
     context = view_context(poll, current_user.id)
     return render_template("_poll_widget.html", success=success, message=message, **context)
