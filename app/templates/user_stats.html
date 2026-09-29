@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Your Stats{% endblock %}
 {% block content %}
-{% set filtered = selected_game_ids or selected_opponent_ids or request.args.get('start_date') or request.args.get('end_date') %}
+{% set filtered = selected_game_ids or selected_opponent_ids or start_date or end_date %}
 {% macro sort_link(col, label, extra='') %}
 <th class="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-stone-500 {{ extra }}">
   <a href="{{ url_for('games.user_stats', game_ids=request.args.getlist('game_ids'), opponent_ids=request.args.getlist('opponent_ids'),
@@ -33,89 +33,72 @@
   </div>
 
   <!-- Filters -->
-  <details class="rounded-xl border border-stone-200 bg-white p-5 shadow-sm" {% if filtered %}open{% endif %}>
-    <summary class="cursor-pointer text-sm font-semibold text-stone-700">Filter by game, opponent or date</summary>
-    <form method="get" class="pt-4" id="userStatsForm">
-  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-
-    <!-- Game filter -->
-    <div>
-      <label for="gameSearch" class="block text-sm font-medium text-stone-700 mb-1">Games</label>
-      <input
-        type="text"
-        id="gameSearch"
-        class="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
-        placeholder="Search for a game..."
-        autocomplete="off"
-      />
-      <div id="gameSuggestion" class="mt-1 text-xs text-stone-400 italic"></div>
-      <div id="gameTags" class="flex flex-wrap gap-2 mt-2">
-        {% for game in selected_game_names %}
-        <span class="inline-flex items-center gap-1 rounded-full bg-stone-100 px-3 py-1 text-xs font-medium text-stone-700">
-          {{ game.name }}
-          <button type="button" onclick="removeTag(this)" class="text-stone-400 hover:text-stone-600">×</button>
-          <input type="hidden" name="game_ids" value="{{ game.id }}" />
+  {% macro chip_group(name, label, choices, selected, hint) %}
+  <fieldset data-chips>
+    <div class="flex items-baseline justify-between gap-2 mb-1.5">
+      <legend class="text-sm font-medium text-stone-700">{{ label }}</legend>
+      {% if choices|length > 8 %}
+      <input type="search" data-chip-search placeholder="Find…" aria-label="Find {{ label|lower }}"
+             class="w-32 rounded-lg border border-stone-300 px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-red-500">
+      {% endif %}
+    </div>
+    {% if hint %}<p class="text-xs text-stone-500 mb-2">{{ hint }}</p>{% endif %}
+    <div class="flex flex-wrap gap-2">
+      {% for c in choices %}
+      {% set on = c.id in selected %}
+      <label data-chip data-name="{{ c.name|lower }}" class="cursor-pointer {{ 'hidden' if loop.index > 8 and not on else '' }}" {% if loop.index > 8 %}data-extra{% endif %}>
+        <input type="checkbox" name="{{ name }}" value="{{ c.id }}" {% if on %}checked{% endif %} class="peer sr-only" data-autosubmit>
+        <span class="inline-flex min-h-[2.25rem] items-center gap-1.5 rounded-full border border-stone-300 bg-white px-3 text-sm text-stone-700 peer-checked:border-red-600 peer-checked:bg-red-600 peer-checked:text-white peer-focus-visible:ring-2 peer-focus-visible:ring-red-400">
+          {{ c.name }} <span class="text-xs opacity-60">{{ c.count }}</span>
         </span>
+      </label>
+      {% else %}
+      <p class="text-sm text-stone-500">Nothing yet.</p>
+      {% endfor %}
+      {% if choices|length > 8 %}
+      <button type="button" data-chip-more class="min-h-[2.25rem] rounded-full px-3 text-sm font-medium text-red-600 underline">Show all {{ choices|length }}</button>
+      {% endif %}
+    </div>
+  </fieldset>
+  {% endmacro %}
+
+  <form method="get" id="userStatsForm" class="rounded-xl border border-stone-200 bg-white p-5 shadow-sm space-y-5">
+    <input type="hidden" name="sort_by" value="{{ sort_by }}" />
+    <input type="hidden" name="sort_order" value="{{ sort_order }}" />
+
+    <fieldset>
+      <legend class="text-sm font-medium text-stone-700 mb-1.5">When</legend>
+      <div class="flex flex-wrap gap-2">
+        {% for label, ps, pe in presets %}
+        {% set on = start_date == ps and end_date == pe %}
+        <a href="{{ url_for('games.user_stats', game_ids=selected_game_ids, opponent_ids=selected_opponent_ids, start_date=ps or None, end_date=pe or None, sort_by=sort_by, sort_order=sort_order) }}"
+           class="inline-flex min-h-[2.25rem] items-center rounded-full border px-3 text-sm {{ 'border-red-600 bg-red-600 text-white' if on else 'border-stone-300 bg-white text-stone-700 hover:bg-stone-50' }}">{{ label }}</a>
         {% endfor %}
       </div>
-    </div>
+      <details class="mt-2" {% if custom_dates %}open{% endif %}>
+        <summary class="cursor-pointer text-xs text-stone-600 underline">Custom dates</summary>
+        <div class="mt-2 grid grid-cols-2 gap-3">
+          <label class="text-xs font-medium text-stone-600">From
+            <input type="date" name="start_date" value="{{ start_date }}" data-autosubmit
+                   class="mt-1 block w-full rounded-lg border border-stone-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500">
+          </label>
+          <label class="text-xs font-medium text-stone-600">To
+            <input type="date" name="end_date" value="{{ end_date }}" data-autosubmit
+                   class="mt-1 block w-full rounded-lg border border-stone-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500">
+          </label>
+        </div>
+      </details>
+    </fieldset>
 
-    <!-- Opponent filter -->
-    <div>
-      <label for="opponentSearch" class="block text-sm font-medium text-stone-700 mb-1">Opponents</label>
-      <input
-        type="text"
-        id="opponentSearch"
-        class="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
-        placeholder="Search for an opponent..."
-        autocomplete="off"
-      />
-      <div id="opponentSuggestion" class="mt-1 text-xs text-stone-400 italic"></div>
-      <div id="opponentTags" class="flex flex-wrap gap-2 mt-2">
-        {% for person in selected_opponent_names %}
-        <span class="inline-flex items-center gap-1 rounded-full bg-stone-100 px-3 py-1 text-xs font-medium text-stone-700">
-          {{ person.name }}
-          <button type="button" onclick="removeTag(this)" class="text-stone-400 hover:text-stone-600">×</button>
-          <input type="hidden" name="opponent_ids" value="{{ person.id }}" />
-        </span>
-        {% endfor %}
-      </div>
-    </div>
+    {{ chip_group('opponent_ids', 'Played with', opponent_choices, selected_opponent_ids,
+                  'Only games where everyone you pick was at the table. Numbers are games together.') }}
+    {{ chip_group('game_ids', 'Games', game_choices, selected_game_ids, '') }}
 
-    <!-- Date filters -->
-    <div>
-      <label for="start_date" class="block text-sm font-medium text-stone-700 mb-1">Start Date</label>
-      <input
-        type="date"
-        id="start_date"
-        name="start_date"
-        class="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
-        value="{{ start_date }}"
-      />
-    </div>
-
-    <div>
-      <label for="end_date" class="block text-sm font-medium text-stone-700 mb-1">End Date</label>
-      <input
-        type="date"
-        id="end_date"
-        name="end_date"
-        class="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
-        value="{{ end_date }}"
-      />
-    </div>
-  </div>
-
-  <!-- Preserve sort_by and sort_order -->
-  <input type="hidden" name="sort_by" value="{{ sort_by }}" />
-  <input type="hidden" name="sort_order" value="{{ sort_order }}" />
-
-  <div class="flex gap-3">
-    <button type="submit" class="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 transition-colors">Apply Filters</button>
-    <a href="{{ url_for('games.user_stats') }}" class="inline-flex items-center rounded-lg border border-stone-300 px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50 transition-colors">Clear Filters</a>
-  </div>
-</form>
-  </details>
+    <noscript><button class="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white">Apply</button></noscript>
+    {% if filtered %}
+    <a href="{{ url_for('games.user_stats') }}" class="inline-block text-sm text-stone-600 underline">Clear all filters</a>
+    {% endif %}
+  </form>
 
   <!-- Per game -->
   <section class="rounded-xl border border-stone-200 bg-white shadow-sm overflow-hidden">
@@ -157,11 +140,39 @@
     {% endif %}
   </section>
 
+  <!-- Head to head -->
+  <section class="rounded-xl border border-stone-200 bg-white shadow-sm overflow-hidden">
+    <h2 class="px-5 pt-4 text-lg font-semibold text-stone-800">Head to head</h2>
+    <p class="px-5 text-xs text-stone-500">Each game you both played: who finished higher.{% if selected_game_ids or start_date or end_date %} Uses the game and date filters.{% endif %}</p>
+    {% if head_to_head %}
+    <ul class="mt-2 divide-y divide-stone-100">
+      {% for h in head_to_head %}
+      {% set on = h.person_id in selected_opponent_ids %}
+      <li>
+        <a href="{{ url_for('games.user_stats', opponent_ids=[] if on else [h.person_id], game_ids=selected_game_ids, start_date=start_date or None, end_date=end_date or None) }}"
+           class="flex items-center gap-3 px-5 py-2.5 hover:bg-stone-50 {{ 'bg-red-50' if on else '' }}">
+          <span class="w-28 shrink-0 truncate text-sm font-medium text-stone-800">{{ h.name }}</span>
+          <span class="flex h-2.5 flex-1 overflow-hidden rounded-full bg-stone-100" title="{{ h.ahead }} ahead · {{ h.ties }} tied · {{ h.behind }} behind">
+            <span class="bg-green-500" style="width: {{ (h.ahead * 100 / h.games)|round(1) }}%"></span>
+            <span class="bg-stone-300" style="width: {{ (h.ties * 100 / h.games)|round(1) }}%"></span>
+            <span class="bg-red-400" style="width: {{ (h.behind * 100 / h.games)|round(1) }}%"></span>
+          </span>
+          <span class="w-28 shrink-0 text-right text-xs text-stone-600"><strong class="text-green-700">{{ h.ahead }}</strong>–<strong class="text-red-600">{{ h.behind }}</strong>{% if h.ties %}–{{ h.ties }}{% endif %} <span class="text-stone-400">of {{ h.games }}</span></span>
+        </a>
+      </li>
+      {% endfor %}
+    </ul>
+    <p class="px-5 py-3 text-xs text-stone-500"><span class="text-green-700 font-medium">You ahead</span> – <span class="text-red-600 font-medium">them ahead</span> – tied. Tap someone to see only games with them.</p>
+    {% else %}
+    <p class="px-5 pb-5 pt-2 text-sm text-stone-500">No shared games {{ 'match these filters' if filtered else 'yet' }}.</p>
+    {% endif %}
+  </section>
+
   <!-- Badges -->
   <section>
     <div class="flex items-baseline justify-between mb-3">
       <h2 class="text-lg font-semibold text-stone-800">Badges <span class="text-sm font-normal text-stone-500">({{ badges|length }} of {{ badge_count }})</span></h2>
-      <span class="text-xs text-stone-500">Tap one to see what it's for and where you earned it</span>
+      <span class="hidden sm:inline text-xs text-stone-500">Tap one to see what it's for and where you earned it</span>
     </div>
     {% if badges %}
     <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
@@ -176,74 +187,27 @@
 </div>
 {% include "_badge_dialog.html" %}
 
-<!-- Script: Autocomplete logic -->
 <script>
-  async function fetchTopMatch(apiUrl, query) {
-    if (!query || query.length < 1) return null;
-    const res = await fetch(`${apiUrl}?q=${encodeURIComponent(query)}`);
-    const data = await res.json();
-    return data.length > 0 ? data[0] : null;
-  }
-
-  function setupInlineAutocomplete(
-    searchBoxId,
-    tagsContainerId,
-    inputName,
-    apiUrl,
-    suggestionBoxId
-  ) {
-    const searchBox = document.getElementById(searchBoxId);
-    const tagsContainer = document.getElementById(tagsContainerId);
-    const suggestionBox = document.getElementById(suggestionBoxId);
-    const form = document.getElementById("userStatsForm");
-    let topMatch = null;
-
-    async function updateSuggestion() {
-      const query = searchBox.value.trim();
-      topMatch = await fetchTopMatch(apiUrl, query);
-      suggestionBox.textContent = topMatch ? topMatch.name : "";
-    }
-
-    searchBox.addEventListener("input", updateSuggestion);
-
-    searchBox.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") {
-        e.preventDefault();
-        if (topMatch) {
-          const input = document.createElement("input");
-          input.type = "hidden";
-          input.name = inputName;
-          input.value = topMatch.id;
-          form.appendChild(input);
-          form.submit();
-        }
+  (function () {
+    const form = document.getElementById('userStatsForm');
+    form.querySelectorAll('[data-autosubmit]').forEach(el => el.addEventListener('change', () => form.submit()));
+    form.querySelectorAll('[data-chips]').forEach(group => {
+      const chips = [...group.querySelectorAll('[data-chip]')];
+      const more = group.querySelector('[data-chip-more]');
+      const search = group.querySelector('[data-chip-search]');
+      let expanded = false;
+      function show() {
+        const q = search ? search.value.trim().toLowerCase() : '';
+        chips.forEach(c => {
+          const checked = c.querySelector('input').checked;
+          const visible = q ? c.dataset.name.includes(q) : (expanded || !('extra' in c.dataset) || checked);
+          c.classList.toggle('hidden', !visible);
+        });
+        if (more) more.hidden = expanded || !!q;
       }
+      if (more) more.addEventListener('click', () => { expanded = true; show(); });
+      if (search) search.addEventListener('input', show);
     });
-  }
-
-  function removeTag(button) {
-    const tag = button.parentNode;
-    tag.querySelector("input[type='hidden']").remove();
-    tag.remove();
-    document.getElementById("userStatsForm").submit();
-  }
-
-  document.addEventListener("DOMContentLoaded", () => {
-    setupInlineAutocomplete(
-      "gameSearch",
-      "gameTags",
-      "game_ids",
-      "/games/autocomplete",
-      "gameSuggestion"
-    );
-    setupInlineAutocomplete(
-      "opponentSearch",
-      "opponentTags",
-      "opponent_ids",
-      "/people/autocomplete",
-      "opponentSuggestion"
-    );
-  });
+  })();
 </script>
-
 {% endblock %}

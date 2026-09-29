@@ -181,6 +181,8 @@
     // Inject CSRF hidden input into every HTML form on the page
     document.addEventListener('DOMContentLoaded', function () {
       document.querySelectorAll('form').forEach(function (form) {
+        // GET forms (filters, search) must not put the token in the URL.
+        if (form.method.toLowerCase() !== 'post') return;
         if (!form.querySelector('input[name="csrf_token"]')) {
           const input = document.createElement('input');
           input.type = 'hidden';

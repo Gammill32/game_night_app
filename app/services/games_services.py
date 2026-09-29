@@ -449,13 +449,7 @@ def get_user_stats(
     if game_ids:
         query = query.filter(GameNightGame.game_id.in_(game_ids))
 
-    for raw, op in ((start_date, "ge"), (end_date, "le")):
-        if raw:
-            try:
-                day = datetime.strptime(raw, "%Y-%m-%d").date()
-            except ValueError:
-                continue  # Invalid date format; ignore filter
-            query = query.filter(GameNight.date >= day if op == "ge" else GameNight.date <= day)
+    query = _filter_night_dates(query, start_date, end_date)
 
     if opponent_ids:
         subquery = (
@@ -485,6 +479,77 @@ def get_user_stats(
         query = query.order_by(sort_column.desc().nullslast(), Game.name)
 
     return query.all()
+
+
+def _parse_day(raw):
+    try:
+        return datetime.strptime(raw, "%Y-%m-%d").date() if raw else None
+    except ValueError:
+        return None  # Invalid date format; ignore filter
+
+
+def _filter_night_dates(query, start_date, end_date):
+    start, end = _parse_day(start_date), _parse_day(end_date)
+    if start:
+        query = query.filter(GameNight.date >= start)
+    if end:
+        query = query.filter(GameNight.date <= end)
+    return query
+
+
+def get_head_to_head(user_id, game_ids=None, start_date=None, end_date=None):
+    """Everyone the user has shared a game with: games together and who
+    finished ahead (by position). Most games together first."""
+    from sqlalchemy.orm import aliased
+
+    me_result, me_player = aliased(Result), aliased(Player)
+    op_result, op_player = aliased(Result), aliased(Player)
+    ahead = func.sum(case((me_result.position < op_result.position, 1), else_=0))
+    behind = func.sum(case((me_result.position > op_result.position, 1), else_=0))
+    query = (
+        db.session.query(
+            Person.id.label("person_id"),
+            Person.first_name,
+            Person.last_name,
+            func.count().label("games"),
+            ahead.label("ahead"),
+            behind.label("behind"),
+        )
+        .select_from(me_result)
+        .join(me_player, me_result.player_id == me_player.id)
+        .join(op_result, op_result.game_night_game_id == me_result.game_night_game_id)
+        .join(op_player, op_result.player_id == op_player.id)
+        .join(Person, Person.id == op_player.people_id)
+        .join(GameNightGame, GameNightGame.id == me_result.game_night_game_id)
+        .join(GameNight, GameNight.id == GameNightGame.game_night_id)
+        .filter(
+            me_player.people_id == user_id,
+            op_player.people_id != user_id,
+            me_result.position.isnot(None),
+            op_result.position.isnot(None),
+        )
+    )
+    if game_ids:
+        query = query.filter(GameNightGame.game_id.in_(game_ids))
+    query = _filter_night_dates(query, start_date, end_date)
+    rows = query.group_by(Person.id, Person.first_name, Person.last_name).all()
+    result = []
+    for r in rows:
+        ties = r.games - r.ahead - r.behind
+        result.append(
+            {
+                "person_id": r.person_id,
+                "name": f"{r.first_name} {r.last_name}",
+                "first_name": r.first_name,
+                "games": r.games,
+                "ahead": r.ahead,
+                "behind": r.behind,
+                "ties": ties,
+                "ahead_pct": round(r.ahead * 100 / r.games) if r.games else 0,
+            }
+        )
+    result.sort(key=lambda r: (-r["games"], r["name"].lower()))
+    return result
 
 
 def summarize_user_stats(rows):

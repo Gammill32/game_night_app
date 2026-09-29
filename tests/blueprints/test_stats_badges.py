@@ -37,7 +37,7 @@ def test_stats_use_night_date_and_show_win_pct(client, make_person, make_night):
     page = client.get("/user_stats?start_date=2031-07-01&end_date=2031-12-31").get_data(
         as_text=True
     )
-    assert game.name not in page
+    assert "No games match these filters" in page
     _db.session.delete(gn)
     _db.session.delete(game)
     _db.session.commit()
@@ -63,6 +63,31 @@ def test_badges_link_back_to_the_night(client, make_person, make_night):
     from app.models import PersonBadge
 
     PersonBadge.query.filter_by(game_night_id=gn.id).delete()
+    _db.session.delete(gn)
+    _db.session.delete(game)
+    _db.session.commit()
+
+
+def test_head_to_head_and_chip_filters(client, make_person, make_night):
+    ann, bo = make_person("Ann"), make_person("Bo")
+    gn, game = _night_with_win(make_night, ann, bo, dt.date(2031, 6, 20))
+    from app.services import games_services
+
+    h2h = games_services.get_head_to_head(ann.id)
+    assert [(h["person_id"], h["games"], h["ahead"], h["behind"]) for h in h2h] == [
+        (bo.id, 1, 1, 0)
+    ]
+    assert games_services.get_head_to_head(bo.id)[0]["behind"] == 1
+    assert games_services.get_head_to_head(ann.id, start_date="2031-07-01") == []
+
+    login(client, ann)
+    page = " ".join(client.get("/user_stats").get_data(as_text=True).split())
+    # opponents and games are tappable chips, no typing needed
+    assert f'name="opponent_ids" value="{bo.id}"' in page
+    assert f'name="game_ids" value="{game.id}"' in page
+    assert "Head to head" in page and "Bo Test" in page
+    page = client.get(f"/user_stats?opponent_ids={bo.id}").get_data(as_text=True)
+    assert f'name="opponent_ids" value="{bo.id}" checked' in " ".join(page.split())
     _db.session.delete(gn)
     _db.session.delete(game)
     _db.session.commit()

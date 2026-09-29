@@ -7,7 +7,7 @@ from flask_login import current_user, login_required
 
 from app.extensions import db
 from app.models import Game, OwnedBy
-from app.services import badge_services, games_services, index_services
+from app.services import badge_services, games_services
 from app.services.bgg_service import BGGService
 from app.utils import admin_required
 
@@ -229,25 +229,16 @@ def update_tutorial_url(game_id):
 @games_bp.route("/user_stats", methods=["GET"])
 @login_required
 def user_stats():
-    # Retrieve filter parameters from the request
     game_ids = request.args.getlist("game_ids", type=int)
     opponent_ids = request.args.getlist("opponent_ids", type=int)
-    start_date = request.args.get("start_date")
-    end_date = request.args.get("end_date")
+    start_date = request.args.get("start_date", "")
+    end_date = request.args.get("end_date", "")
     sort_by = request.args.get("sort_by", "wins")
     sort_order = request.args.get("sort_order", "desc")
+    user_id = current_user.id
 
-    # Default date range
-    if not start_date:
-        earliest = index_services.get_earliest_game_night()
-        start_date = earliest.isoformat() if earliest else ""
-
-    if not end_date:
-        end_date = date.today().isoformat()
-
-    # Fetch filtered user stats
     stats = games_services.get_user_stats(
-        user_id=current_user.id,
+        user_id=user_id,
         game_ids=game_ids,
         opponent_ids=opponent_ids,
         start_date=start_date,
@@ -255,12 +246,21 @@ def user_stats():
         sort_by=sort_by,
         sort_order=sort_order,
     )
+    # Choices for the filter chips: everyone you've played with / every game
+    # you've played, all time, most first.
+    all_games = games_services.get_user_stats(user_id, sort_by="games_played")
+    all_opponents = games_services.get_head_to_head(user_id)
 
-    # Get selected game and opponent display names for tags
-    selected_games = games_services.get_selected_games(game_ids)
-    selected_opponents_raw = games_services.get_selected_opponents(opponent_ids)
-    selected_opponents = [
-        {"id": p.id, "name": f"{p.first_name} {p.last_name}"} for p in selected_opponents_raw
+    today = date.today()
+    presets = [
+        ("All time", "", ""),
+        ("This year", date(today.year, 1, 1).isoformat(), ""),
+        ("Last 12 months", date(today.year - 1, today.month, 1).isoformat(), ""),
+        (
+            "Last year",
+            date(today.year - 1, 1, 1).isoformat(),
+            date(today.year - 1, 12, 31).isoformat(),
+        ),
     ]
 
     return render_template(
@@ -270,11 +270,18 @@ def user_stats():
         sort_order=sort_order,
         start_date=start_date,
         end_date=end_date,
+        presets=presets,
+        custom_dates=(start_date, end_date) not in [(ps, pe) for _, ps, pe in presets],
         selected_game_ids=game_ids,
         selected_opponent_ids=opponent_ids,
-        selected_game_names=selected_games,
-        selected_opponent_names=selected_opponents,
-        badges=badge_services.get_person_badges(current_user.id),
+        game_choices=[
+            {"id": g.game_id, "name": g.game_name, "count": g.games_played} for g in all_games
+        ],
+        opponent_choices=[
+            {"id": o["person_id"], "name": o["name"], "count": o["games"]} for o in all_opponents
+        ],
+        head_to_head=games_services.get_head_to_head(user_id, game_ids, start_date, end_date),
+        badges=badge_services.get_person_badges(user_id),
         badge_count=badge_services.total_badges(),
         earned_on=badge_services.earned_on,
         summary=games_services.summarize_user_stats(stats),
