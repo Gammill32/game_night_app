@@ -21,7 +21,8 @@
         {% endif %}
         <div class="flex gap-3 mt-2 text-xs text-stone-400">
           <span>{{ poll.options | length }} options</span>
-          {% if poll.closes_at %}<span>Closes {{ poll.closes_at.strftime('%b %-d') }}</span>{% endif %}
+          {% if poll.closes_at %}<span>Closes {{ (poll.closes_at|local_dt).strftime('%b %-d, %-I:%M %p') }}</span>{% endif %}
+          {% if poll.game_night %}<a href="{{ url_for('game_night.view_game_night', game_night_id=poll.game_night_id) }}" class="text-stone-500 underline">{{ 'RSVP for' if poll.availability else 'Linked to' }} {{ poll.game_night.date.strftime('%b %-d') }} night</a>{% endif %}
           {% if poll.closed %}<span class="text-amber-600 font-medium">Closed</span>{% endif %}
           {% if poll.private %}<span class="text-purple-600 font-medium">Private</span>{% endif %}
         </div>

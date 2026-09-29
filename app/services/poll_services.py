@@ -1,5 +1,7 @@
 from datetime import datetime
 
+import pytz
+from flask import current_app
 from sqlalchemy import func
 from sqlalchemy.orm import joinedload
 
@@ -16,6 +18,27 @@ def poll_is_active(poll: Poll) -> bool:
     return True
 
 
+def _tz():
+    return pytz.timezone(current_app.config["APP_TIMEZONE"])
+
+
+def parse_closes_at(raw: str) -> datetime | None:
+    """A datetime-local form value (local time) → naive UTC for storage.
+    Raises ValueError on a bad value."""
+    raw = (raw or "").strip()
+    if not raw:
+        return None
+    local = _tz().localize(datetime.fromisoformat(raw))
+    return local.astimezone(pytz.utc).replace(tzinfo=None)
+
+
+def to_local(utc_naive: datetime | None) -> datetime | None:
+    """Stored naive UTC → local time, for display and form values."""
+    if utc_naive is None:
+        return None
+    return pytz.utc.localize(utc_naive).astimezone(_tz())
+
+
 def create_poll(
     title: str,
     description: str | None,
@@ -25,6 +48,7 @@ def create_poll(
     closes_at: datetime | None = None,
     private: bool = False,
     invitee_ids: list[int] | None = None,
+    game_night_id: int | None = None,
 ) -> Poll:
     """Create a new poll with options. Returns the saved Poll."""
     for _attempt in range(3):
@@ -42,6 +66,7 @@ def create_poll(
         closes_at=closes_at,
         token=token,
         private=private,
+        game_night_id=game_night_id,
     )
     db.session.add(poll)
     db.session.flush()
@@ -66,9 +91,15 @@ def update_poll(
     private: bool,
     invitee_ids: list[int] | None,
     option_updates: dict[int, str],
+    game_night_id: int | None = None,
 ) -> None:
-    """Update poll metadata, option labels, and invitees."""
+    """Update poll metadata, option labels, invitees and linked night.
+
+    An availability poll stays on its night; other polls can be linked to any
+    night or none."""
     poll.title = title
+    if not poll.availability:
+        poll.game_night_id = game_night_id
     poll.description = description
     poll.closes_at = closes_at
     poll.multi_select = multi_select
@@ -87,22 +118,28 @@ def update_poll(
     db.session.commit()
 
 
-def create_availability_poll(game_night_id: int, user_id: int) -> Poll:
-    """Create a standard Can/Maybe/Can't poll linked to a game night."""
+def create_availability_poll(game_night_id: int, user_id: int) -> tuple[bool, str]:
+    """Create the night's Can/Maybe/Can't poll. Its answers are the RSVPs."""
     from app.models import GameNight
 
     gn = GameNight.query.get_or_404(game_night_id)
+    if gn.availability_poll is not None:
+        return False, "This game night already has an availability poll."
     date_str = gn.date.strftime("%B %-d, %Y")
     poll = create_poll(
         title=f"Availability — Game Night {date_str}",
         description=None,
-        option_labels=["Can Make It", "Maybe", "Can't Make It"],
+        option_labels=AVAILABILITY_OPTIONS,
         created_by_id=user_id,
         multi_select=False,
+        game_night_id=game_night_id,
     )
-    poll.game_night_id = game_night_id
+    poll.availability = True
     db.session.commit()
-    return poll
+    return True, "Availability poll created. Players can answer it on this page."
+
+
+AVAILABILITY_OPTIONS = ["Can Make It", "Maybe", "Can't Make It"]
 
 
 def get_poll_by_token(token: str) -> Poll | None:
@@ -110,56 +147,75 @@ def get_poll_by_token(token: str) -> Poll | None:
     return Poll.query.filter_by(token=token).first()
 
 
-def has_responded(poll: Poll, person_id: int | None, respondent_name: str | None) -> bool:
-    """Check if this respondent has already submitted a response."""
-    query = PollResponse.query.filter_by(poll_id=poll.id)
-    if person_id is not None:
-        return query.filter_by(person_id=person_id).first() is not None
-    if respondent_name:
-        normalised = respondent_name.strip().lower()
-        existing = query.filter(PollResponse.person_id.is_(None)).all()
-        return any((r.respondent_name or "").strip().lower() == normalised for r in existing)
-    return False
+def can_view(poll: Poll, user) -> bool:
+    """Polls need a login. Admins see everything; a private poll is for its
+    invitees; a poll linked to a game night is for that night's players."""
+    if not user.is_authenticated:
+        return False
+    if user.admin or user.owner:
+        return True
+    if poll.private:
+        return any(inv.person_id == user.id for inv in poll.invitees)  # type: ignore[attr-defined]
+    if poll.game_night_id is not None:
+        from app.models import Player
+
+        return (
+            Player.query.filter_by(game_night_id=poll.game_night_id, people_id=user.id).first()
+            is not None
+        )
+    return True
 
 
-def submit_response(
-    poll: Poll,
-    option_ids: list[int],
-    person_id: int | None,
-    respondent_name: str | None,
-) -> tuple[bool, str]:
-    """Submit a response. Returns (success, message)."""
+def has_responded(poll: Poll, person_id: int) -> bool:
+    """Check if this person has already answered."""
+    return PollResponse.query.filter_by(poll_id=poll.id, person_id=person_id).first() is not None
+
+
+def submit_response(poll: Poll, option_ids: list[int], person_id: int) -> tuple[bool, str]:
+    """Record a person's answer, replacing any earlier one. Returns (success, message)."""
     if not poll_is_active(poll):
         return False, "This poll is no longer accepting responses."
-
-    original_name = respondent_name
-    normalised_name = respondent_name.strip().lower() if respondent_name else None
-
-    if poll.multi_select:
-        existing = _get_existing_responses(poll, person_id, normalised_name)
-        for r in existing:
-            db.session.delete(r)
-    else:
-        if has_responded(poll, person_id, normalised_name):
-            return False, "You have already responded to this poll."
+    if not option_ids:
+        return False, "Please select at least one option."
+    if not poll.multi_select and len(option_ids) > 1:
+        return False, "Pick one option."
 
     valid_ids = {opt.id for opt in poll.options}  # type: ignore[attr-defined]
-    for oid in option_ids:
-        if oid not in valid_ids:
-            return False, "Invalid option selected."
+    if any(oid not in valid_ids for oid in option_ids):
+        return False, "Invalid option selected."
 
-    for oid in option_ids:
-        db.session.add(
-            PollResponse(
-                poll_id=poll.id,
-                option_id=oid,
-                person_id=person_id,
-                respondent_name=original_name,
-            )
-        )
+    changed = has_responded(poll, person_id)
+    PollResponse.query.filter_by(poll_id=poll.id, person_id=person_id).delete()
+    for oid in dict.fromkeys(option_ids):
+        db.session.add(PollResponse(poll_id=poll.id, option_id=oid, person_id=person_id))
 
     db.session.commit()
-    return True, "Response recorded. Thank you!"
+    return True, "Answer updated." if changed else "Response recorded. Thank you!"
+
+
+def view_context(poll: Poll, person_id: int) -> dict:
+    """Everything the poll widget needs for one viewer."""
+    active = poll_is_active(poll)
+    user_votes = get_user_responses(poll, person_id)
+    return {
+        "poll": poll,
+        "active": active,
+        "user_votes": user_votes,
+        "results": get_results(poll) if user_votes or not active else None,
+    }
+
+
+def rsvps_for_night(game_night) -> dict[int, str]:
+    """{person_id: availability answer} from the night's availability poll."""
+    poll = game_night.availability_poll
+    if poll is None:
+        return {}
+    labels = {opt.id: opt.label for opt in poll.options}
+    return {
+        r.person_id: labels[r.option_id]
+        for r in poll.responses
+        if r.person_id is not None and r.option_id in labels
+    }
 
 
 def get_results(poll: Poll) -> list[dict]:
@@ -213,17 +269,3 @@ def get_detailed_results(poll: Poll) -> list[dict]:
             }
         )
     return results
-
-
-def _get_existing_responses(
-    poll: Poll,
-    person_id: int | None,
-    normalised_name: str | None,
-) -> list[PollResponse]:
-    query = PollResponse.query.filter_by(poll_id=poll.id)
-    if person_id is not None:
-        return query.filter_by(person_id=person_id).all()
-    if normalised_name:
-        all_anon = query.filter(PollResponse.person_id.is_(None)).all()
-        return [r for r in all_anon if (r.respondent_name or "").strip().lower() == normalised_name]
-    return []

@@ -41,6 +41,23 @@
         <p class="text-xs text-stone-400 mt-2">Option labels can be edited. Adding or removing options requires deleting and recreating the poll.</p>
       </div>
 
+      {% if poll.availability %}
+      <p class="text-xs text-stone-500">This is the availability poll for the {{ poll.game_night.date.strftime('%B %-d, %Y') }} game night; its answers are the players' RSVPs.</p>
+      {% else %}
+      <div>
+        <label class="block text-sm font-medium text-stone-700 mb-1">Game night (optional)</label>
+        <select name="game_night_id"
+                class="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent">
+          <option value="">Not linked to a night</option>
+          {% for gn in nights %}
+          <option value="{{ gn.id }}" {% if poll.game_night_id == gn.id %}selected{% endif %}>{{ gn.date.strftime('%B %-d, %Y') }}</option>
+          {% endfor %}
+        </select>
+        <p class="text-xs text-stone-400 mt-1">A linked poll shows on that night's page and only its players can see it.</p>
+      </div>
+
+      {% endif %}
+
       <div class="flex items-center gap-3">
         <label class="text-sm font-medium text-stone-700">Allow multiple selections</label>
         <input type="checkbox" name="multi_select" value="true"
@@ -51,7 +68,7 @@
       <div class="flex items-center gap-3">
         <label class="block text-sm font-medium text-stone-700">Close date (optional)</label>
         <input type="datetime-local" name="closes_at"
-               value="{{ poll.closes_at.strftime('%Y-%m-%dT%H:%M') if poll.closes_at else '' }}"
+               value="{{ (poll.closes_at|local_dt).strftime('%Y-%m-%dT%H:%M') if poll.closes_at else '' }}"
                class="rounded-lg border border-stone-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent" />
       </div>
 
@@ -62,7 +79,7 @@
                  {% if poll.private %}checked{% endif %}
                  class="rounded border-stone-300 text-red-600 focus:ring-red-500" />
           <label for="private-toggle" class="text-sm font-medium text-stone-700">Private poll</label>
-          <span class="text-xs text-stone-400">Only invited people see this on the home page</span>
+          <span class="text-xs text-stone-400">Only invited people can see or answer it</span>
         </div>
 
         <div id="invitee-section" class="{% if not poll.private %}hidden{% endif %} space-y-2">

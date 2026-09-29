@@ -23,6 +23,7 @@ from app.models import (
     Wishlist,
     db,
 )
+from app.services import poll_services
 from app.services.admin_services import get_all_people
 
 logger = logging.getLogger(__name__)
@@ -187,10 +188,12 @@ def toggle_game_night_field(game_night_id, field):
 
     db.session.commit()
 
-    closes_availability_poll = field in ("final", "closed") and getattr(game_night, field) is True
-    if closes_availability_poll:
-        if game_night.availability_poll and not game_night.availability_poll.closed:
-            game_night.availability_poll.closed = True
+    # Closing voting or finalizing closes the night's linked polls too.
+    if field in ("final", "closed") and getattr(game_night, field) is True:
+        open_polls = [p for p in game_night.polls if not p.closed]
+        for poll in open_polls:
+            poll.closed = True
+        if open_polls:
             db.session.commit()
 
     if field == "final" and getattr(game_night, field) is True:
@@ -338,6 +341,8 @@ def get_view_game_night_details(game_night_id, current_user_id):
     for nomination in nominations:
         nomination["avg_rating"] = avg_ratings_by_game_id.get(nomination["game_id"])
 
+    rsvps = poll_services.rsvps_for_night(game_night)
+
     return {
         "game_night": game_night,
         "players": players,
@@ -357,6 +362,8 @@ def get_view_game_night_details(game_night_id, current_user_id):
         "owned_game_ids": owned_game_ids,
         "user_ratings_by_game_id": user_ratings_by_game_id,
         "availability_poll": game_night.availability_poll,
+        "rsvps": rsvps,
+        "rsvp_in_count": sum(1 for p in players if rsvps.get(p.people_id) == "Can Make It"),
     }
 
 

@@ -1,17 +1,17 @@
-from flask import Blueprint, abort, flash, redirect, render_template, request, session, url_for
+from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 from sqlalchemy.orm import selectinload
 
 from app.services.poll_services import (
+    can_view,
     create_poll,
     get_detailed_results,
     get_poll_by_token,
-    get_results,
-    get_user_responses,
-    has_responded,
+    parse_closes_at,
     poll_is_active,
     submit_response,
     update_poll,
+    view_context,
 )
 from app.utils import admin_required
 
@@ -20,32 +20,41 @@ polls_bp = Blueprint("polls", __name__)
 
 @polls_bp.app_context_processor
 def inject_active_polls():
-    """Make active poll count and list available in all templates.
-
-    Private polls are only visible to their invitees and to admins/owners.
-    """
+    """Make the open polls the current user can see available in all templates."""
     from app.models import Poll
 
+    if not current_user.is_authenticated:
+        return {"active_polls_count": 0, "active_polls": []}
     try:
-        all_open = Poll.query.filter_by(closed=False).options(selectinload(Poll.invitees)).all()
-        active_all = [p for p in all_open if poll_is_active(p)]
-
-        is_admin = current_user.is_authenticated and (current_user.admin or current_user.owner)
-        user_id = current_user.id if current_user.is_authenticated else None
-
-        def _visible(poll: Poll) -> bool:
-            if not poll.private:
-                return True
-            if is_admin:
-                return True
-            if user_id is None:
-                return False
-            return any(inv.person_id == user_id for inv in poll.invitees)  # type: ignore[attr-defined]
-
-        active = [p for p in active_all if _visible(p)]
+        all_open = (
+            Poll.query.filter_by(closed=False)
+            .options(selectinload(Poll.invitees), selectinload(Poll.game_night))
+            .order_by(Poll.created_at.desc())
+            .all()
+        )
+        active = [p for p in all_open if poll_is_active(p) and can_view(p, current_user)]
         return {"active_polls_count": len(active), "active_polls": active}
     except Exception:
         return {"active_polls_count": 0, "active_polls": []}
+
+
+def _linkable_nights():
+    """Nights a poll can be linked to: anything not finalized, newest first."""
+    from app.models import GameNight
+
+    return GameNight.query.filter_by(final=False).order_by(GameNight.date.desc()).all()
+
+
+@polls_bp.app_template_filter("local_dt")
+def _local_dt(value):
+    from app.services.poll_services import to_local
+
+    return to_local(value)
+
+
+def _form_night_id() -> int | None:
+    raw = request.form.get("game_night_id", "")
+    return int(raw) if raw.isdigit() else None
 
 
 # ── Admin routes ─────────────────────────────────────────────────────────── #
@@ -80,6 +89,7 @@ def poll_create():
     from app.models import Person
 
     people = Person.query.order_by(Person.first_name).all()
+    nights = _linkable_nights()
 
     if request.method == "POST":
         title = request.form.get("title", "").strip()
@@ -91,12 +101,16 @@ def poll_create():
         private = request.form.get("private") == "true"
         invitee_ids = [int(i) for i in request.form.getlist("invitee_ids") if i.isdigit()]
 
+        error = None
+        closes_at = None
+        try:
+            closes_at = parse_closes_at(request.form.get("closes_at", ""))
+        except ValueError:
+            error = "Invalid close date format. Please use the date picker."
         if not title or len(option_labels) < 2:
-            return render_template(
-                "poll_create.html",
-                people=people,
-                error="A title and at least two options are required.",
-            )
+            error = "A title and at least two options are required."
+        if error:
+            return render_template("poll_create.html", people=people, nights=nights, error=error)
 
         create_poll(
             title,
@@ -104,12 +118,14 @@ def poll_create():
             option_labels,
             current_user.id,
             multi_select,
+            closes_at=closes_at,
             private=private,
             invitee_ids=invitee_ids if private else None,
+            game_night_id=_form_night_id(),
         )
         return redirect(url_for("polls.poll_list"))
 
-    return render_template("poll_create.html", people=people)
+    return render_template("poll_create.html", people=people, nights=nights)
 
 
 @polls_bp.route("/polls/<int:poll_id>/edit", methods=["GET", "POST"])
@@ -120,28 +136,27 @@ def poll_edit(poll_id: int):
 
     poll = Poll.query.get_or_404(poll_id)
     people = Person.query.order_by(Person.first_name).all()
+    nights = _linkable_nights()
+    if poll.game_night and poll.game_night not in nights:
+        nights.insert(0, poll.game_night)
 
     if request.method == "POST":
-        from datetime import datetime
-
         title = request.form.get("title", "").strip()
         description = request.form.get("description", "").strip() or None
         multi_select = request.form.get("multi_select") == "true"
         private = request.form.get("private") == "true"
         invitee_ids = [int(i) for i in request.form.getlist("invitee_ids") if i.isdigit()]
 
-        closes_at_str = request.form.get("closes_at", "").strip()
-        closes_at = None
-        if closes_at_str:
-            try:
-                closes_at = datetime.fromisoformat(closes_at_str)
-            except ValueError:
-                return render_template(
-                    "poll_edit.html",
-                    poll=poll,
-                    people=people,
-                    error="Invalid close date format. Please use the date picker.",
-                )
+        try:
+            closes_at = parse_closes_at(request.form.get("closes_at", ""))
+        except ValueError:
+            return render_template(
+                "poll_edit.html",
+                poll=poll,
+                people=people,
+                nights=nights,
+                error="Invalid close date format. Please use the date picker.",
+            )
 
         option_updates: dict[int, str] = {}
         for key, val in request.form.items():
@@ -154,7 +169,11 @@ def poll_edit(poll_id: int):
 
         if not title:
             return render_template(
-                "poll_edit.html", poll=poll, people=people, error="Title is required."
+                "poll_edit.html",
+                poll=poll,
+                people=people,
+                nights=nights,
+                error="Title is required.",
             )
 
         update_poll(
@@ -166,11 +185,12 @@ def poll_edit(poll_id: int):
             private=private,
             invitee_ids=invitee_ids if private else None,
             option_updates=option_updates,
+            game_night_id=_form_night_id(),
         )
         flash("Poll updated.", "success")
         return redirect(url_for("polls.poll_list"))
 
-    return render_template("poll_edit.html", poll=poll, people=people)
+    return render_template("poll_edit.html", poll=poll, people=people, nights=nights)
 
 
 @polls_bp.route("/polls/<int:poll_id>/close", methods=["POST"])
@@ -257,100 +277,37 @@ def poll_option_row():
     return render_template("_poll_option_row.html")
 
 
-# ── Public routes ─────────────────────────────────────────────────────────── #
+# ── Member routes ─────────────────────────────────────────────────────────── #
+# Polls need a login; a poll linked to a game night is also answered from
+# that night's page.
+
+
+def _viewable_poll(token: str):
+    poll = get_poll_by_token(token)
+    if poll is None or not can_view(poll, current_user):
+        abort(404)
+    return poll
 
 
 @polls_bp.route("/poll/<token>", endpoint="poll_respond")
+@login_required
 def poll_page(token: str):
-    poll = get_poll_by_token(token)
-    if poll is None:
-        abort(404)
-
-    # DB check for logged-in users; session fallback for anonymous
-    if current_user.is_authenticated:
-        already_responded = has_responded(poll, current_user.id, None)
-    else:
-        already_responded = session.get(f"poll_{token}_responded", False)
-
-    # Multi-select polls always show the form so users can change their vote
-    if poll.multi_select:
-        already_responded = False
-
-    user_votes: set[int] = set()
-    if current_user.is_authenticated:
-        user_votes = get_user_responses(poll, current_user.id)
-    elif session.get(f"poll_{token}_votes"):
-        user_votes = set(session.get(f"poll_{token}_votes", []))
-
-    results = get_results(poll) if already_responded or not poll_is_active(poll) else None
-
-    return render_template(
-        "poll_respond.html",
-        poll=poll,
-        active=poll_is_active(poll),
-        already_responded=already_responded,
-        results=results,
-        user_votes=user_votes,
-    )
+    poll = _viewable_poll(token)
+    return render_template("poll_respond.html", **view_context(poll, current_user.id))
 
 
 @polls_bp.route("/poll/<token>/respond", methods=["POST"], endpoint="poll_submit")
+@login_required
 def poll_submit(token: str):
-    poll = get_poll_by_token(token)
-    if poll is None:
-        abort(404)
-
-    person_id = current_user.id if current_user.is_authenticated else None
-    respondent_name = request.form.get("respondent_name", "") or None
-    option_ids_raw = request.form.getlist("option_ids")
-
+    """HTMX: record the answer and return the refreshed poll widget."""
+    poll = _viewable_poll(token)
     try:
-        option_ids = [int(oid) for oid in option_ids_raw]
+        option_ids = [int(oid) for oid in request.form.getlist("option_ids")]
     except (ValueError, TypeError):
-        return render_template(
-            "_poll_thanks.html",
-            success=False,
-            message="Invalid submission.",
-            results=None,
-            poll=poll,
-            user_votes=set(),
-        )
+        option_ids = []
+        success, message = False, "Invalid submission."
+    else:
+        success, message = submit_response(poll, option_ids, current_user.id)
 
-    if not option_ids:
-        return render_template(
-            "_poll_thanks.html",
-            success=False,
-            message="Please select at least one option.",
-            results=None,
-            poll=poll,
-            user_votes=set(),
-        )
-
-    if person_id is None and not respondent_name:
-        return render_template(
-            "_poll_thanks.html",
-            success=False,
-            message="Please enter your name.",
-            results=None,
-            poll=poll,
-            user_votes=set(),
-        )
-
-    success, message = submit_response(poll, option_ids, person_id, respondent_name)
-
-    user_votes: set[int] = set()
-    if success:
-        session[f"poll_{token}_responded"] = True
-        user_votes = set(option_ids)
-        if person_id is None:
-            session[f"poll_{token}_votes"] = option_ids
-
-    results = get_results(poll)
-    return render_template(
-        "_poll_thanks.html",
-        success=success,
-        message=message,
-        results=results,
-        poll=poll,
-        user_votes=user_votes,
-    )
+    context = view_context(poll, current_user.id)
+    return render_template("_poll_widget.html", success=success, message=message, **context)

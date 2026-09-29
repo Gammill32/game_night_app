@@ -4,7 +4,7 @@ from flask import Blueprint, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 
 from app.models import GameNightGame, TrackerSession
-from app.services import admin_services, game_night_services
+from app.services import admin_services, game_night_services, poll_services
 from app.utils import admin_required, flash_if_no_action, game_night_access_required
 
 game_night_bp = Blueprint("game_night", __name__)
@@ -53,6 +53,11 @@ def view_game_night(game_night_id):
         else {}
     )
     context["tracker_sessions"] = tracker_sessions
+    context["night_polls"] = [
+        poll_services.view_context(poll, current_user.id)
+        for poll in context["game_night"].polls
+        if poll_services.can_view(poll, current_user)
+    ]
     return render_template("view_game_night.html", **context)
 
 
@@ -199,11 +204,9 @@ def delete_game_night(game_night_id):
 @login_required
 @admin_required
 def create_availability_poll(game_night_id):
-    from app.services.poll_services import create_availability_poll as _create_poll
-
-    _create_poll(game_night_id, current_user.id)
-    flash("Availability poll created.", "success")
-    return redirect(url_for("game_night.view_game_night", game_night_id=game_night_id))
+    success, message = poll_services.create_availability_poll(game_night_id, current_user.id)
+    flash(message, "success" if success else "error")
+    return redirect(url_for("game_night.view_game_night", game_night_id=game_night_id) + "#polls")
 
 
 @game_night_bp.route("/game_night/<int:game_night_id>/recap")

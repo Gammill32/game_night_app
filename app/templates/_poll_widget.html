@@ -1,0 +1,37 @@
+{# One poll's answer form and results, swapped in place by HTMX.
+   Expects: poll, active, user_votes, results; optional success/message. #}
+<div id="poll-{{ poll.id }}">
+  {% if message %}
+  <div class="rounded-lg px-4 py-2 mb-3 text-sm {{ 'bg-green-50 text-green-800 border border-green-200' if success else 'bg-red-50 text-red-800 border border-red-200' }}">{{ message }}</div>
+  {% endif %}
+
+  {% if active %}
+  <form hx-post="{{ url_for('polls.poll_submit', token=poll.token) }}"
+        hx-target="#poll-{{ poll.id }}"
+        hx-swap="outerHTML">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+    <div class="space-y-2">
+      {% for option in poll.options %}
+      <label class="flex items-center gap-3 p-3 rounded-lg border cursor-pointer hover:bg-stone-50 transition-colors {{ 'border-red-300 bg-red-50/40' if option.id in user_votes else 'border-stone-200' }}">
+        <input type="{{ 'checkbox' if poll.multi_select else 'radio' }}"
+               name="option_ids" value="{{ option.id }}"
+               {% if option.id in user_votes %}checked{% endif %}
+               class="text-red-600 focus:ring-red-500" />
+        <span class="text-sm font-medium text-stone-700">{{ option.label }}</span>
+      </label>
+      {% endfor %}
+    </div>
+    <div class="flex flex-wrap items-center gap-3 mt-3">
+      <button type="submit"
+              class="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 transition-colors">
+        {{ 'Update my answer' if user_votes else 'Submit' }}
+      </button>
+      {% if poll.closes_at %}<span class="text-xs text-stone-400">Closes {{ (poll.closes_at|local_dt).strftime('%b %-d at %-I:%M %p') }}</span>{% endif %}
+    </div>
+  </form>
+  {% else %}
+  <p class="text-sm text-stone-500">This poll is closed.</p>
+  {% endif %}
+
+  {% if results %}{% include "_poll_results.html" %}{% endif %}
+</div>

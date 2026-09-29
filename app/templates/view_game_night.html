@@ -13,16 +13,32 @@
 
   <!-- Players -->
   <div class="bg-white rounded-xl border border-stone-200 shadow-sm p-5">
-    <h2 class="text-lg font-semibold text-stone-800 mb-3">Players</h2>
+    <div class="flex items-baseline justify-between gap-2 mb-3">
+      <h2 class="text-lg font-semibold text-stone-800">Players</h2>
+      {% if availability_poll %}
+      <span class="text-xs text-stone-500">{{ rsvp_in_count }} of {{ players | length }} can make it</span>
+      {% endif %}
+    </div>
     <ul class="flex flex-wrap gap-2">
       {% for player in players %}
-        <li class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-stone-100 text-stone-700">
+        {% set answer = rsvps.get(player.people_id) %}
+        <li class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-stone-100 text-stone-700">
           {{ player.person.first_name }} {{ player.person.last_name }}
+          {% if availability_poll %}
+            {% if answer == "Can Make It" %}<span class="rounded-full bg-green-100 px-1.5 text-green-800">In</span>
+            {% elif answer == "Maybe" %}<span class="rounded-full bg-amber-100 px-1.5 text-amber-800">Maybe</span>
+            {% elif answer == "Can't Make It" %}<span class="rounded-full bg-red-100 px-1.5 text-red-800">Out</span>
+            {% elif answer %}<span class="rounded-full bg-stone-200 px-1.5 text-stone-700">{{ answer }}</span>
+            {% else %}<span class="text-stone-400">no reply</span>{% endif %}
+          {% endif %}
         </li>
       {% else %}
         <li class="text-sm text-stone-500">No players found.</li>
       {% endfor %}
     </ul>
+    {% if availability_poll and availability_poll.id in (night_polls | map(attribute="poll.id") | list) %}
+    <p class="text-xs text-stone-500 mt-3">RSVPs come from the <a href="#polls" class="underline">availability poll</a> below.</p>
+    {% endif %}
   </div>
 
   <!-- Games Played -->
@@ -208,31 +224,47 @@
   </div>
   {% endif %}
 
-  <!-- Availability Poll -->
-  {% if (current_user.admin or current_user.owner) and not game_night.closed %}
-  <div class="bg-white rounded-xl border border-stone-200 shadow-sm p-5">
-    <h2 class="text-lg font-semibold text-stone-800 mb-3">Availability Poll</h2>
-    {% if availability_poll %}
-      <div class="mb-3 space-y-1">
-        {% for option in availability_poll.options %}
-          {% set count = availability_poll.responses | selectattr("option_id", "equalto", option.id) | list | length %}
-          <div class="flex items-center gap-2 text-sm text-stone-700">
-            <span class="font-medium w-28">{{ option.label }}</span>
-            <span class="px-2 py-0.5 rounded-full bg-stone-100 text-stone-600 text-xs font-medium">{{ count }}</span>
+  <!-- Polls linked to this night -->
+  {% set can_add_availability = (current_user.admin or current_user.owner) and not availability_poll and not game_night.closed %}
+  {% if night_polls or can_add_availability %}
+  <div id="polls" class="bg-white rounded-xl border border-stone-200 shadow-sm p-5">
+    <h2 class="text-lg font-semibold text-stone-800 mb-3">Polls</h2>
+    <div class="space-y-6">
+      {% for ctx in night_polls %}
+      <div class="{{ 'border-t border-stone-100 pt-5' if not loop.first else '' }}">
+        <div class="flex items-start justify-between gap-2 mb-2">
+          <div>
+            <h3 class="text-sm font-semibold text-stone-800">{{ ctx.poll.title }}</h3>
+            {% if ctx.poll.availability %}<p class="text-xs text-stone-500">Your answer is your RSVP for this night.</p>{% endif %}
+            {% if ctx.poll.description %}<p class="text-xs text-stone-500">{{ ctx.poll.description }}</p>{% endif %}
           </div>
-        {% endfor %}
+          {% if current_user.admin or current_user.owner %}
+          <a href="{{ url_for('polls.poll_results', poll_id=ctx.poll.id) }}" class="text-xs text-stone-500 hover:text-red-600 underline whitespace-nowrap">Who answered</a>
+          {% endif %}
+        </div>
+        {% with poll=ctx.poll, active=ctx.active, user_votes=ctx.user_votes, results=ctx.results, message=None %}
+          {% include "_poll_widget.html" %}
+        {% endwith %}
       </div>
-      <a href="{{ url_for('polls.poll_respond', token=availability_poll.token) }}"
-         class="inline-flex items-center rounded-lg border border-stone-300 px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50 transition-colors">
-        View Poll
-      </a>
-    {% else %}
+      {% endfor %}
+    </div>
+    {% if current_user.admin or current_user.owner %}
+    <div class="flex flex-wrap gap-3 {{ 'mt-5 pt-4 border-t border-stone-100' if night_polls else '' }}">
+      {% if can_add_availability %}
       <form action="{{ url_for('game_night.create_availability_poll', game_night_id=game_night.id) }}" method="POST">
         <button type="submit"
                 class="inline-flex items-center rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 transition-colors">
           Create Availability Poll
         </button>
       </form>
+      {% endif %}
+      {% if not game_night.final %}
+      <a href="{{ url_for('polls.poll_create', game_night_id=game_night.id) }}"
+         class="inline-flex items-center rounded-lg border border-stone-300 px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50 transition-colors">
+        New Poll for This Night
+      </a>
+      {% endif %}
+    </div>
     {% endif %}
   </div>
   {% endif %}

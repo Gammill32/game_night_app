@@ -25,7 +25,12 @@ class GameNight(db.Model):
         "GameNominations", back_populates="game_night", cascade="all, delete-orphan"
     )
     votes = db.relationship("GameVotes", back_populates="game_night", cascade="all, delete-orphan")
-    availability_poll = db.relationship("Poll", back_populates="game_night", uselist=False)
+    polls = db.relationship("Poll", back_populates="game_night", order_by="Poll.created_at")
+
+    @property
+    def availability_poll(self):
+        """The Can Make It / Maybe / Can't Make It poll; its answers are the RSVPs."""
+        return next((p for p in self.polls if p.availability), None)
 
 
 class Person(db.Model, UserMixin):
@@ -315,9 +320,12 @@ class Poll(db.Model):
     multi_select = db.Column(db.Boolean, default=False, nullable=False)
     private = db.Column(db.Boolean, default=False, nullable=False)
     game_night_id = db.Column(db.Integer, db.ForeignKey("gamenights.id"), nullable=True)
+    # The night's RSVP poll (created from the night page), as opposed to any
+    # other poll that's merely linked to the night.
+    availability = db.Column(db.Boolean, default=False, nullable=False, server_default="false")
 
     creator = db.relationship("Person", foreign_keys=[created_by])
-    game_night = db.relationship("GameNight", back_populates="availability_poll")
+    game_night = db.relationship("GameNight", back_populates="polls")
     options = db.relationship(
         "PollOption",
         back_populates="poll",

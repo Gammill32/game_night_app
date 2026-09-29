@@ -106,7 +106,7 @@
       {% for poll in active_polls %}
       <a href="{{ url_for('polls.poll_respond', token=poll.token) }}"
          class="flex items-center justify-between bg-white rounded-xl border border-stone-200 px-5 py-3 hover:bg-stone-50 transition-colors">
-        <span class="text-sm font-medium text-stone-700">{{ poll.title }}</span>
+        <span class="text-sm font-medium text-stone-700">{{ poll.title }}{% if poll.game_night and not poll.availability %} <span class="text-xs font-normal text-stone-400">· {{ poll.game_night.date.strftime('%b %-d') }} game night</span>{% endif %}</span>
         <span class="text-xs text-red-600 font-medium">Vote &rarr;</span>
       </a>
       {% endfor %}

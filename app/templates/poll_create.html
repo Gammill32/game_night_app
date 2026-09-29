@@ -44,6 +44,19 @@
         </button>
       </div>
 
+{% set selected_night = request.form.get("game_night_id", "")|int(0) if request.method == "POST" else request.args.get("game_night_id", 0)|int %}
+      <div>
+        <label class="block text-sm font-medium text-stone-700 mb-1">Game night (optional)</label>
+        <select name="game_night_id"
+                class="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent">
+          <option value="">Not linked to a night</option>
+          {% for gn in nights %}
+          <option value="{{ gn.id }}" {% if selected_night == gn.id %}selected{% endif %}>{{ gn.date.strftime('%B %-d, %Y') }}</option>
+          {% endfor %}
+        </select>
+        <p class="text-xs text-stone-400 mt-1">A linked poll shows on that night's page and only its players can see it.</p>
+      </div>
+
       <div class="flex items-center gap-3">
         <label class="text-sm font-medium text-stone-700">Allow multiple selections</label>
         <input type="checkbox" name="multi_select" value="true"
@@ -62,7 +75,7 @@
           <input type="checkbox" id="private-toggle" name="private" value="true"
                  class="rounded border-stone-300 text-red-600 focus:ring-red-500" />
           <label for="private-toggle" class="text-sm font-medium text-stone-700">Private poll</label>
-          <span class="text-xs text-stone-400">Only invited people see this on the home page</span>
+          <span class="text-xs text-stone-400">Only invited people can see or answer it</span>
         </div>
 
         <div id="invitee-section" class="hidden space-y-2">

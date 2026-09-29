@@ -177,7 +177,8 @@ def test_toggle_closed_auto_closes_availability_poll(admin_client, app, db):
     gn = GameNight(date=datetime.date.today(), closed=False, final=False)
     _db.session.add(gn)
     _db.session.commit()
-    poll = create_availability_poll(gn.id, person.id)
+    create_availability_poll(gn.id, person.id)
+    poll = gn.availability_poll
     gn_id, person_id, poll_id = gn.id, person.id, poll.id
     assert poll.closed is False
 
@@ -196,4 +197,45 @@ def test_toggle_closed_auto_closes_availability_poll(admin_client, app, db):
     Poll.query.filter_by(id=poll_id).delete()
     GameNight.query.filter_by(id=gn_id).delete()
     Person.query.filter_by(id=person_id).delete()
+    _db.session.commit()
+
+
+def test_night_page_shows_rsvps_and_linked_poll_to_players(auth_client, app, db):
+    """Players see the availability poll on the night page and RSVP badges by name."""
+    import datetime
+    import uuid
+
+    from app.extensions import db as _db
+    from app.models import GameNight, Person, Player
+    from app.services.poll_services import create_availability_poll, submit_response
+
+    user = Person.query.filter_by(email="test@example.com").first()
+    other = Person(
+        first_name="Rsvp", last_name="Other", email=f"rsvp_{uuid.uuid4().hex[:6]}@x.invalid"
+    )
+    _db.session.add(other)
+    gn = GameNight(date=datetime.date(2026, 10, 4))
+    _db.session.add(gn)
+    _db.session.flush()
+    _db.session.add_all(
+        [
+            Player(game_night_id=gn.id, people_id=user.id),
+            Player(game_night_id=gn.id, people_id=other.id),
+        ]
+    )
+    _db.session.commit()
+    create_availability_poll(gn.id, other.id)
+    poll = gn.availability_poll
+    submit_response(poll, [poll.options[1].id], other.id)  # Maybe
+
+    body = " ".join(auth_client.get(f"/game_night/{gn.id}").data.decode().split())
+    assert poll.title in body
+    assert 'name="option_ids"' in body
+    assert "Maybe</span>" in body
+    assert "no reply" in body
+    assert "0 of 2 can make it" in body
+
+    _db.session.delete(poll)
+    _db.session.delete(gn)
+    _db.session.delete(other)
     _db.session.commit()
