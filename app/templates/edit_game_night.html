@@ -1,238 +1,29 @@
-{% extends "base.html" %} {% block title %}Edit Game Night{% endblock %} {%
-block content %}
-<h1 class="text-2xl font-bold text-stone-800 mb-6">Edit Game Night</h1>
+{% extends "base.html" %}
+{% block title %}Edit Game Night{% endblock %}
+{% block content %}
+<div class="max-w-xl mx-auto">
+  <h1 class="text-2xl font-bold text-stone-800 mb-6">Edit Game Night</h1>
 
-<form
-  action="{{ url_for('game_night.edit_game_night', game_night_id=game_night.id) }}"
-  method="POST"
-  id="editGameNightForm"
->
-  <div class="space-y-1 mb-4">
-    <label for="date" class="block text-sm font-medium text-stone-700 mb-1">Date:</label>
-    <input
-      type="date"
-      name="date"
-      id="date"
-      class="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
-      value="{{ game_night.date.strftime('%Y-%m-%d') }}"
-      required
-    />
-  </div>
+  <form action="{{ url_for('game_night.edit_game_night', game_night_id=game_night.id) }}" method="POST" id="gameNightForm">
+    {% include "_game_night_fields.html" %}
+    {% include "_food_settings.html" %}
+    {% with selected_ids = current_attendees, form_id = 'gameNightForm' %}
+      {% include "_attendee_picker.html" %}
+    {% endwith %}
 
-  <div class="space-y-1 mb-4">
-    <label for="notes" class="block text-sm font-medium text-stone-700 mb-1">Notes:</label>
-    <textarea name="notes" id="notes" rows="4" class="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent">
-{{ game_night.notes }}</textarea
-    >
-  </div>
-
-  {% include "_food_settings.html" %}
-
-  <div class="space-y-1 mb-4">
-    <h3 class="block text-sm font-medium text-stone-700 mb-1">Attendees:</h3>
-    <input
-      type="text"
-      id="searchBox"
-      class="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
-      placeholder="Search for a name..."
-      autocomplete="off"
-    />
-
-    <div id="attendeesContainer" class="space-y-2 mt-3"></div>
-
-    <div id="pagination" class="flex items-center justify-center gap-4 mt-4">
-      <button type="button" id="prevPage" class="inline-flex items-center rounded-lg border border-stone-300 px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50 transition-colors">
-        Previous
-      </button>
-      <span id="pageInfo" class="text-sm text-stone-600"></span>
-      <button type="button" id="nextPage" class="inline-flex items-center rounded-lg border border-stone-300 px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50 transition-colors">
-        Next
-      </button>
+    <div class="flex flex-wrap gap-3">
+      <button type="submit" class="inline-flex items-center rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 transition-colors">Save Changes</button>
+      <a href="{{ url_for('game_night.view_game_night', game_night_id=game_night.id) }}"
+         class="inline-flex items-center rounded-lg border border-stone-300 px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50 transition-colors">Cancel</a>
     </div>
+  </form>
 
-    <div id="selectedCount" class="text-sm text-stone-600 mt-4">0 Attendees Selected</div>
-  </div>
-
-  <div class="flex flex-wrap gap-3">
-    <button type="submit" class="inline-flex items-center rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 transition-colors">Save Changes</button>
-
-    <button
-      type="submit"
-      class="inline-flex items-center rounded-lg border border-stone-300 px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50 transition-colors"
-      formaction="{{ url_for('game_night.delete_game_night', game_night_id=game_night.id) }}"
-      formmethod="POST"
-      formnovalidate
-      onclick="return confirm('Are you sure you want to delete this game night? This cannot be undone.');"
-    >
-      Delete Game Night
-    </button>
-
-    <a
-      href="{{ url_for('game_night.view_game_night', game_night_id=game_night.id) }}"
-      class="inline-flex items-center rounded-lg border border-stone-300 px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50 transition-colors"
-    >Back to Game Night</a>
-  </div>
-</form>
-
-  <script>
-    const people = [
-      {% for person in people %}
-        { id: {{ person.id }}, name: "{{ person.first_name }} {{ person.last_name }}" },
-      {% endfor %}
-    ];
-
-    const currentAttendees = new Set([
-      {% for id in current_attendees %}
-        {{ id }},
-      {% endfor %}
-    ]);
-
-    let filteredPeople = [...people];
-    let currentPage = 1;
-    const pageSize = 25;
-    let highlightedIndex = 0;
-    const selectedPeople = new Set(currentAttendees);
-
-    const attendeesContainer = document.getElementById('attendeesContainer');
-    const searchBox = document.getElementById('searchBox');
-    const pageInfo = document.getElementById('pageInfo');
-    const prevPage = document.getElementById('prevPage');
-    const nextPage = document.getElementById('nextPage');
-
-    function updateSelectedCount() {
-      const count = selectedPeople.size;
-      const text = `${count} Attendee${count !== 1 ? 's' : ''} Selected`;
-      document.getElementById('selectedCount').textContent = text;
-    }
-
-    function renderAttendees() {
-      attendeesContainer.innerHTML = '';
-      const start = (currentPage - 1) * pageSize;
-      const pagePeople = filteredPeople.slice(start, start + pageSize);
-
-      if (pagePeople.length === 0 && currentPage > 1) {
-        currentPage--;
-        renderAttendees();
-        return;
-      }
-
-      pagePeople.forEach((person, index) => {
-        const label = document.createElement('label');
-        label.className = 'flex items-center gap-2 p-2 rounded-lg hover:bg-stone-50 transition-colors cursor-pointer';
-        label.dataset.index = index;
-
-        const checkbox = document.createElement('input');
-        checkbox.type = 'checkbox';
-        checkbox.name = 'attendees';
-        checkbox.value = person.id;
-        checkbox.className = 'rounded border-stone-300';
-
-        if (selectedPeople.has(person.id)) {
-          checkbox.checked = true;
-          label.classList.add('bg-red-50');
-        }
-
-        checkbox.addEventListener('change', () => {
-          if (checkbox.checked) {
-            selectedPeople.add(person.id);
-          } else {
-            selectedPeople.delete(person.id);
-          }
-          updateSelectedCount();
-          renderAttendees();
-        });
-
-        label.appendChild(checkbox);
-        label.appendChild(document.createTextNode(' ' + person.name));
-        attendeesContainer.appendChild(label);
-      });
-
-      pageInfo.textContent = `Page ${currentPage} of ${Math.ceil(filteredPeople.length / pageSize)}`;
-      highlightTopMatch();
-      updateSelectedCount();
-    }
-
-    function updateFilter() {
-      const searchTerm = searchBox.value.toLowerCase();
-      filteredPeople = people.filter(person => person.name.toLowerCase().includes(searchTerm));
-      currentPage = 1;
-      highlightedIndex = 0;
-      renderAttendees();
-    }
-
-    function highlightTopMatch() {
-      const labels = attendeesContainer.querySelectorAll('label');
-      labels.forEach(label => {
-        const value = Number(label.querySelector('input').value);
-        label.classList.toggle('bg-red-50', selectedPeople.has(value));
-        label.classList.remove('ring-2 ring-red-500');
-      });
-
-      if (labels.length > 0 && labels[highlightedIndex]) {
-        labels[highlightedIndex].scrollIntoView({ block: "nearest" });
-        labels[highlightedIndex].classList.add('ring-2 ring-red-500');
-      }
-    }
-
-    searchBox.addEventListener('input', updateFilter);
-
-    prevPage.addEventListener('click', () => {
-      if (currentPage > 1) {
-        currentPage--;
-        highlightedIndex = 0;
-        renderAttendees();
-      }
-    });
-
-    nextPage.addEventListener('click', () => {
-      if (currentPage * pageSize < filteredPeople.length) {
-        currentPage++;
-        highlightedIndex = 0;
-        renderAttendees();
-      }
-    });
-
-    searchBox.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        const person = filteredPeople[(currentPage - 1) * pageSize + highlightedIndex];
-        if (person) {
-          if (e.shiftKey) {
-            selectedPeople.delete(person.id);
-          } else {
-            selectedPeople.add(person.id);
-          }
-          searchBox.value = '';
-          updateFilter();
-          searchBox.focus();
-        }
-      } else if (e.key === 'ArrowDown') {
-        e.preventDefault();
-        if (highlightedIndex < Math.min(pageSize, filteredPeople.length - (currentPage - 1) * pageSize) - 1) {
-          highlightedIndex++;
-          highlightTopMatch();
-        }
-      } else if (e.key === 'ArrowUp') {
-        e.preventDefault();
-        if (highlightedIndex > 0) {
-          highlightedIndex--;
-          highlightTopMatch();
-        }
-      }
-    });
-
-    document.getElementById('editGameNightForm').addEventListener('submit', (e) => {
-      document.querySelectorAll('input[name="attendees"][type="hidden"]').forEach(el => el.remove());
-      selectedPeople.forEach(id => {
-        const hiddenInput = document.createElement('input');
-        hiddenInput.type = 'hidden';
-        hiddenInput.name = 'attendees';
-        hiddenInput.value = id;
-        document.getElementById('editGameNightForm').appendChild(hiddenInput);
-      });
-    });
-
-    renderAttendees();
-  </script>
-  {% endblock %}
-</form>
+  {% if not game_night.final %}
+  <form action="{{ url_for('game_night.delete_game_night', game_night_id=game_night.id) }}" method="POST"
+        data-confirm="Delete this game night, its games, results, polls, photos and food? This cannot be undone."
+        class="mt-10 pt-5 border-t border-stone-200">
+    <button type="submit" class="text-sm text-red-600 underline hover:text-red-700">Delete this game night</button>
+  </form>
+  {% endif %}
+</div>
+{% endblock %}

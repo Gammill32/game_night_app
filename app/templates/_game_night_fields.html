@@ -1,0 +1,20 @@
+{# Date and notes for the start / edit game night forms. #}
+<div class="bg-white rounded-xl border border-stone-200 shadow-sm p-5 mb-5 space-y-4">
+  <div>
+    <label for="dateInput" class="block text-sm font-medium text-stone-700 mb-1">Date</label>
+    <input type="date" name="date" id="dateInput" required
+           value="{{ game_night.date.strftime('%Y-%m-%d') if game_night else request.form.get('date', '') }}"
+           class="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent" />
+  </div>
+  <div>
+    <label for="notesInput" class="block text-sm font-medium text-stone-700 mb-1">Notes</label>
+    <textarea name="notes" id="notesInput" rows="3" placeholder="Time, place, anything people should know"
+              class="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent">{{ game_night.notes or '' if game_night else request.form.get('notes', '') }}</textarea>
+  </div>
+  {% if not game_night %}
+  <label class="flex items-start gap-2 text-sm text-stone-700">
+    <input type="checkbox" name="rsvp_poll" value="1" {% if request.method == 'GET' or request.form.get('rsvp_poll') %}checked{% endif %} class="mt-0.5 h-4 w-4 rounded border-stone-300 accent-red-600">
+    <span>Ask players to RSVP <span class="block text-xs text-stone-500">Creates the availability poll; each player's answer shows next to their name.</span></span>
+  </label>
+  {% endif %}
+</div>

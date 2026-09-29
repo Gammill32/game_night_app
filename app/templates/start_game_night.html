@@ -1,67 +1,15 @@
-{% extends "base.html" %} {% block title %}Start Game Night{% endblock %} {%
-block content %}
+{% extends "base.html" %}
+{% block title %}Start Game Night{% endblock %}
+{% block content %}
 <div class="max-w-xl mx-auto">
   <h1 class="text-2xl font-bold text-stone-800 mb-6">Start a New Game Night</h1>
 
-  <form
-    action="{{ url_for('game_night.start_game_night') }}"
-    method="POST"
-    id="startGameNightForm"
-  >
-    <div class="bg-white rounded-xl border border-stone-200 shadow-sm p-5 mb-5 space-y-4">
-      <div>
-        <label for="dateInput" class="block text-sm font-medium text-stone-700 mb-1">Date:</label>
-        <input
-          type="date"
-          name="date"
-          id="dateInput"
-          class="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
-          required
-        />
-      </div>
-
-      <div>
-        <label for="notesInput" class="block text-sm font-medium text-stone-700 mb-1">Notes:</label>
-        <textarea
-          name="notes"
-          id="notesInput"
-          rows="4"
-          class="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
-        ></textarea>
-      </div>
-    </div>
-
+  <form action="{{ url_for('game_night.start_game_night') }}" method="POST" id="gameNightForm">
+    {% include "_game_night_fields.html" %}
     {% include "_food_settings.html" %}
-
-    <div class="bg-white rounded-xl border border-stone-200 shadow-sm p-5 mb-5">
-      <h2 class="text-lg font-semibold text-stone-800 mb-3">Attendees</h2>
-
-      <input
-        type="text"
-        id="searchBox"
-        class="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent mb-3"
-        placeholder="Search for a name..."
-        autocomplete="off"
-      />
-
-      <div id="attendeesContainer" class="attendees-container space-y-1 min-h-[2rem]">
-        <!-- JavaScript will inject attendee checkboxes -->
-      </div>
-
-      <div id="pagination" class="flex items-center gap-3 mt-3">
-        <button type="button" id="prevPage"
-                class="inline-flex items-center rounded-lg border border-stone-300 px-3 py-1.5 text-xs font-medium text-stone-700 hover:bg-stone-50 transition-colors">
-          Previous
-        </button>
-        <span id="pageInfo" class="text-xs text-stone-500"></span>
-        <button type="button" id="nextPage"
-                class="inline-flex items-center rounded-lg border border-stone-300 px-3 py-1.5 text-xs font-medium text-stone-700 hover:bg-stone-50 transition-colors">
-          Next
-        </button>
-      </div>
-
-      <div id="selectedCount" class="mt-3 text-sm font-medium text-stone-700">0 Attendees Selected</div>
-    </div>
+    {% with selected_ids = request.form.getlist('attendees') | map('int') | list, form_id = 'gameNightForm' %}
+      {% include "_attendee_picker.html" %}
+    {% endwith %}
 
     <div class="flex flex-wrap gap-3">
       <button type="submit"
@@ -70,159 +18,9 @@ block content %}
       </button>
       <a href="{{ url_for('main.index') }}"
          class="inline-flex items-center rounded-lg border border-stone-300 px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50 transition-colors">
-        Back to Home
+        Cancel
       </a>
     </div>
   </form>
 </div>
-
-<script>
-  const people = [
-    {% for person in people %}
-      { id: {{ person.id }}, name: "{{ person.first_name }} {{ person.last_name }}" },
-    {% endfor %}
-  ];
-
-  let filteredPeople = [...people];
-  let currentPage = 1;
-  const pageSize = 25;
-  let highlightedIndex = 0;
-  const selectedPeople = new Set();
-
-  const attendeesContainer = document.getElementById('attendeesContainer');
-  const searchBox = document.getElementById('searchBox');
-  const pageInfo = document.getElementById('pageInfo');
-  const prevPage = document.getElementById('prevPage');
-  const nextPage = document.getElementById('nextPage');
-
-  function updateSelectedCount() {
-    const count = selectedPeople.size;
-    document.getElementById('selectedCount').textContent = `${count} Attendee${count !== 1 ? 's' : ''} Selected`;
-  }
-
-  function renderAttendees() {
-    attendeesContainer.innerHTML = '';
-    const start = (currentPage - 1) * pageSize;
-    const pagePeople = filteredPeople.slice(start, start + pageSize);
-
-    if (pagePeople.length === 0 && currentPage > 1) {
-      currentPage--;
-      renderAttendees();
-      return;
-    }
-
-    pagePeople.forEach((person, index) => {
-      const label = document.createElement('label');
-      label.dataset.index = index;
-      label.className = 'flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer text-sm transition-colors';
-
-      const checkbox = document.createElement('input');
-      checkbox.type = 'checkbox';
-      checkbox.name = 'attendees';
-      checkbox.value = person.id;
-      checkbox.className = 'rounded border-stone-300 accent-red-600';
-
-      if (selectedPeople.has(person.id)) {
-        checkbox.checked = true;
-        label.classList.add('bg-red-50', 'text-red-800', 'font-medium');
-      } else {
-        label.classList.add('text-stone-700', 'hover:bg-stone-50');
-      }
-
-      checkbox.addEventListener('change', () => {
-        if (checkbox.checked) selectedPeople.add(person.id);
-        else selectedPeople.delete(person.id);
-        updateSelectedCount();
-        renderAttendees();
-      });
-
-      label.appendChild(checkbox);
-      label.appendChild(document.createTextNode(' ' + person.name));
-      attendeesContainer.appendChild(label);
-    });
-
-    pageInfo.textContent = `Page ${currentPage} of ${Math.ceil(filteredPeople.length / pageSize)}`;
-    highlightTopMatch();
-    updateSelectedCount();
-  }
-
-  function updateFilter() {
-    const searchTerm = searchBox.value.toLowerCase();
-    filteredPeople = people.filter(person => person.name.toLowerCase().includes(searchTerm));
-    currentPage = 1;
-    highlightedIndex = 0;
-    renderAttendees();
-  }
-
-  function highlightTopMatch() {
-    const labels = attendeesContainer.querySelectorAll('label');
-    labels.forEach(label => {
-      const isSelected = selectedPeople.has(+label.querySelector('input').value);
-      label.classList.toggle('bg-red-50', isSelected);
-      label.classList.toggle('text-red-800', isSelected);
-      label.classList.toggle('font-medium', isSelected);
-      label.classList.toggle('text-stone-700', !isSelected);
-      label.classList.toggle('hover:bg-stone-50', !isSelected);
-      label.classList.remove('outline', 'outline-2', 'outline-red-400');
-    });
-    if (labels[highlightedIndex]) {
-      labels[highlightedIndex].scrollIntoView({ block: "nearest" });
-      labels[highlightedIndex].classList.add('outline', 'outline-2', 'outline-red-400');
-    }
-  }
-
-  searchBox.addEventListener('input', updateFilter);
-
-  prevPage.addEventListener('click', () => {
-    if (currentPage > 1) {
-      currentPage--;
-      highlightedIndex = 0;
-      renderAttendees();
-    }
-  });
-
-  nextPage.addEventListener('click', () => {
-    if (currentPage * pageSize < filteredPeople.length) {
-      currentPage++;
-      highlightedIndex = 0;
-      renderAttendees();
-    }
-  });
-
-  searchBox.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      const person = filteredPeople[(currentPage - 1) * pageSize + highlightedIndex];
-      if (person) {
-        if (e.shiftKey) selectedPeople.delete(person.id);
-        else selectedPeople.add(person.id);
-      }
-      searchBox.value = '';
-      highlightedIndex = 0;
-      updateFilter();
-      searchBox.focus();
-    } else if (e.key === 'ArrowDown' && highlightedIndex < Math.min(pageSize, filteredPeople.length - (currentPage - 1) * pageSize) - 1) {
-      e.preventDefault();
-      highlightedIndex++;
-      highlightTopMatch();
-    } else if (e.key === 'ArrowUp' && highlightedIndex > 0) {
-      e.preventDefault();
-      highlightedIndex--;
-      highlightTopMatch();
-    }
-  });
-
-  document.getElementById('startGameNightForm').addEventListener('submit', (e) => {
-    document.querySelectorAll('input[name="attendees"][type="hidden"]').forEach(el => el.remove());
-    selectedPeople.forEach(id => {
-      const hiddenInput = document.createElement('input');
-      hiddenInput.type = 'hidden';
-      hiddenInput.name = 'attendees';
-      hiddenInput.value = id;
-      document.getElementById('startGameNightForm').appendChild(hiddenInput);
-    });
-  });
-
-  renderAttendees();
-</script>
 {% endblock %}

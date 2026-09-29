@@ -125,9 +125,8 @@ def create_availability_poll(game_night_id: int, user_id: int) -> tuple[bool, st
     gn = GameNight.query.get_or_404(game_night_id)
     if gn.availability_poll is not None:
         return False, "This game night already has an availability poll."
-    date_str = gn.date.strftime("%B %-d, %Y")
     poll = create_poll(
-        title=f"Availability — Game Night {date_str}",
+        title=availability_title(gn.date),
         description=None,
         option_labels=AVAILABILITY_OPTIONS,
         created_by_id=user_id,
@@ -140,6 +139,10 @@ def create_availability_poll(game_night_id: int, user_id: int) -> tuple[bool, st
 
 
 AVAILABILITY_OPTIONS = ["Can Make It", "Maybe", "Can't Make It"]
+
+
+def availability_title(date) -> str:
+    return f"Availability — Game Night {date.strftime('%B %-d, %Y')}"
 
 
 def get_poll_by_token(token: str) -> Poll | None:

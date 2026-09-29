@@ -30,6 +30,9 @@ def start_game_night():
             success, message, game_night = game_night_services.start_game_night(
                 form.get("date"), form.get("notes"), form.getlist("attendees"), food
             )
+            if success and form.get("rsvp_poll"):
+                poll_services.create_availability_poll(game_night.id, current_user.id)
+                message = "Game night started. Players can RSVP on its page."
             flash(message, "success" if success else "error")
             if success:
                 return redirect(url_for("game_night.view_game_night", game_night_id=game_night.id))

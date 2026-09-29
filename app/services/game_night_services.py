@@ -38,18 +38,24 @@ def parse_date(date_str):
 
 
 def manage_attendees(game_night, attendees_ids):
-    """Helper to sync attendees in a game night."""
-    current_attendees = {p.people_id for p in game_night.players}
-    new_attendees = set(map(int, attendees_ids))
+    """Sync a game night's players to the given person ids.
 
-    # Add new attendees
+    Returns an error message (and changes nothing) if a player being removed
+    already has results logged; their nominations and votes go with them."""
+    new_attendees = {int(i) for i in attendees_ids}
+    removing = [p for p in game_night.players if p.people_id not in new_attendees]
+    with_results = [p for p in removing if p.results]
+    if with_results:
+        names = ", ".join(p.person.first_name for p in with_results)
+        return f"{names} already {'has' if len(with_results) == 1 else 'have'} results logged for this night; remove those results before removing them."
+
+    for player in removing:
+        db.session.delete(player)  # ORM cascade removes their nominations and votes
+
+    current_attendees = {p.people_id for p in game_night.players}
     for person_id in new_attendees - current_attendees:
         db.session.add(Player(game_night_id=game_night.id, people_id=person_id))
-
-    # Remove attendees who are no longer in the list
-    Player.query.filter(
-        Player.game_night_id == game_night.id, Player.people_id.notin_(new_attendees)
-    ).delete()
+    return None
 
 
 def start_game_night(date_str, notes, attendees_ids, food=("none", None, None)):
@@ -66,7 +72,7 @@ def start_game_night(date_str, notes, attendees_ids, food=("none", None, None)):
     manage_attendees(game_night, attendees_ids)
     db.session.commit()
 
-    return True, "Game night started successfully.", game_night
+    return True, "Game night started.", game_night
 
 
 def get_game_night_details(game_night_id):
@@ -90,9 +96,14 @@ def edit_game_night(game_night_id, date_str, notes, attendees_ids, food=None):
 
     game_night.date = date
     game_night.notes = notes
+    if game_night.availability_poll is not None:
+        game_night.availability_poll.title = poll_services.availability_title(date)
     if food is not None:
         food_services.apply_food_settings(game_night, *food)
-    manage_attendees(game_night, attendees_ids)
+    error = manage_attendees(game_night, attendees_ids)
+    if error:
+        db.session.rollback()
+        return False, error
 
     db.session.commit()
     return True, "Game night updated successfully."

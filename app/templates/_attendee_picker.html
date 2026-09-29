@@ -1,0 +1,106 @@
+{# Searchable attendee checklist for the start / edit game night forms.
+   Expects: people, selected_ids (iterable of person ids), form_id.
+   Type to filter, Enter adds the highlighted person (Shift+Enter removes),
+   arrow keys move the highlight. #}
+<div class="bg-white rounded-xl border border-stone-200 shadow-sm p-5 mb-5">
+  <div class="flex items-baseline justify-between gap-2 mb-3">
+    <h2 class="text-lg font-semibold text-stone-800">Players</h2>
+    <span id="selectedCount" class="text-sm font-medium text-stone-600"></span>
+  </div>
+
+  <input type="text" id="searchBox"
+         class="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent mb-3"
+         placeholder="Search for a name… (Enter adds, Shift+Enter removes)" autocomplete="off" />
+
+  <div id="attendeesContainer" class="space-y-1 min-h-[2rem]"></div>
+
+  <div id="pagination" class="flex items-center gap-3 mt-3">
+    <button type="button" id="prevPage"
+            class="inline-flex items-center rounded-lg border border-stone-300 px-3 py-1.5 text-xs font-medium text-stone-700 hover:bg-stone-50 transition-colors">Previous</button>
+    <span id="pageInfo" class="text-xs text-stone-500"></span>
+    <button type="button" id="nextPage"
+            class="inline-flex items-center rounded-lg border border-stone-300 px-3 py-1.5 text-xs font-medium text-stone-700 hover:bg-stone-50 transition-colors">Next</button>
+  </div>
+</div>
+
+<script>
+  (function () {
+    const people = {{ people | map(attribute='id') | list | tojson }}.map((id, i) => ({
+      id, name: {{ people | map(attribute='full_name') | list | tojson }}[i],
+    }));
+    const selected = new Set({{ selected_ids | list | tojson }});
+    const pageSize = 25;
+    let filtered = people, page = 1, highlighted = 0;
+
+    const form = document.getElementById({{ form_id | tojson }});
+    const box = document.getElementById('searchBox');
+    const list = document.getElementById('attendeesContainer');
+    const pageInfo = document.getElementById('pageInfo');
+
+    function pageItems() { return filtered.slice((page - 1) * pageSize, page * pageSize); }
+
+    function render() {
+      const pages = Math.max(1, Math.ceil(filtered.length / pageSize));
+      page = Math.min(page, pages);
+      const items = pageItems();
+      highlighted = Math.min(highlighted, Math.max(0, items.length - 1));
+      list.innerHTML = '';
+      items.forEach((person, i) => {
+        const on = selected.has(person.id);
+        const label = document.createElement('label');
+        label.className = 'flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer text-sm transition-colors ' +
+          (on ? 'bg-red-50 text-red-800 font-medium' : 'text-stone-700 hover:bg-stone-50') +
+          (i === highlighted && box.value ? ' outline outline-2 outline-red-400' : '');
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.checked = on;
+        cb.className = 'rounded border-stone-300 accent-red-600';
+        cb.addEventListener('change', () => { toggle(person.id, cb.checked); });
+        label.append(cb, document.createTextNode(' ' + person.name));
+        list.appendChild(label);
+        if (i === highlighted && box.value) label.scrollIntoView({ block: 'nearest' });
+      });
+      if (!items.length) list.innerHTML = '<p class="text-sm text-stone-500 px-3 py-2">No matches.</p>';
+      pageInfo.textContent = `Page ${page} of ${pages}`;
+      document.getElementById('selectedCount').textContent =
+        `${selected.size} player${selected.size === 1 ? '' : 's'} selected`;
+    }
+
+    function toggle(id, on) { on ? selected.add(id) : selected.delete(id); render(); }
+
+    box.addEventListener('input', () => {
+      const q = box.value.toLowerCase();
+      filtered = people.filter(p => p.name.toLowerCase().includes(q));
+      page = 1; highlighted = 0; render();
+    });
+    box.addEventListener('keydown', (e) => {
+      const items = pageItems();
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        const person = items[highlighted];
+        if (person) toggle(person.id, !e.shiftKey);
+        box.value = ''; box.dispatchEvent(new Event('input'));
+      } else if (e.key === 'ArrowDown' && highlighted < items.length - 1) {
+        e.preventDefault(); highlighted++; render();
+      } else if (e.key === 'ArrowUp' && highlighted > 0) {
+        e.preventDefault(); highlighted--; render();
+      }
+    });
+    document.getElementById('prevPage').addEventListener('click', () => { if (page > 1) { page--; highlighted = 0; render(); } });
+    document.getElementById('nextPage').addEventListener('click', () => {
+      if (page * pageSize < filtered.length) { page++; highlighted = 0; render(); }
+    });
+
+    // Only the hidden inputs are submitted, so selections on other pages count.
+    form.addEventListener('submit', () => {
+      form.querySelectorAll('input[name="attendees"]').forEach(el => el.remove());
+      selected.forEach(id => {
+        const input = document.createElement('input');
+        input.type = 'hidden'; input.name = 'attendees'; input.value = id;
+        form.appendChild(input);
+      });
+    });
+
+    render();
+  })();
+</script>

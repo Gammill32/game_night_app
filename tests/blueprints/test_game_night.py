@@ -239,3 +239,92 @@ def test_night_page_shows_rsvps_and_linked_poll_to_players(auth_client, app, db)
     _db.session.delete(gn)
     _db.session.delete(other)
     _db.session.commit()
+
+
+def test_edit_removing_player_who_voted_does_not_crash(admin_client, make_person, make_night):
+    from app.extensions import db as _db
+    from app.models import Game, GameNominations, Player
+
+    ann, bo = make_person("Ann"), make_person("Bo")
+    gn = make_night(ann, bo)
+    game = Game(name="Nominated")
+    _db.session.add(game)
+    _db.session.flush()
+    bo_player = Player.query.filter_by(game_night_id=gn.id, people_id=bo.id).one()
+    _db.session.add(GameNominations(game_night_id=gn.id, player_id=bo_player.id, game_id=game.id))
+    _db.session.commit()
+
+    resp = admin_client.post(
+        f"/game_night/{gn.id}/edit",
+        data={"date": str(gn.date), "notes": "", "attendees": [str(ann.id)], "food_mode": "none"},
+    )
+    assert resp.status_code == 302
+    assert {p.people_id for p in gn.players} == {ann.id}
+    assert GameNominations.query.filter_by(game_night_id=gn.id).count() == 0
+    _db.session.delete(game)
+    _db.session.commit()
+
+
+def test_edit_refuses_removing_player_with_results(admin_client, make_person, make_night):
+    from app.extensions import db as _db
+    from app.models import Game, GameNightGame, Player, Result
+
+    ann, bo = make_person("Ann"), make_person("Bo")
+    gn = make_night(ann, bo)
+    game = Game(name="Played")
+    _db.session.add(game)
+    _db.session.flush()
+    gng = GameNightGame(game_night_id=gn.id, game_id=game.id, round=1)
+    _db.session.add(gng)
+    _db.session.flush()
+    bo_player = Player.query.filter_by(game_night_id=gn.id, people_id=bo.id).one()
+    _db.session.add(Result(game_night_game_id=gng.id, player_id=bo_player.id, position=1))
+    _db.session.commit()
+
+    resp = admin_client.post(
+        f"/game_night/{gn.id}/edit",
+        data={"date": str(gn.date), "notes": "", "attendees": [str(ann.id)], "food_mode": "none"},
+    )
+    assert "results logged" in resp.get_data(as_text=True)  # re-rendered with the error
+    _db.session.expire_all()
+    assert {p.people_id for p in gn.players} == {ann.id, bo.id}
+    _db.session.delete(gn)
+    _db.session.delete(game)
+    _db.session.commit()
+
+
+def test_start_night_with_rsvp_poll(admin_client, make_person):
+    from app.extensions import db as _db
+    from app.models import GameNight
+
+    ann = make_person("Ann")
+    admin_client.post(
+        "/game_night/start",
+        data={
+            "date": "2031-02-03",
+            "attendees": [str(ann.id)],
+            "food_mode": "none",
+            "rsvp_poll": "1",
+        },
+    )
+    gn = GameNight.query.filter_by(date="2031-02-03").order_by(GameNight.id.desc()).first()
+    assert gn.availability_poll is not None
+    assert "February 3, 2031" in gn.availability_poll.title
+
+    admin_client.post(
+        f"/game_night/{gn.id}/edit",
+        data={"date": "2031-02-10", "attendees": [str(ann.id)], "food_mode": "none"},
+    )
+    assert "February 10, 2031" in gn.availability_poll.title
+    _db.session.delete(gn.availability_poll)
+    _db.session.delete(gn)
+    _db.session.commit()
+
+
+def test_start_and_edit_pages_render(admin_client, make_person, make_night):
+    ann = make_person("O'Brien")
+    gn = make_night(ann)
+    for url in ("/game_night/start", f"/game_night/{gn.id}/edit"):
+        page = admin_client.get(url).get_data(as_text=True)
+        assert "attendeesContainer" in page and "Food plan" in page
+        assert "O\\u0027Brien" in page or "O'Brien" in page
