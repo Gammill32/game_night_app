@@ -23,6 +23,7 @@ Migrations `j7k8l9m0n1o2` through `s6t7u8v9w0x1`; the entrypoint applies them on
 - Votes for games no longer nominated are removed
 - Container runs as uid 1000; `ProxyFix` for Traefik headers
 - Flask 3.1.3, Werkzeug 3.1.9, Flask-SQLAlchemy 3.1.1, SQLAlchemy 2.0.51 (pinned)
+- gunicorn 26.2.0, requests 2.34.2, cachetools 7.2.0, APScheduler 3.11.3, Flask-Migrate 4.1.0, Flask-WTF 1.3.0, psycopg2-binary 2.9.13 and current pytz / python-dotenv; SQLAlchemy held at 2.0 (2.1 switches the default Postgres driver) and flask-session at 0.6 (0.8 would sign everyone out)
 
 ## [Unreleased] — Phase 1: UI Infrastructure (2026-03-26)
 
