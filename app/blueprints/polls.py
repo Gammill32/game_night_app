@@ -1,4 +1,13 @@
-from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
+from flask import (
+    Blueprint,
+    abort,
+    flash,
+    has_request_context,
+    redirect,
+    render_template,
+    request,
+    url_for,
+)
 from flask_login import current_user, login_required
 
 from app.services import date_poll_services
@@ -22,7 +31,8 @@ def inject_active_polls():
     """The number of open polls the current user can see (for the nav badge)."""
     from app.services.poll_services import open_polls_for
 
-    if not current_user.is_authenticated:
+    # Emails rendered by the scheduler have no request (and so no user).
+    if not has_request_context() or not current_user.is_authenticated:
         return {"active_polls_count": 0}
     try:
         return {"active_polls_count": len(open_polls_for(current_user))}

@@ -271,3 +271,32 @@ def test_reminders_go_out_day_before_and_skip_people_who_are_out(
     assert "Say whether you can make it" in body and f"/game_night/{gn.id}" in body
     assert "https://" in body
     assert "Say whether you can make it" not in sent[cy.email][1]
+
+
+def test_reminders_render_without_a_request(app, make_person, make_night, monkeypatch):
+    """The scheduler has no request or logged-in user; rendering must still work."""
+    import datetime
+    import threading
+
+    import pytz
+
+    from app.services import reminders_services
+
+    ann = make_person("Ann")
+    today = datetime.datetime.now(pytz.timezone(app.config["APP_TIMEZONE"])).date()
+    make_night(ann, date=today)
+    sent, errors = {}, []
+    monkeypatch.setattr(reminders_services, "send_email", lambda to, s, b: sent.__setitem__(to, s))
+
+    def run():  # a fresh thread = a fresh app context with no request, like APScheduler
+        try:
+            with app.app_context():
+                reminders_services.check_and_send_reminders()
+        except Exception as e:  # pragma: no cover - reported below
+            errors.append(e)
+
+    t = threading.Thread(target=run)
+    t.start()
+    t.join()
+    assert not errors, errors
+    assert sent.get(ann.email, "").startswith("Game night tonight")
