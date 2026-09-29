@@ -4,58 +4,14 @@
 
 {% block content %}
 
-<h1 class="text-2xl font-bold text-stone-800 mb-6">My Profile</h1>
-
-<!-- Overall Stats -->
-<div class="grid grid-cols-3 gap-4 mb-6">
-  <div class="bg-white rounded-xl border border-stone-200 shadow-sm p-5 text-center">
-    <p class="text-3xl font-bold text-stone-800">{{ stats.games_played }}</p>
-    <p class="text-sm text-stone-500 mt-1">Games Played</p>
+<div class="max-w-3xl mx-auto">
+<div class="mb-6 flex flex-wrap items-center justify-between gap-3">
+  <div>
+    <h1 class="text-2xl font-bold text-stone-800">{{ person.first_name }} {{ person.last_name }}</h1>
+    <p class="text-sm text-stone-500">Your account and how you get paid back.</p>
   </div>
-  <div class="bg-white rounded-xl border border-stone-200 shadow-sm p-5 text-center">
-    <p class="text-3xl font-bold text-stone-800">{{ stats.wins }}</p>
-    <p class="text-sm text-stone-500 mt-1">Total Wins</p>
-  </div>
-  <div class="bg-white rounded-xl border border-stone-200 shadow-sm p-5 text-center">
-    <p class="text-3xl font-bold text-stone-800">{{ stats.win_percentage }}%</p>
-    <p class="text-sm text-stone-500 mt-1">Win Percentage</p>
-  </div>
+  <a href="{{ url_for('games.user_stats') }}" class="inline-flex items-center rounded-lg border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50">📊 Your stats &amp; badges</a>
 </div>
-
-<!-- Game highlights row -->
-{% if stats.most_played_game or stats.most_wins_game %}
-<div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-
-  {% if stats.most_played_game %}
-  <div class="bg-white rounded-xl border border-stone-200 shadow-sm p-5 text-center">
-    <p class="text-xs font-semibold text-stone-500 uppercase tracking-wide mb-3">Most Played Game</p>
-    <img src="{{ stats.most_played_game.image_url }}" alt="{{ stats.most_played_game.name }}"
-         class="w-24 h-24 rounded-lg object-cover mx-auto mb-3">
-    <p class="font-semibold text-stone-800">{{ stats.most_played_game.name }}</p>
-    <div class="mt-2 space-y-1 text-sm text-stone-600">
-      <p>Wins: <strong class="text-stone-800">{{ stats.most_played_stats[0] }}</strong></p>
-      <p>Win %: <strong class="text-stone-800">{{ stats.most_played_stats[1] }}%</strong></p>
-      <p>Avg Finish: <strong class="text-stone-800">{{ stats.most_played_stats[2] }}</strong></p>
-    </div>
-  </div>
-  {% endif %}
-
-  {% if stats.most_wins_game %}
-  <div class="bg-white rounded-xl border border-stone-200 shadow-sm p-5 text-center">
-    <p class="text-xs font-semibold text-stone-500 uppercase tracking-wide mb-3">Game With Most Wins</p>
-    <img src="{{ stats.most_wins_game.image_url }}" alt="{{ stats.most_wins_game.name }}"
-         class="w-24 h-24 rounded-lg object-cover mx-auto mb-3">
-    <p class="font-semibold text-stone-800">{{ stats.most_wins_game.name }}</p>
-    <div class="mt-2 space-y-1 text-sm text-stone-600">
-      <p>Wins: <strong class="text-stone-800">{{ stats.most_wins_stats[0] }}</strong></p>
-      <p>Win %: <strong class="text-stone-800">{{ stats.most_wins_stats[1] }}%</strong></p>
-      <p>Avg Finish: <strong class="text-stone-800">{{ stats.most_wins_stats[2] }}</strong></p>
-    </div>
-  </div>
-  {% endif %}
-
-</div>
-{% endif %}
 
 <!-- Account Settings -->
 <div class="bg-white rounded-xl border border-stone-200 shadow-sm p-5">
@@ -93,12 +49,7 @@
       <button type="submit" class="inline-flex items-center rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 transition-colors">
         Update
       </button>
-      <a href="{{ url_for('games.user_stats') }}" class="inline-flex items-center rounded-lg bg-stone-100 px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-200 transition-colors">
-        Full Stats
-      </a>
-      <a href="{{ url_for('main.index') }}" class="text-sm text-stone-600 hover:text-stone-800 transition-colors">
-        Back to Home
-      </a>
+
     </div>
 
   </form>
@@ -142,4 +93,8 @@
   <p class="text-xs text-stone-500 mt-2">Pasting a profile link works too (venmo.com/u/…, cash.app/$…, paypal.me/…). Zelle takes an email or US phone number; Apple Cash takes a phone number.</p>
 </div>
 
+<form action="{{ url_for('auth.logout') }}" method="POST" class="mt-6 md:hidden">
+  <button class="w-full rounded-lg border border-stone-300 bg-white px-4 py-2.5 text-sm font-medium text-stone-700">Sign out</button>
+</form>
+</div>
 {% endblock %}

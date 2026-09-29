@@ -1,4 +1,3 @@
-import datetime as dt
 from datetime import datetime
 
 from sqlalchemy import case, distinct, func
@@ -388,30 +387,6 @@ def get_play_stats():
     }
 
 
-def get_recently_played_games(days=30):
-    """Returns games played within the last N days (final nights only), with play stats."""
-    cutoff = dt.date.today() - dt.timedelta(days=days)
-    rows = (
-        db.session.query(
-            Game,
-            func.count(GameNightGame.id).label("play_count"),
-            func.max(GameNight.date).label("last_played"),
-        )
-        .join(GameNightGame, Game.id == GameNightGame.game_id)
-        .join(GameNight, GameNightGame.game_night_id == GameNight.id)
-        .filter(GameNight.final.is_(True), GameNight.date >= cutoff)
-        .group_by(Game.id)
-        .order_by(func.max(GameNight.date).desc())
-        .all()
-    )
-    result = []
-    for game, play_count, last_played in rows:
-        game.play_count = play_count
-        game.last_played = last_played
-        result.append(game)
-    return result
-
-
 def get_bridesmaid_games():
     """Returns games nominated but never played, annotated with nomination_count."""
     played_ids = db.session.query(distinct(GameNightGame.game_id)).scalar_subquery()
@@ -518,12 +493,27 @@ def update_game_rating(game_id, user_id, ranking):
     return True, "Rating saved successfully."
 
 
-def update_tutorial_url(game_id, tutorial_url):
-    game = Game.query.get_or_404(game_id)
+def youtube_id(url):
+    """The video id from any common YouTube link (watch?v=, youtu.be/, shorts/,
+    embed/, with or without extra parameters), or None."""
+    import re
 
-    game.tutorial_url = tutorial_url.strip() or None
+    match = re.search(
+        r"(?:youtube\.com/(?:watch\?(?:.*&)?v=|shorts/|embed/|live/)|youtu\.be/)([A-Za-z0-9_-]{11})",
+        url or "",
+    )
+    return match.group(1) if match else None
+
+
+def update_tutorial_url(game_id, tutorial_url):
+    """Save a YouTube tutorial link (or clear it). Returns (success, message)."""
+    game = Game.query.get_or_404(game_id)
+    tutorial_url = (tutorial_url or "").strip()
+    if tutorial_url and not youtube_id(tutorial_url):
+        return False, "That doesn't look like a YouTube video link."
+    game.tutorial_url = tutorial_url or None
     db.session.commit()
-    return game
+    return True, "Tutorial video saved." if tutorial_url else "Tutorial video removed."
 
 
 def get_user_stats(

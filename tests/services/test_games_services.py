@@ -242,3 +242,20 @@ def test_game_leaderboard_counts_wins_per_person(auth_client, game_with_plays):
     name = f"{person.first_name} {person.last_name}"
     assert f'{name}</span> <span class="tabular-nums">2 wins' in page
     assert page.count(f"🥇 {name}") == 1
+
+
+@pytest.mark.parametrize(
+    "url,vid",
+    [
+        ("https://www.youtube.com/watch?v=dQw4w9WgXcQ", "dQw4w9WgXcQ"),
+        ("https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=42s", "dQw4w9WgXcQ"),
+        ("https://youtu.be/dQw4w9WgXcQ?si=abc", "dQw4w9WgXcQ"),
+        ("https://www.youtube.com/shorts/dQw4w9WgXcQ", "dQw4w9WgXcQ"),
+        ("https://m.youtube.com/watch?feature=share&v=dQw4w9WgXcQ", "dQw4w9WgXcQ"),
+        ("https://vimeo.com/123", None),
+    ],
+)
+def test_youtube_id(url, vid):
+    from app.services.games_services import youtube_id
+
+    assert youtube_id(url) == vid

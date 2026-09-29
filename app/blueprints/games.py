@@ -197,8 +197,8 @@ def update_rating(game_id):
 def update_tutorial_url(game_id):
     tutorial_url = request.form.get("tutorial_url", "").strip()
 
-    games_services.update_tutorial_url(game_id, tutorial_url)
-    flash("Tutorial URL updated.", "success")
+    success, message = games_services.update_tutorial_url(game_id, tutorial_url)
+    flash(message, "success" if success else "error")
 
     return redirect(url_for("games.view_game", game_id=game_id))
 

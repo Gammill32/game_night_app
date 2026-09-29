@@ -2,10 +2,7 @@
 
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required, login_user, logout_user
-from sqlalchemy import func
 
-from app.extensions import db
-from app.models import Game, GameNightGame, Player, Result
 from app.services import auth_services, payment_services
 from app.utils import flash_if_no_action
 
@@ -117,7 +114,7 @@ def update_password():
 @auth_bp.route("/manage_user", methods=["GET", "POST"])
 @login_required
 def manage_user():
-    """Displays user profile and game stats; POST updates email/password."""
+    """Profile: account settings and payment methods; POST updates email/password."""
     user = current_user
 
     if request.method == "POST":
@@ -131,98 +128,8 @@ def manage_user():
         flash(message, "success" if success else "error")
         return redirect(url_for("auth.manage_user"))
 
-    games_played = (
-        db.session.query(func.count(Result.id))
-        .join(GameNightGame, Result.game_night_game_id == GameNightGame.id)
-        .join(Player, Result.player_id == Player.id)
-        .filter(Player.people_id == user.id)
-        .scalar()
-        or 0
-    )
-
-    total_wins = (
-        db.session.query(func.count(Result.id))
-        .join(GameNightGame, Result.game_night_game_id == GameNightGame.id)
-        .join(Player, Result.player_id == Player.id)
-        .filter(Player.people_id == user.id, Result.position == 1)
-        .scalar()
-        or 0
-    )
-
-    win_percentage = round((total_wins / games_played * 100) if games_played > 0 else 0, 2)
-
-    def get_game_stats(game_id):
-        """Fetch win percentage, total wins, and average finish for a game."""
-        total_wins = (
-            db.session.query(func.count(Result.id))
-            .join(GameNightGame, Result.game_night_game_id == GameNightGame.id)
-            .join(Player, Result.player_id == Player.id)
-            .filter(
-                Player.people_id == user.id, GameNightGame.game_id == game_id, Result.position == 1
-            )
-            .scalar()
-        )
-        total_played = (
-            db.session.query(func.count(Result.id))
-            .join(GameNightGame, Result.game_night_game_id == GameNightGame.id)
-            .join(Player, Result.player_id == Player.id)
-            .filter(Player.people_id == user.id, GameNightGame.game_id == game_id)
-            .scalar()
-        )
-        avg_finish = (
-            db.session.query(func.avg(Result.position))
-            .join(GameNightGame, Result.game_night_game_id == GameNightGame.id)
-            .join(Player, Result.player_id == Player.id)
-            .filter(Player.people_id == user.id, GameNightGame.game_id == game_id)
-            .scalar()
-        )
-
-        win_percentage = round((total_wins / total_played * 100) if total_played > 0 else 0, 2)
-        avg_finish = round(avg_finish, 2) if avg_finish else None
-
-        return total_wins, win_percentage, avg_finish
-
-    most_played_game_query = (
-        db.session.query(Game, func.count(Result.id).label("play_count"))
-        .join(GameNightGame, GameNightGame.game_id == Game.id)
-        .join(Result, Result.game_night_game_id == GameNightGame.id)
-        .join(Player, Result.player_id == Player.id)
-        .filter(Player.people_id == user.id)
-        .group_by(Game.id)
-        .order_by(func.count(Result.id).desc())
-        .first()
-    )
-
-    most_played_game = most_played_game_query[0] if most_played_game_query else None
-    most_played_stats = get_game_stats(most_played_game.id) if most_played_game else (0, 0, None)
-
-    most_wins_game_query = (
-        db.session.query(Game, func.count(Result.id).label("win_count"))
-        .join(GameNightGame, GameNightGame.game_id == Game.id)
-        .join(Result, Result.game_night_game_id == GameNightGame.id)
-        .join(Player, Result.player_id == Player.id)
-        .filter(Player.people_id == user.id, Result.position == 1)
-        .group_by(Game.id)
-        .order_by(func.count(Result.id).desc())
-        .first()
-    )
-
-    most_wins_game = most_wins_game_query[0] if most_wins_game_query else None
-    most_wins_stats = get_game_stats(most_wins_game.id) if most_wins_game else (0, 0, None)
-
-    stats = {
-        "games_played": games_played,
-        "wins": total_wins,
-        "win_percentage": win_percentage,
-        "most_played_game": most_played_game,
-        "most_played_stats": most_played_stats,
-        "most_wins_game": most_wins_game,
-        "most_wins_stats": most_wins_stats,
-    }
-
     context = {
         "person": user,
-        "stats": stats,
         "payment_labels": payment_services.LABELS,
         "payment_placeholders": payment_services.PLACEHOLDERS,
         "payment_display": payment_services.display,

@@ -38,7 +38,6 @@ def register_blueprints(app):
     app.register_blueprint(blueprints.voting_bp)
     app.register_blueprint(blueprints.reminders_bp)
     app.register_blueprint(blueprints.main_bp)
-    app.register_blueprint(blueprints.api_bp)
     app.register_blueprint(blueprints.polls_bp)
     app.register_blueprint(blueprints.tracker_bp)
     app.register_blueprint(blueprints.photos_bp)
@@ -107,6 +106,10 @@ def create_app(config_class=None):
     from app.services.food_services import money
 
     app.jinja_env.filters["money"] = money
+
+    from app.services.games_services import youtube_id
+
+    app.jinja_env.filters["youtube_id"] = youtube_id
 
     @app.errorhandler(413)
     def upload_too_large(_error):
