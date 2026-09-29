@@ -94,3 +94,34 @@ def update_password(user, current_password, new_password, confirm_password):
     db.session.commit()
 
     return True, "Password updated successfully."
+
+
+def update_profile(user, current_password, email, new_password, confirm_password):
+    """Change email and/or password from the profile page. Either change
+    needs the current password."""
+    email = (email or "").strip().lower()
+    new_password = new_password or ""
+    changing_email = email != (user.email or "")
+    if not changing_email and not new_password:
+        return False, "Nothing to update."
+    if not user.password or not bcrypt.check_password_hash(user.password, current_password or ""):
+        return False, "Current password is incorrect."
+
+    if changing_email:
+        if not email or "@" not in email:
+            return False, "Enter a valid email address."
+        taken = Person.query.filter(func.lower(Person.email) == email, Person.id != user.id).first()
+        if taken:
+            return False, "An account with this email already exists."
+        user.email = email
+
+    if new_password:
+        if new_password != confirm_password:
+            return False, "New passwords do not match."
+        user.password = bcrypt.generate_password_hash(new_password).decode("utf-8")
+        user.temp_pass = False
+        user.temp_pass_expires_at = None
+
+    db.session.commit()
+    changed = [what for what, did in (("Email", changing_email), ("password", new_password)) if did]
+    return True, f"{' and '.join(changed).capitalize()} updated."

@@ -101,8 +101,19 @@ def update_password():
 @auth_bp.route("/manage_user", methods=["GET", "POST"])
 @login_required
 def manage_user():
-    """Displays user profile and game stats."""
+    """Displays user profile and game stats; POST updates email/password."""
     user = current_user
+
+    if request.method == "POST":
+        success, message = auth_services.update_profile(
+            user,
+            request.form.get("current_password"),
+            request.form.get("email"),
+            request.form.get("new_password"),
+            request.form.get("confirm_password"),
+        )
+        flash(message, "success" if success else "error")
+        return redirect(url_for("auth.manage_user"))
 
     games_played = (
         db.session.query(func.count(Result.id))

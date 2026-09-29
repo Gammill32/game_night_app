@@ -236,3 +236,38 @@ def test_open_redirect_blocked(client, registered_user):
     assert resp.status_code == 302
     location = resp.headers.get("Location", "")
     assert "evil.com" not in location
+
+
+def test_profile_updates_email_and_password(client, make_person):
+    from tests.conftest import login
+
+    ann = make_person("Ann")
+    login(client, ann)
+    client.post(
+        "/manage_user",
+        data={"current_password": "wrong", "email": "ann.new@test.invalid", "new_password": ""},
+    )
+    assert ann.email != "ann.new@test.invalid"
+
+    client.post(
+        "/manage_user",
+        data={
+            "current_password": "password",
+            "email": "Ann.New@test.invalid",
+            "new_password": "hunter22",
+            "confirm_password": "hunter22",
+        },
+    )
+    assert ann.email == "ann.new@test.invalid"
+    client.post("/logout")
+    resp = client.post("/login", data={"email": "ann.new@test.invalid", "password": "hunter22"})
+    assert resp.status_code == 302 and "/login" not in resp.headers["Location"]
+
+
+def test_profile_rejects_taken_email(client, make_person):
+    from tests.conftest import login
+
+    ann, bo = make_person("Ann"), make_person("Bo")
+    login(client, ann)
+    client.post("/manage_user", data={"current_password": "password", "email": bo.email})
+    assert ann.email != bo.email
