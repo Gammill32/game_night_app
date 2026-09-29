@@ -87,31 +87,62 @@
 
       <!-- Date poll -->
       <div data-kind="dates" class="space-y-4 {% if kind != 'dates' %}hidden{% endif %}">
-        <div class="grid grid-cols-2 gap-3">
-          <div>
-            <label for="start_date" class="block text-sm font-medium text-stone-700 mb-1">From</label>
-            <input type="date" name="start_date" id="start_date" value="{{ f.get('start_date', '') }}"
-                   class="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent">
-          </div>
-          <div>
-            <label for="end_date" class="block text-sm font-medium text-stone-700 mb-1">To</label>
-            <input type="date" name="end_date" id="end_date" value="{{ f.get('end_date', '') }}"
-                   class="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent">
-          </div>
+        {% set date_mode = f.get('date_mode', 'pick') %}
+        <div class="inline-flex rounded-lg border border-stone-300 p-0.5 text-sm" role="radiogroup" aria-label="How to choose dates">
+          {% for value, label in [('pick', 'Pick dates'), ('range', 'Date range')] %}
+          <label class="cursor-pointer">
+            <input type="radio" name="date_mode" value="{{ value }}" {% if date_mode == value %}checked{% endif %} class="peer sr-only">
+            <span class="block rounded-md px-3 py-1.5 font-medium text-stone-600 peer-checked:bg-red-600 peer-checked:text-white peer-focus-visible:ring-2 peer-focus-visible:ring-red-400">{{ label }}</span>
+          </label>
+          {% endfor %}
         </div>
-        <fieldset>
-          <legend class="block text-sm font-medium text-stone-700 mb-1">Only these days</legend>
-          {% set chosen = f.getlist('weekdays') if request.method == 'POST' else ['4', '5'] %}
-          <div class="flex flex-wrap gap-1.5">
-            {% for day in weekdays %}
-            <label class="cursor-pointer">
-              <input type="checkbox" name="weekdays" value="{{ loop.index0 }}" {% if loop.index0|string in chosen %}checked{% endif %} class="peer sr-only">
-              <span class="inline-block rounded-full border border-stone-300 px-3 py-1 text-xs font-medium text-stone-600 peer-checked:border-red-500 peer-checked:bg-red-600 peer-checked:text-white peer-focus-visible:ring-2 peer-focus-visible:ring-red-400">{{ day }}</span>
-            </label>
-            {% endfor %}
+
+        <!-- Pick dates: tap days on a calendar -->
+        <div data-date-mode="pick" class="{% if date_mode != 'pick' %}hidden{% endif %}">
+          <div id="datePicker" class="rounded-lg border border-stone-200 p-3 select-none"
+               data-selected='{{ f.getlist("dates") | tojson }}'>
+            <div class="flex items-center justify-between mb-2">
+              <button type="button" data-cal-prev class="h-9 w-9 rounded-lg border border-stone-300 text-stone-600 hover:bg-stone-50" aria-label="Previous month">&larr;</button>
+              <span data-cal-title class="text-sm font-semibold text-stone-800"></span>
+              <button type="button" data-cal-next class="h-9 w-9 rounded-lg border border-stone-300 text-stone-600 hover:bg-stone-50" aria-label="Next month">&rarr;</button>
+            </div>
+            <div class="grid grid-cols-7 text-center text-[11px] font-semibold uppercase text-stone-400 mb-1">
+              {% for d in ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] %}<span>{{ d }}</span>{% endfor %}
+            </div>
+            <div data-cal-grid class="grid grid-cols-7 gap-1"></div>
           </div>
-          <p id="datePreview" class="text-xs text-stone-500 mt-2"></p>
-        </fieldset>
+          <div data-cal-chosen class="mt-2 flex flex-wrap gap-1.5"></div>
+          <p data-cal-count class="text-xs text-stone-500 mt-1">Tap the dates you want to offer.</p>
+        </div>
+
+        <!-- Range -->
+        <div data-date-mode="range" class="space-y-4 {% if date_mode != 'range' %}hidden{% endif %}">
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label for="start_date" class="block text-sm font-medium text-stone-700 mb-1">From</label>
+              <input type="date" name="start_date" id="start_date" value="{{ f.get('start_date', '') }}"
+                     class="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent">
+            </div>
+            <div>
+              <label for="end_date" class="block text-sm font-medium text-stone-700 mb-1">To</label>
+              <input type="date" name="end_date" id="end_date" value="{{ f.get('end_date', '') }}"
+                     class="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent">
+            </div>
+          </div>
+          <fieldset>
+            <legend class="block text-sm font-medium text-stone-700 mb-1">Only these days</legend>
+            {% set chosen = f.getlist('weekdays') if request.method == 'POST' else ['4', '5'] %}
+            <div class="flex flex-wrap gap-1.5">
+              {% for day in weekdays %}
+              <label class="cursor-pointer">
+                <input type="checkbox" name="weekdays" value="{{ loop.index0 }}" {% if loop.index0|string in chosen %}checked{% endif %} class="peer sr-only">
+                <span class="inline-block rounded-full border border-stone-300 px-3 py-1 text-xs font-medium text-stone-600 peer-checked:border-red-500 peer-checked:bg-red-600 peer-checked:text-white peer-focus-visible:ring-2 peer-focus-visible:ring-red-400">{{ day }}</span>
+              </label>
+              {% endfor %}
+            </div>
+            <p id="datePreview" class="text-xs text-stone-500 mt-2"></p>
+          </fieldset>
+        </div>
         <p class="text-xs text-stone-500">People answer Yes / If needed / No for each date. The results page ranks the dates; pick one there to create the game night with everyone who's free, RSVPs filled in.</p>
       </div>
 
@@ -177,6 +208,66 @@
       out.textContent = n ? `${n} date${n === 1 ? '' : 's'} in the poll.` : 'No dates match yet.';
     }
     document.querySelectorAll('input[name="kind"]').forEach(r => r.addEventListener('change', syncKind));
+
+    // Pick dates vs range
+    function syncDateMode() {
+      const mode = document.querySelector('input[name="date_mode"]:checked').value;
+      document.querySelectorAll('[data-date-mode]').forEach(el => el.classList.toggle('hidden', el.dataset.dateMode !== mode));
+    }
+    document.querySelectorAll('input[name="date_mode"]').forEach(r => r.addEventListener('change', syncDateMode));
+
+    // Tap-to-select calendar; each chosen date becomes a hidden "dates" input
+    (function () {
+      const root = document.getElementById('datePicker');
+      const grid = root.querySelector('[data-cal-grid]');
+      const chosenBox = document.querySelector('[data-cal-chosen]');
+      const count = document.querySelector('[data-cal-count]');
+      const iso = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      const today = new Date(); today.setHours(0, 0, 0, 0);
+      const selected = new Set(JSON.parse(root.dataset.selected || '[]'));
+      let month = new Date(today.getFullYear(), today.getMonth(), 1);
+
+      function render() {
+        root.querySelector('[data-cal-title]').textContent =
+          month.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+        grid.innerHTML = '';
+        for (let i = 0; i < month.getDay(); i++) grid.appendChild(document.createElement('span'));
+        const days = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate();
+        for (let n = 1; n <= days; n++) {
+          const d = new Date(month.getFullYear(), month.getMonth(), n);
+          const key = iso(d), on = selected.has(key), past = d < today;
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.textContent = n;
+          btn.disabled = past;
+          btn.setAttribute('aria-pressed', on);
+          btn.setAttribute('aria-label', d.toDateString());
+          btn.className = 'h-10 rounded-lg text-sm transition-colors ' + (past ? 'text-stone-300' :
+            on ? 'bg-red-600 font-semibold text-white' : 'text-stone-700 hover:bg-stone-100');
+          btn.addEventListener('click', () => { on ? selected.delete(key) : selected.add(key); render(); });
+          grid.appendChild(btn);
+        }
+        chosenBox.innerHTML = '';
+        [...selected].sort().forEach(key => {
+          const d = new Date(key + 'T12:00');
+          const chip = document.createElement('button');
+          chip.type = 'button';
+          chip.className = 'inline-flex items-center gap-1 rounded-full bg-red-50 px-2.5 py-1 text-xs font-medium text-red-800';
+          chip.innerHTML = '<span></span><span aria-hidden="true">×</span>';
+          chip.firstChild.textContent = d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+          chip.setAttribute('aria-label', 'Remove ' + d.toDateString());
+          chip.addEventListener('click', () => { selected.delete(key); render(); });
+          const input = document.createElement('input');
+          input.type = 'hidden'; input.name = 'dates'; input.value = key;
+          chip.appendChild(input);
+          chosenBox.appendChild(chip);
+        });
+        count.textContent = selected.size ? `${selected.size} date${selected.size === 1 ? '' : 's'} in the poll.` : 'Tap the dates you want to offer.';
+      }
+      root.querySelector('[data-cal-prev]').addEventListener('click', () => { month.setMonth(month.getMonth() - 1); render(); });
+      root.querySelector('[data-cal-next]').addEventListener('click', () => { month.setMonth(month.getMonth() + 1); render(); });
+      render();
+    })();
     document.querySelectorAll('#start_date, #end_date, input[name="weekdays"]').forEach(el => el.addEventListener('change', preview));
     document.getElementById('private-toggle').addEventListener('change', function () {
       document.getElementById('invitee-section').classList.toggle('hidden', !this.checked);

@@ -100,3 +100,25 @@ def test_create_date_poll_route_and_pick(admin_client, make_person):
     _db.session.delete(poll)
     _db.session.delete(night)
     _db.session.commit()
+
+
+def test_picked_dates(admin_client):
+    ok, err = dps.picked_dates(["2031-05-09", "2031-05-02", "2031-05-09"])
+    assert err is None and ok == [dt.date(2031, 5, 2), dt.date(2031, 5, 9)]
+    assert dps.picked_dates([])[1]
+    assert dps.picked_dates(["nope"])[1]
+
+    resp = admin_client.post(
+        "/polls/create",
+        data={
+            "kind": "dates",
+            "date_mode": "pick",
+            "title": "Picked poll",
+            "dates": ["2031-05-16", "2031-05-02"],
+        },
+    )
+    assert resp.status_code == 302
+    poll = Poll.query.filter_by(title="Picked poll").one()
+    assert [o.option_date for o in poll.options] == [dt.date(2031, 5, 2), dt.date(2031, 5, 16)]
+    _db.session.delete(poll)
+    _db.session.commit()

@@ -40,6 +40,9 @@ def dates_in_range(start: date, end: date, weekdays: set[int]) -> tuple[list[dat
 
 
 def parse_form(form) -> tuple[list[date], str | None]:
+    """Dates for a new date poll: hand-picked (date_mode=pick) or a range."""
+    if form.get("date_mode") == "pick":
+        return picked_dates(form.getlist("dates"))
     try:
         start = date.fromisoformat(form.get("start_date", ""))
         end = date.fromisoformat(form.get("end_date", ""))
@@ -47,6 +50,18 @@ def parse_form(form) -> tuple[list[date], str | None]:
         return [], "Pick a start and end date."
     weekdays = {int(d) for d in form.getlist("weekdays") if d.isdigit() and int(d) < 7}
     return dates_in_range(start, end, weekdays)
+
+
+def picked_dates(raw: list[str]) -> tuple[list[date], str | None]:
+    try:
+        dates = sorted({date.fromisoformat(d) for d in raw if d})
+    except ValueError:
+        return [], "One of those dates isn't valid."
+    if not dates:
+        return [], "Tap at least one date on the calendar."
+    if len(dates) > MAX_DATES:
+        return [], f"That's more than {MAX_DATES} dates."
+    return dates, None
 
 
 def label_for(day: date) -> str:
