@@ -223,6 +223,7 @@ def search_for_adding(query, user_id):
             for g in Game.query.filter(Game.bgg_id.in_([r["bgg_id"] for r in results])).all()
         }
         local_ids = {g.id for g in local_games}
+        local_names = {g.name.lower() for g in local_games}
         q = query.lower()
 
         def relevance(r):
@@ -233,8 +234,8 @@ def search_for_adding(query, user_id):
 
         for r in sorted(results, key=relevance)[:12]:
             game = known.get(r["bgg_id"])
-            if game is not None and game.id in local_ids:
-                continue  # already listed under the library
+            if (game is not None and game.id in local_ids) or r["name"].lower() in local_names:
+                continue  # already listed under the site's games
             bgg.append({**r, "local": status(game) if game else None})
     return {"local": local, "bgg": bgg}
 
