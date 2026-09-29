@@ -96,7 +96,9 @@ def get_upcoming_nights(user, today, limit=6):
                 "bringing": [i.name for i in night.food_items if i.claimed_by == user.id],
                 "owed": food_services.my_food_summary(night, user),
                 "days_away": (night.date - today).days,
-                "next_step": _next_voting_step(night, user.id),
+                "next_step": None
+                if rsvps.get(user.id) == "Can't Make It"
+                else _next_voting_step(night, user.id),
             }
         )
     return cards
