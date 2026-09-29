@@ -1,4 +1,5 @@
 from app.models import (
+    Game,
     GameNominations,
     GameVotes,
     Player,
@@ -24,21 +25,25 @@ def nominate_game(game_night_id, user_id, game_id):
     if existing_nomination and existing_nomination.player_id != player_id:
         return False, "This game has already been nominated by another player."
 
-    GameVotes.query.filter_by(game_night_id=game_night_id, player_id=player_id).delete()
     nomination = GameNominations.query.filter_by(
         game_night_id=game_night_id, player_id=player_id
     ).first()
+    game = db.session.get(Game, int(game_id))
+    name = game.name if game else "that game"
 
     if nomination:
+        if nomination.game_id == int(game_id):
+            return True, f"{name} is already your nomination."
+        # The game you're replacing is no longer nominated, so rankings of
+        # it (anyone's) no longer count. Your other rankings stay.
+        GameVotes.query.filter_by(game_night_id=game_night_id, game_id=nomination.game_id).delete()
         nomination.game_id = game_id
-        message = "Your nomination has been updated, and your votes have been cleared."
+        message = f"You're now nominating {name}. Rankings of your old pick were removed."
     else:
-        new_nomination = GameNominations(
-            game_night_id=game_night_id, player_id=player_id, game_id=game_id
+        db.session.add(
+            GameNominations(game_night_id=game_night_id, player_id=player_id, game_id=game_id)
         )
-        db.session.add(new_nomination)
-        message = "Your nomination has been submitted, and any previous votes have been cleared."
-
+        message = f"You nominated {name}. Next: rank your top 3 games."
     db.session.commit()
     return True, message
 
@@ -80,4 +85,7 @@ def vote_game(game_night_id, user_id, votes_dict):
                 db.session.add(new_vote)
 
     db.session.commit()
-    return True, "Your votes have been updated successfully."
+    ranked = sum(1 for rank in votes_dict.values() if rank is not None)
+    if not ranked:
+        return True, "Your ranking is cleared."
+    return True, f"Your ranking is saved ({ranked} of 3 picked)."

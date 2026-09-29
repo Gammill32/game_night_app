@@ -72,3 +72,33 @@ def test_finalized_night_and_all_nights_list(client, make_person, make_night):
     _db.session.delete(gng)
     _db.session.commit()
     _cleanup(game)
+
+
+def test_changing_nomination_keeps_other_rankings(client, make_person, make_night):
+    from app.models import GameVotes
+    from app.services import voting_services
+
+    ann, bo = make_person("Ann"), make_person("Bo")
+    gn = make_night(ann, bo, date=dt.date(2031, 8, 15))
+    a, b, c = _games(ann, "KeepA", "KeepB", "KeepC")
+    ok, msg = voting_services.nominate_game(gn.id, ann.id, a.id)
+    assert ok and "Next: rank" in msg
+    voting_services.nominate_game(gn.id, bo.id, b.id)
+    voting_services.vote_game(gn.id, ann.id, {a.id: 2, b.id: 1})
+    voting_services.vote_game(gn.id, bo.id, {a.id: 1})
+
+    ok, msg = voting_services.nominate_game(gn.id, ann.id, c.id)
+    assert ok and "KeepC" in msg
+    left = {(v.player.people_id, v.game_id) for v in GameVotes.query.filter_by(game_night_id=gn.id)}
+    assert left == {(ann.id, b.id)}  # Ann's other ranking kept; everyone's votes for KeepA gone
+
+    login(client, ann)
+    page = " ".join(client.get(f"/game_night/{gn.id}").get_data(as_text=True).split())
+    assert "You picked <strong>KeepC</strong>" in page and "You've ranked 1 game" in page
+    assert "Your pick" in page
+    home = client.get("/").get_data(as_text=True)
+    assert "Rank your top 3" not in home  # Ann has ranked; nothing to nudge
+    GameVotes.query.filter_by(game_night_id=gn.id).delete()
+    GameNominations.query.filter_by(game_night_id=gn.id).delete()
+    _db.session.commit()
+    _cleanup(a, b, c)

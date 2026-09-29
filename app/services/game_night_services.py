@@ -383,6 +383,7 @@ def get_view_game_night_details(game_night_id, current_user_id):
         "eligible_games": eligible_games,
         "user_nomination": user_nomination,
         "current_player_id": current_player.id if current_player else None,
+        "my_nominated_game_id": user_nomination.game_id if user_nomination else None,
         "user_votes": user_votes,
         "top_places": None
         if not results_logged

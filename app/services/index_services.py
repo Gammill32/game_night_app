@@ -96,9 +96,26 @@ def get_upcoming_nights(user, today, limit=6):
                 "bringing": [i.name for i in night.food_items if i.claimed_by == user.id],
                 "owed": food_services.my_food_summary(night, user),
                 "days_away": (night.date - today).days,
+                "next_step": _next_voting_step(night, user.id),
             }
         )
     return cards
+
+
+def _next_voting_step(night, user_id):
+    """'nominate' / 'rank' while voting is open and the player hasn't yet."""
+    from app.models import GameNominations, GameVotes
+
+    if night.closed or night.final:
+        return None
+    me = next((p for p in night.players if p.people_id == user_id), None)
+    if me is None:
+        return None
+    if not GameNominations.query.filter_by(game_night_id=night.id, player_id=me.id).first():
+        return "nominate"
+    if not GameVotes.query.filter_by(game_night_id=night.id, player_id=me.id).first():
+        return "rank"
+    return None
 
 
 def get_recent_nights(user, today, limit=5):

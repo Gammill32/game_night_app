@@ -52,6 +52,8 @@
           {% if gn.food_mode == 'provided' %}<span>🍕 {{ 'You\'re' if gn.food_provider_id == current_user.id else (gn.food_provider.first_name if gn.food_provider else 'Someone') ~ ' is' }} providing food{% if gn.food_note %}: {{ gn.food_note }}{% endif %}</span>
           {% elif gn.food_mode != 'none' %}<span>🍕 {{ gn.food_note or ('Sign-up list' if gn.food_signup else 'Splitting the cost') }}</span>{% endif %}
           {% if card.bringing %}<span class="text-green-700">You're bringing {{ card.bringing|join(', ') }}</span>{% endif %}
+          {% if card.next_step == 'nominate' %}<span class="font-medium text-amber-700">👉 Nominate a game</span>
+          {% elif card.next_step == 'rank' %}<span class="font-medium text-amber-700">👉 Rank your top 3 games</span>{% endif %}
           {% for share, expense in card.owed %}<span class="text-amber-700 font-medium">You owe {{ expense.payer.first_name }} {{ share.amount_cents|money }}</span>{% endfor %}
         </div>
       </a>

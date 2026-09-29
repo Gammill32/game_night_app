@@ -538,51 +538,89 @@
   {% endif %}
 
   <!-- Choosing games: nominate + rank -->
-  {% if not game_night.closed %}
+  {% set voting_open = not game_night.closed %}
+  {% if voting_open or nominations %}
+  {% set ranked = user_votes | length %}
   <div id="games" class="bg-white rounded-xl border border-stone-200 shadow-sm p-5">
-    <div class="flex items-start justify-between gap-2">
-      <div>
-        <h2 class="text-lg font-semibold text-stone-800">What should we play?</h2>
-        <p class="text-xs text-stone-500">Each player nominates one game, then ranks their top 3. 1st = 3 points, 2nd = 2, 3rd = 1.</p>
-      </div>
-      {% if current_player_id %}
-      <a href="{{ url_for('voting.nominate_game_page', game_night_id=game_night.id) }}"
-         class="shrink-0 inline-flex items-center rounded-lg {{ 'border border-stone-300 text-stone-700 hover:bg-stone-50' if user_nomination else 'bg-red-600 text-white hover:bg-red-700' }} px-3 py-1.5 text-sm font-medium">
-        {{ 'Change nomination' if user_nomination else '+ Nominate' }}</a>
-      {% endif %}
-    </div>
-    {% if not nominations %}
-    <p class="mt-3 text-sm text-stone-500">Nothing nominated yet.</p>
+    <h2 class="text-lg font-semibold text-stone-800">What should we play?</h2>
+
+    {% if voting_open and current_player_id %}
+    <!-- Where you are in the two steps -->
+    <ol class="mt-3 grid gap-2 sm:grid-cols-2">
+      <li class="flex items-start gap-3 rounded-lg p-3 {{ 'bg-green-50' if user_nomination else 'bg-amber-50 ring-1 ring-amber-200' }}">
+        <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold {{ 'bg-green-600 text-white' if user_nomination else 'bg-amber-500 text-white' }}">{{ '✓' if user_nomination else '1' }}</span>
+        <span class="text-sm">
+          <strong class="block text-stone-800">Nominate one game</strong>
+          {% if user_nomination %}
+          <span class="text-stone-600">You picked <strong>{{ user_nomination.game.name }}</strong>.</span>
+          <a href="{{ url_for('voting.nominate_game_page', game_night_id=game_night.id) }}" class="text-red-600 underline">Change</a>
+          {% else %}
+          <span class="block text-stone-600">Suggest a game you'd like to play tonight.</span>
+          <a href="{{ url_for('voting.nominate_game_page', game_night_id=game_night.id) }}"
+             class="mt-2 inline-flex items-center rounded-lg bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700">Nominate a game</a>
+          {% endif %}
+        </span>
+      </li>
+      <li class="flex items-start gap-3 rounded-lg p-3 {{ 'bg-green-50' if ranked else ('bg-amber-50 ring-1 ring-amber-200' if nominations else 'bg-stone-50') }}">
+        <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold {{ 'bg-green-600 text-white' if ranked else ('bg-amber-500 text-white' if nominations else 'bg-stone-300 text-white') }}">{{ '✓' if ranked else '2' }}</span>
+        <span class="text-sm">
+          <strong class="block text-stone-800">Rank your top 3</strong>
+          <span class="text-stone-600">
+            {% if ranked %}You've ranked {{ ranked }} game{{ 's' if ranked != 1 }}. You can change it until voting closes.
+            {% elif nominations %}Tap 1st, 2nd and 3rd below on the games you want most, then save.
+            {% else %}Once games are nominated, rank your favourites here.{% endif %}
+          </span>
+        </span>
+      </li>
+    </ol>
+    <p class="mt-2 text-xs text-stone-500">Points: 1st = 3, 2nd = 2, 3rd = 1. The game with the most points is on top. Voting closes when the host says so.</p>
+    {% elif voting_open %}
+    <p class="mt-1 text-sm text-stone-500">Players nominate one game each and rank their top 3. You're not a player at this night, so you can watch the standings.</p>
     {% else %}
+    <p class="mt-1 text-sm text-stone-500">Voting is closed. Final standings:</p>
+    {% endif %}
+
+    {% if not nominations %}
+    <p class="mt-4 rounded-lg border border-dashed border-stone-300 p-4 text-center text-sm text-stone-500">Nothing nominated yet{% if current_player_id %} — be the first{% endif %}.</p>
+    {% else %}
+    {% set can_rank = voting_open and current_player_id %}
     <form method="POST" action="{{ url_for('voting.vote_game', game_night_id=game_night.id) }}" data-rank-form class="mt-4">
+      {% if can_rank %}<p class="mb-2 flex justify-end pr-1 text-xs font-medium text-stone-500 sm:pr-3">Your rank</p>{% endif %}
       <ul class="space-y-2">
         {% for n in nominations %}
         {% set mine = user_votes.get(n.game_id) %}
-        <li class="flex flex-wrap items-center gap-3 rounded-lg border border-stone-200 p-3">
+        {% set is_mine = n.game_id == my_nominated_game_id %}
+        <li class="flex flex-wrap items-center gap-3 rounded-lg border p-3 {{ 'border-amber-300 bg-amber-50/40' if loop.first and n.vote_score else 'border-stone-200' }}">
           <a href="{{ url_for('games.view_game', game_id=n.game_id) }}" class="shrink-0">
             {% if n.image_url %}<img src="{{ n.image_url }}" alt="" class="h-12 w-12 rounded-lg object-cover border border-stone-200">{% else %}<span class="flex h-12 w-12 items-center justify-center rounded-lg bg-stone-100 text-xl">🎲</span>{% endif %}
           </a>
           <div class="min-w-0 flex-1">
-            <p class="text-sm font-semibold text-stone-800">{% if loop.first and n.vote_score %}🥇 {% endif %}{{ n.game_name }}</p>
-            <p class="text-xs text-stone-500">{% if n.nominated_by %}{{ n.nominated_by }}'s pick · {% endif %}{{ n.vote_score or 0 }} pts{% if n.avg_rating %} · ★ {{ n.avg_rating }}{% endif %}</p>
+            <p class="text-sm font-semibold text-stone-800">{% if loop.first and n.vote_score %}🥇 {% endif %}{{ n.game_name }}
+              {% if is_mine %}<span class="ml-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-800">Your pick</span>{% endif %}</p>
+            <p class="text-xs text-stone-500">{% if n.nominated_by and not is_mine %}{{ n.nominated_by }}'s pick · {% endif %}<strong class="text-stone-700">{{ n.vote_score or 0 }} pts</strong>{% if n.avg_rating %} · ★ {{ n.avg_rating }}{% endif %}</p>
             <div class="mt-1 h-1.5 rounded-full bg-stone-100"><div class="h-full rounded-full bg-red-500" style="width: {{ n.vote_pct }}%"></div></div>
           </div>
-          {% if current_player_id %}
+          {% if can_rank %}
           <div class="flex w-full justify-end gap-1 sm:w-auto" role="radiogroup" aria-label="Your rank for {{ n.game_name }}">
-            {% for value, label in [('1', '1st'), ('2', '2nd'), ('3', '3rd'), ('', '–')] %}
-            <label class="cursor-pointer">
-              <input type="radio" name="votes[{{ n.game_id }}]" value="{{ value }}" data-rank="{{ value }}"
+            {% for value, label, title in [('1', '1st', '1st choice'), ('2', '2nd', '2nd choice'), ('3', '3rd', '3rd choice'), ('', '✕', 'Not ranked')] %}
+            <label class="cursor-pointer" title="{{ title }}">
+              <input type="radio" name="votes[{{ n.game_id }}]" value="{{ value }}" data-rank="{{ value }}" aria-label="{{ title }}"
                      {% if (mine|string if mine else '') == value %}checked{% endif %} class="peer sr-only">
-              <span class="inline-flex h-9 min-w-[2.5rem] items-center justify-center rounded-lg border border-stone-300 px-2 text-xs font-medium text-stone-600 peer-checked:border-red-600 peer-checked:bg-red-600 peer-checked:text-white peer-focus-visible:ring-2 peer-focus-visible:ring-red-400">{{ label }}</span>
+              <span class="inline-flex h-9 min-w-[2.5rem] items-center justify-center rounded-lg border border-stone-300 px-2 text-xs font-medium text-stone-600 peer-checked:border-red-600 peer-checked:bg-red-600 peer-checked:text-white peer-focus-visible:ring-2 peer-focus-visible:ring-red-400 {{ 'peer-checked:!border-stone-400 peer-checked:!bg-stone-200 peer-checked:!text-stone-600' if not value else '' }}">{{ label }}</span>
             </label>
             {% endfor %}
           </div>
+          {% elif mine %}
+          <span class="rounded-full bg-stone-100 px-2 py-0.5 text-xs text-stone-600">You ranked it {{ ['1st', '2nd', '3rd'][mine - 1] }}</span>
           {% endif %}
         </li>
         {% endfor %}
       </ul>
-      {% if current_player_id %}
-      <button type="submit" class="mt-3 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700">Save my ranking</button>
+      {% if can_rank %}
+      <div class="mt-3 flex flex-wrap items-center gap-3">
+        <button type="submit" class="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700">Save my ranking</button>
+        <span data-unsaved class="hidden text-sm font-medium text-amber-700">You have unsaved changes</span>
+      </div>
       {% endif %}
     </form>
     {% endif %}
@@ -907,6 +945,8 @@
   // Each rank (1st/2nd/3rd) can go to only one game: picking it elsewhere clears it here.
   document.querySelectorAll('[data-rank-form]').forEach(function (form) {
     form.addEventListener('change', function (e) {
+      const hint = form.querySelector('[data-unsaved]');
+      if (hint) hint.classList.remove('hidden');
       const rank = e.target.dataset.rank;
       if (!rank) return;
       form.querySelectorAll('input[data-rank="' + rank + '"]:checked').forEach(function (other) {
