@@ -4,7 +4,7 @@
   {% if st.yours %}<span class="rounded-full bg-green-100 px-2 py-0.5 text-[11px] font-medium text-green-800">You own it</span>
   {% elif st.wishlisted %}<span class="rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-blue-700">On your wishlist</span>
   {% elif st.owners %}<span class="rounded-full bg-stone-100 px-2 py-0.5 text-[11px] font-medium text-stone-600">{{ st.owners|join(', ') }} {{ 'owns' if st.owners|length == 1 else 'own' }} it</span>
-  {% else %}<span class="rounded-full bg-stone-100 px-2 py-0.5 text-[11px] font-medium text-stone-600">In the library</span>{% endif %}
+  {% else %}<span class="rounded-full bg-stone-100 px-2 py-0.5 text-[11px] font-medium text-stone-600">Not owned yet</span>{% endif %}
 {% endmacro %}
 {% macro row(select_args, name, sub, image, st) %}
 {% set is_blocked = st and (st.yours or (mode == 'wish' and st.wishlisted)) %}
@@ -25,7 +25,7 @@
 {% endmacro %}
 
 {% if local %}
-<p class="mt-1 mb-1 text-xs font-semibold uppercase tracking-wide text-stone-500">Already in the group's library</p>
+<p class="mt-1 mb-1 text-xs font-semibold uppercase tracking-wide text-stone-500">Already on the site</p>
 <ul class="divide-y divide-stone-100 overflow-hidden rounded-xl border border-stone-200 bg-white">
   {% for g in local %}{{ row({'select_game': g.game_id, 'name': g.name, 'image': g.image_url or ''}, g.name, '', g.image_url, g) }}{% endfor %}
 </ul>

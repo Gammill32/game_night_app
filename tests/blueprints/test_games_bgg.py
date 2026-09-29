@@ -80,7 +80,7 @@ def test_find_game_marks_library_and_adds_by_pick(client, make_person, monkeypat
     )
     login(client, ann)
     html = client.get("/games/bgg-search?q=Findable&mode=own").get_data(as_text=True)
-    assert "Already in the group" in html and "Bo owns it" in html
+    assert "Already on the site" in html and "Bo owns it" in html
     assert "From BoardGameGeek" in html and "Findable Junior" in html
     assert html.count("Findable Cascadia") == 1  # not listed twice
 

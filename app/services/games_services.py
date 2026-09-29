@@ -223,7 +223,15 @@ def search_for_adding(query, user_id):
             for g in Game.query.filter(Game.bgg_id.in_([r["bgg_id"] for r in results])).all()
         }
         local_ids = {g.id for g in local_games}
-        for r in results[:12]:
+        q = query.lower()
+
+        def relevance(r):
+            # Exact name first, then base games before expansions/promos
+            # ("Cascadia: Landmarks"), then shorter names.
+            name = r["name"].lower()
+            return (name != q, not name.startswith(q), ":" in name or "–" in name, len(name))
+
+        for r in sorted(results, key=relevance)[:12]:
             game = known.get(r["bgg_id"])
             if game is not None and game.id in local_ids:
                 continue  # already listed under the library
