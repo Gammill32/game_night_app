@@ -9,7 +9,7 @@
   <p class="text-sm text-stone-500 mb-6">{{ poll.title }}</p>
 
   <div class="bg-white rounded-xl border border-stone-200 shadow-sm p-5 mb-5">
-    <p class="text-xs font-medium text-stone-500 mb-1">Poll link</p>
+    <p class="text-xs font-medium text-stone-500 mb-1">Poll link (people need to sign in to answer)</p>
     <span class="text-xs font-mono text-stone-700 bg-stone-50 px-2 py-1 rounded select-all break-all">{{ poll_url }}</span>
   </div>
 
@@ -38,6 +38,9 @@
       </div>
       {% else %}
       <p class="text-sm text-stone-500">No users with email addresses found.</p>
+      {% endif %}
+      {% if unclaimed %}
+      <p class="text-xs text-amber-700">{{ unclaimed }} {{ 'person hasn\'t' if unclaimed == 1 else 'people haven\'t' }} signed up yet, so they can't be emailed or answer polls. They can claim their account on the sign-up page with the name an admin added.</p>
       {% endif %}
 
       <button type="submit"

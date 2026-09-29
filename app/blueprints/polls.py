@@ -259,14 +259,21 @@ def poll_share(poll_id: int):
     from app.models import Person, Poll
 
     poll = Poll.query.get_or_404(poll_id)
-    people = Person.query.filter(Person.email.isnot(None)).order_by(Person.first_name).all()
+    people = (
+        Person.query.filter(Person.email.isnot(None), Person.active.is_(True))
+        .order_by(Person.first_name)
+        .all()
+    )
+    unclaimed = Person.query.filter(Person.email.is_(None), Person.active.is_(True)).count()
     poll_url = request.host_url.rstrip("/") + url_for("polls.poll_respond", token=poll.token)
 
     if request.method == "POST":
         selected_ids = request.form.getlist("person_ids")
         if not selected_ids:
             flash("Select at least one person.", "warning")
-            return render_template("poll_share.html", poll=poll, people=people, poll_url=poll_url)
+            return render_template(
+                "poll_share.html", poll=poll, people=people, poll_url=poll_url, unclaimed=unclaimed
+            )
 
         recipients = [p for p in people if str(p.id) in selected_ids]
         sent = 0
@@ -278,10 +285,21 @@ def poll_share(poll_id: int):
                     recipients=[person.email],
                     body=(
                         f"Hi {person.first_name},\n\n"
-                        f"You're invited to respond to a Game Night poll: {poll.title}\n"
-                        f"{poll.description + chr(10) if poll.description else ''}\n"
-                        f"Vote here: {poll_url}\n\n"
-                        f"— Game Night"
+                        + (
+                            f"Help pick a date for the next game night: {poll.title}\n"
+                            if poll.date_poll
+                            else f"There's a Game Night poll for you: {poll.title}\n"
+                        )
+                        + (f"{poll.description}\n" if poll.description else "")
+                        + (
+                            "\nSay which dates work for you here:\n"
+                            if poll.date_poll
+                            else "\nAnswer it here:\n"
+                        )
+                        + f"{poll_url}\n\n"
+                        "You'll be asked to sign in first. Forgot your password? "
+                        "The sign-in page has a reset link.\n\n"
+                        "— Game Night"
                     ),
                 )
                 mail.send(msg)
@@ -295,7 +313,9 @@ def poll_share(poll_id: int):
             flash(f"{errors} email{'s' if errors != 1 else ''} failed to send.", "danger")
         return redirect(url_for("polls.poll_list"))
 
-    return render_template("poll_share.html", poll=poll, people=people, poll_url=poll_url)
+    return render_template(
+        "poll_share.html", poll=poll, people=people, poll_url=poll_url, unclaimed=unclaimed
+    )
 
 
 @polls_bp.route("/polls/option-row")

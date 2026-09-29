@@ -250,3 +250,18 @@ def test_failed_submit_does_not_render_results(auth_client, open_poll):
     assert resp.status_code == 200
     assert b"your-vote" not in resp.data
     assert b"at least one option" in resp.data.lower()
+
+
+def test_share_email_says_to_sign_in(admin_client, make_person, monkeypatch):
+    from app.extensions import mail
+
+    ann = make_person("Ann")
+    poll = create_poll("Share me", None, ["A", "B"], ann.id, False)
+    sent = []
+    monkeypatch.setattr(mail, "send", lambda msg: sent.append(msg))
+    page = admin_client.get(f"/polls/{poll.id}/share").get_data(as_text=True)
+    assert "people need to sign in" in page
+    admin_client.post(f"/polls/{poll.id}/share", data={"person_ids": [str(ann.id)]})
+    assert sent and "sign in first" in sent[0].body and f"/poll/{poll.token}" in sent[0].body
+    _db.session.delete(poll)
+    _db.session.commit()
