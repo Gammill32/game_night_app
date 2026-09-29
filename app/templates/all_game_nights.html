@@ -6,7 +6,7 @@
 <div class="max-w-2xl mx-auto">
   <div class="flex items-center justify-between gap-3 mb-6">
     <h1 class="text-2xl font-bold text-stone-800">All game nights</h1>
-    {% if current_user.admin or current_user.owner %}
+    {% if current_user.can_start_nights %}
     <a href="{{ url_for('game_night.start_game_night') }}" class="text-sm font-medium text-red-600 hover:text-red-700">+ New game night</a>
     {% endif %}
   </div>

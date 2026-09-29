@@ -76,6 +76,7 @@ def check_and_send_reminders():
                     game_night_id=game_night.id, player_id=player.id
                 ).first(),
                 leader=leader,
+                signer=game_night.host.first_name if game_night.host else None,
                 food_lines=food_services.reminder_lines(game_night),
                 owed=food_services.my_food_summary(game_night, user),
             )

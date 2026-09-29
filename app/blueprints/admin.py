@@ -2,7 +2,7 @@ from flask import Blueprint, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 
 from app.services import admin_services
-from app.utils import admin_required, flash_if_no_action
+from app.utils import admin_required, flash_if_no_action, owner_required
 
 admin_bp = Blueprint("admin", __name__)
 
@@ -21,10 +21,19 @@ def admin_page():
 
 @admin_bp.route("/toggle_admin_status/<int:user_id>", methods=["POST"])
 @login_required
-@admin_required
+@owner_required
 def toggle_admin_status(user_id):
     """Toggles the admin status of a user."""
     success, message = admin_services.toggle_admin_status(user_id)
+    flash(message, "success" if success else "error")
+    return redirect(url_for("admin.admin_page"))
+
+
+@admin_bp.route("/toggle_can_host/<int:user_id>", methods=["POST"])
+@login_required
+@admin_required
+def toggle_can_host(user_id):
+    success, message = admin_services.toggle_can_host(user_id)
     flash(message, "success" if success else "error")
     return redirect(url_for("admin.admin_page"))
 

@@ -5,35 +5,27 @@ from datetime import timedelta
 from sqlalchemy import text
 
 from app.models import (
-    AdminGameNightList,
     GameNight,
     Player,
-    UserGameNightList,
     db,
 )
 
 
 def get_game_nights(user, start_date=None, end_date=None):
-    """Fetches game nights based on user role, optionally filtering by date range."""
+    """Nights for the calendar: the owner sees all; everyone else the nights
+    they play in or host. Rows carry game_night_id/date/final/closed/notes."""
+    from types import SimpleNamespace
 
-    # Select the appropriate model
-    GameNightModel = AdminGameNightList if user.owner else UserGameNightList
-
-    # Start the query
-    query = GameNightModel.query
-
-    # Filter by user ID if needed
-    if not user.owner:
-        query = query.filter_by(user_id=user.id)
-
-    # Apply date filtering if provided
+    query = _visible_nights(user)
     if start_date and end_date:
-        query = query.filter(GameNightModel.date.between(start_date, end_date))
-
-    # Order results
-    query = query.order_by(GameNightModel.date.asc() if start_date else GameNightModel.date.desc())
-
-    return query.all()
+        query = query.filter(GameNight.date.between(start_date, end_date))
+    query = query.order_by(GameNight.date.asc() if start_date else GameNight.date.desc())
+    return [
+        SimpleNamespace(
+            game_night_id=n.id, date=n.date, final=n.final, closed=n.closed, notes=n.notes
+        )
+        for n in query.all()
+    ]
 
 
 def get_earliest_game_night():
@@ -57,14 +49,13 @@ def get_navigation_dates(start_date, earliest_game_night):
     return prev_month, next_month
 
 
-def _visible_nights(user):
-    """Owners see every night; everyone else sees the nights they're in."""
-    query = GameNight.query
-    if not user.owner:
-        query = query.join(Player, Player.game_night_id == GameNight.id).filter(
-            Player.people_id == user.id
-        )
-    return query
+def _visible_nights(user, everything=False):
+    """The owner (or anyone, with everything=True) sees every night; others see
+    nights they play in or host."""
+    if user.owner or everything:
+        return GameNight.query
+    playing = db.session.query(Player.game_night_id).filter(Player.people_id == user.id)
+    return GameNight.query.filter(db.or_(GameNight.id.in_(playing), GameNight.host_id == user.id))
 
 
 def get_upcoming_nights(user, today, limit=6):
@@ -137,7 +128,12 @@ def get_all_night_cards(user):
 
     from app.models import GameNightGame, GameNightRankings, Person
 
-    nights = _visible_nights(user).order_by(GameNight.date.desc()).all()
+    # Admins see every night in the full list; their home page stays personal.
+    nights = (
+        _visible_nights(user, everything=user.is_admin_or_owner)
+        .order_by(GameNight.date.desc())
+        .all()
+    )
     ids = [n.id for n in nights]
     players = dict(
         db.session.query(Player.game_night_id, func.count(Player.id))

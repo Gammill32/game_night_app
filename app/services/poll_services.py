@@ -150,12 +150,22 @@ def get_poll_by_token(token: str) -> Poll | None:
     return Poll.query.filter_by(token=token).first()
 
 
+def can_manage(poll: Poll, user) -> bool:
+    """Admins manage every poll; otherwise whoever created it, or the host of
+    the night it's linked to."""
+    if not getattr(user, "is_authenticated", False):
+        return False
+    if user.admin or user.owner or poll.created_by == user.id:
+        return True
+    return poll.game_night is not None and poll.game_night.managed_by(user)
+
+
 def can_view(poll: Poll, user) -> bool:
     """Polls need a login. Admins see everything; a private poll is for its
     invitees; a poll linked to a game night is for that night's players."""
     if not user.is_authenticated:
         return False
-    if user.admin or user.owner:
+    if can_manage(poll, user):
         return True
     if poll.private:
         return any(inv.person_id == user.id for inv in poll.invitees)  # type: ignore[attr-defined]

@@ -12,6 +12,7 @@ from flask_login import current_user, login_required
 
 from app.services import date_poll_services
 from app.services.poll_services import (
+    can_manage,
     can_view,
     create_poll,
     get_detailed_results,
@@ -21,7 +22,7 @@ from app.services.poll_services import (
     update_poll,
     view_context,
 )
-from app.utils import admin_required
+from app.utils import host_required
 
 polls_bp = Blueprint("polls", __name__)
 
@@ -41,10 +42,26 @@ def inject_active_polls():
 
 
 def _linkable_nights():
-    """Nights a poll can be linked to: anything not finalized, newest first."""
+    """Nights a poll can be linked to: not finalized, and ones you run."""
     from app.models import GameNight
 
-    return GameNight.query.filter_by(final=False).order_by(GameNight.date.desc()).all()
+    nights = GameNight.query.filter_by(final=False).order_by(GameNight.date.desc()).all()
+    return [n for n in nights if n.managed_by(current_user)]
+
+
+def _managed_poll(poll_id: int):
+    """The poll, if the current user may manage it (else 404)."""
+    from app.models import Poll
+
+    poll = Poll.query.get_or_404(poll_id)
+    if not can_manage(poll, current_user):
+        abort(404)
+    return poll
+
+
+@polls_bp.app_template_global("can_manage_poll")
+def _can_manage_poll(poll):
+    return can_manage(poll, current_user)
 
 
 @polls_bp.app_template_filter("local_dt")
@@ -64,21 +81,20 @@ def _form_night_id() -> int | None:
 
 @polls_bp.route("/polls/")
 @login_required
-@admin_required
+@host_required
 def poll_list():
     from app.models import Poll
 
-    polls = Poll.query.order_by(Poll.created_at.desc()).all()
+    polls = [
+        p for p in Poll.query.order_by(Poll.created_at.desc()).all() if can_manage(p, current_user)
+    ]
     return render_template("poll_list.html", polls=polls)
 
 
 @polls_bp.route("/polls/<int:poll_id>/results")
 @login_required
-@admin_required
 def poll_results(poll_id: int):
-    from app.models import Poll
-
-    poll = Poll.query.get_or_404(poll_id)
+    poll = _managed_poll(poll_id)
     if poll.date_poll:
         return render_template(
             "poll_date_results.html",
@@ -93,7 +109,7 @@ def poll_results(poll_id: int):
 
 @polls_bp.route("/polls/create", methods=["GET", "POST"])
 @login_required
-@admin_required
+@host_required
 def poll_create():
     from app.models import Person
 
@@ -154,11 +170,10 @@ def poll_create():
 
 @polls_bp.route("/polls/<int:poll_id>/edit", methods=["GET", "POST"])
 @login_required
-@admin_required
 def poll_edit(poll_id: int):
-    from app.models import Person, Poll
+    from app.models import Person
 
-    poll = Poll.query.get_or_404(poll_id)
+    poll = _managed_poll(poll_id)
     people = Person.query.filter_by(active=True).order_by(Person.first_name).all()
     nights = _linkable_nights()
     if poll.game_night and poll.game_night not in nights:
@@ -219,12 +234,10 @@ def poll_edit(poll_id: int):
 
 @polls_bp.route("/polls/<int:poll_id>/pick/<int:option_id>", methods=["POST"])
 @login_required
-@admin_required
 def poll_pick_date(poll_id: int, option_id: int):
     """Date poll: create the game night on this date."""
-    from app.models import Poll
 
-    poll = Poll.query.get_or_404(poll_id)
+    poll = _managed_poll(poll_id)
     success, message, night = date_poll_services.pick_date(poll, option_id, current_user.id)
     flash(message, "success" if success else "error")
     if night is None:
@@ -234,12 +247,10 @@ def poll_pick_date(poll_id: int, option_id: int):
 
 @polls_bp.route("/polls/<int:poll_id>/close", methods=["POST"])
 @login_required
-@admin_required
 def poll_close(poll_id: int):
     from app.extensions import db
-    from app.models import Poll
 
-    poll = Poll.query.get_or_404(poll_id)
+    poll = _managed_poll(poll_id)
     poll.closed = True
     db.session.commit()
     return redirect(url_for("polls.poll_list"))
@@ -247,12 +258,10 @@ def poll_close(poll_id: int):
 
 @polls_bp.route("/polls/<int:poll_id>/delete", methods=["POST"])
 @login_required
-@admin_required
 def poll_delete(poll_id: int):
     from app.extensions import db
-    from app.models import Poll
 
-    poll = Poll.query.get_or_404(poll_id)
+    poll = _managed_poll(poll_id)
     db.session.delete(poll)
     db.session.commit()
     flash("Poll deleted.", "success")
@@ -261,14 +270,13 @@ def poll_delete(poll_id: int):
 
 @polls_bp.route("/polls/<int:poll_id>/share", methods=["GET", "POST"])
 @login_required
-@admin_required
 def poll_share(poll_id: int):
     from flask_mail import Message
 
     from app.extensions import mail
-    from app.models import Person, Poll
+    from app.models import Person
 
-    poll = Poll.query.get_or_404(poll_id)
+    poll = _managed_poll(poll_id)
     people = (
         Person.query.filter(Person.email.isnot(None), Person.active.is_(True))
         .order_by(Person.first_name)
@@ -330,7 +338,7 @@ def poll_share(poll_id: int):
 
 @polls_bp.route("/polls/option-row")
 @login_required
-@admin_required
+@host_required
 def poll_option_row():
     """HTMX fragment: return a new option input row."""
     return render_template("_poll_option_row.html")

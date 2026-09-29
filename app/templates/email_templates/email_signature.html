@@ -1,10 +1,11 @@
+{# Signed by the night's host when there is one (reminders), otherwise "Game Night". #}
 <hr style="border: none; border-top: 1px solid #cccccc; margin: 20px 0;">
 <div style="font-family: Arial, sans-serif; color: #444444; line-height: 1.6; font-size: 14px;">
   <p style="margin: 0; padding: 0;">
     Thanks,<br>
-    <strong style="color: #000000;">Stephen Gammill</strong>
+    <strong style="color: #000000;">{{ signer or 'Game Night' }}</strong>
   </p>
   <p style="margin: 10px 0 0 0; padding: 0;">
-    <a href="https://gamenight.sgammill.com" style="text-decoration: none; color: #007bff; font-size: 14px; font-weight: bold;">Visit Game Night Website</a>
+    <a href="{{ config.APP_BASE_URL }}" style="text-decoration: none; color: #007bff; font-size: 14px; font-weight: bold;">Visit Game Night Website</a>
   </p>
 </div>

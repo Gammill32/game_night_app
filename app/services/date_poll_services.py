@@ -172,7 +172,7 @@ def pick_date(poll: Poll, option_id: int, admin_id: int) -> tuple[bool, str, Gam
         for r in PollResponse.query.filter_by(poll_id=poll.id, option_id=option.id)
         if r.person_id and r.answer in ("yes", "maybe")
     }
-    night = GameNight(date=option.option_date)
+    night = GameNight(date=option.option_date, host_id=admin_id)  # whoever picks hosts it
     db.session.add(night)
     db.session.flush()
     for person_id in answers:

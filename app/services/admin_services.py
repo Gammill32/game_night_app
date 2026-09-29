@@ -35,6 +35,19 @@ def toggle_admin_status(user_id):
     return True, f"{user.first_name} {user.last_name} has been {action} admin."
 
 
+def toggle_can_host(user_id):
+    """Let someone start and host their own game nights (or stop them)."""
+    user = db.session.get(Person, user_id)
+    if not user or not user.active:
+        return False, "User not found."
+    user.can_host = not user.can_host
+    db.session.commit()
+    name = f"{user.first_name} {user.last_name}"
+    if user.can_host:
+        return True, f"{name} can now start and host game nights."
+    return True, f"{name} can no longer start game nights (nights they already host are unchanged)."
+
+
 def has_history(person):
     """Anything that should outlive the person: attendance (and so results,
     nominations and votes), poll answers or polls, food costs."""
@@ -98,10 +111,16 @@ def restore_user(user_id):
 
 
 def add_person(first_name, last_name):
-    """Add a new person to the system."""
+    """Add a new person to the system. Returns (success, message)."""
+    success, message, _ = create_person(first_name, last_name)
+    return success, message
+
+
+def create_person(first_name, last_name):
+    """Add a new person. Returns (success, message, person or None)."""
     first_name, last_name = (first_name or "").strip(), (last_name or "").strip()
     if not first_name or not last_name:
-        return False, "Both first name and last name are required."
+        return False, "Both first name and last name are required.", None
 
     # Signup claims an account by exact name, so names must be unique.
     existing = Person.query.filter(
@@ -110,11 +129,11 @@ def add_person(first_name, last_name):
     ).first()
     if existing:
         if not existing.active:
-            return False, f"{first_name} {last_name} was deactivated; restore them instead."
-        return False, f"{first_name} {last_name} is already in the system."
+            return False, f"{first_name} {last_name} was deactivated; restore them instead.", None
+        return False, f"{first_name} {last_name} is already in the system.", existing
 
     person = Person(first_name=first_name, last_name=last_name)
     db.session.add(person)
     db.session.commit()
 
-    return True, f"{first_name} {last_name} added. They can now sign up with that name."
+    return True, f"{first_name} {last_name} added. They can now sign up with that name.", person

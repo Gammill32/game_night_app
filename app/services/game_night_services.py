@@ -63,13 +63,13 @@ def manage_attendees(game_night, attendees_ids):
     return None
 
 
-def start_game_night(date_str, notes, attendees_ids, food=("none", None, None)):
+def start_game_night(date_str, notes, attendees_ids, food=("none", None, None), host_id=None):
     """Create a new game night and add attendees. Returns (success, message, game_night)."""
     date = parse_date(date_str)
     if not date:
         return False, "Invalid date format. Please use YYYY-MM-DD.", None
 
-    game_night = GameNight(date=date, notes=notes)
+    game_night = GameNight(date=date, notes=notes, host_id=host_id)
     food_services.apply_food_settings(game_night, *food)
     db.session.add(game_night)
     db.session.flush()  # get game_night.id without committing
@@ -91,8 +91,8 @@ def get_game_night_details(game_night_id):
     return game_night, people, current_attendees
 
 
-def edit_game_night(game_night_id, date_str, notes, attendees_ids, food=None):
-    """Edit an existing game night."""
+def edit_game_night(game_night_id, date_str, notes, attendees_ids, food=None, host_id=None):
+    """Edit an existing game night. host_id (admins only) changes the host."""
     game_night = GameNight.query.get_or_404(game_night_id)
 
     date = parse_date(date_str)
@@ -105,6 +105,8 @@ def edit_game_night(game_night_id, date_str, notes, attendees_ids, food=None):
         game_night.availability_poll.title = poll_services.availability_title(date)
     if food is not None:
         food_services.apply_food_settings(game_night, *food)
+    if host_id is not None:
+        game_night.host_id = host_id or None
     error = manage_attendees(game_night, attendees_ids)
     if error:
         db.session.rollback()

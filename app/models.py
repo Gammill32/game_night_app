@@ -22,6 +22,9 @@ class GameNight(db.Model):
     food_provider_id = db.Column(db.Integer, db.ForeignKey("people.id", ondelete="SET NULL"))
     food_note = db.Column(db.String)
 
+    # Whoever runs the night: they can manage it like an admin, but only this one.
+    host_id = db.Column(db.Integer, db.ForeignKey("people.id", ondelete="SET NULL"))
+    host = relationship("Person", foreign_keys=[host_id])
     food_provider = relationship("Person", foreign_keys=[food_provider_id])
     food_items = relationship(
         "FoodItem",
@@ -55,6 +58,12 @@ class GameNight(db.Model):
         order_by="Poll.created_at",
         foreign_keys="Poll.game_night_id",
     )
+
+    def managed_by(self, user):
+        """Admins, the owner and this night's host can run it."""
+        if user is None or not getattr(user, "is_authenticated", False):
+            return False
+        return bool(user.admin or user.owner or (self.host_id and self.host_id == user.id))
 
     @property
     def food_signup(self):
@@ -91,6 +100,8 @@ class Person(db.Model, UserMixin):
     # Removed people who have history are deactivated instead of deleted, so
     # past results keep their names. They can't log in or be picked.
     active = db.Column(db.Boolean, default=True, nullable=False, server_default="true")
+    # Trusted to start and host their own game nights without being an admin.
+    can_host = db.Column(db.Boolean, default=False, nullable=False, server_default="false")
 
     players = relationship("Player", back_populates="person", cascade="all, delete-orphan")
     owned_games = relationship("OwnedBy", back_populates="person", cascade="all, delete-orphan")
@@ -114,6 +125,10 @@ class Person(db.Model, UserMixin):
     @property
     def is_admin_or_owner(self):
         return self.admin or self.owner
+
+    @property
+    def can_start_nights(self):
+        return bool(self.admin or self.owner or self.can_host)
 
     @property
     def full_name(self):

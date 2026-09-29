@@ -11,6 +11,17 @@
     <textarea name="notes" id="notesInput" rows="3" placeholder="Time, place, anything people should know"
               class="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent">{{ game_night.notes or '' if game_night else request.form.get('notes', '') }}</textarea>
   </div>
+  {% if game_night and (current_user.admin or current_user.owner) %}
+  <div>
+    <label for="hostInput" class="block text-sm font-medium text-stone-700 mb-1">Host</label>
+    <select name="host_id" id="hostInput"
+            class="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent">
+      <option value="">No host (admins run it)</option>
+      {% for p in host_choices %}<option value="{{ p.id }}" {% if p.id == game_night.host_id %}selected{% endif %}>{{ p.first_name }} {{ p.last_name }}</option>{% endfor %}
+    </select>
+    <p class="mt-1 text-xs text-stone-500">The host can run this night (edit it, add games, log results, finalize) without being an admin, and signs its reminder emails.</p>
+  </div>
+  {% endif %}
   {% if not game_night %}
   <label class="flex items-start gap-2 text-sm text-stone-700">
     <input type="checkbox" name="rsvp_poll" value="1" {% if request.method == 'GET' or request.form.get('rsvp_poll') %}checked{% endif %} class="mt-0.5 h-4 w-4 rounded border-stone-300 accent-red-600">

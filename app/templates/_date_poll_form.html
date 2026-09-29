@@ -37,7 +37,7 @@
 <div class="mt-4">
   <div class="flex items-baseline justify-between gap-2 mb-2">
     <h3 class="text-sm font-semibold text-stone-700">Who's free</h3>
-    {% if (current_user.admin or current_user.owner) and not poll.picked_game_night_id %}
+    {% if can_manage_poll(poll) and not poll.picked_game_night_id %}
     <a href="{{ url_for('polls.poll_results', poll_id=poll.id) }}" class="text-xs font-medium text-red-600 underline">Results &amp; pick a date</a>
     {% endif %}
   </div>

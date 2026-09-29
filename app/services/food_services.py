@@ -116,7 +116,7 @@ def add_item(game_night, user, name, claim=False):
     # Players adding something are bringing it; admins adding items build a
     # list for others to claim unless they tick "I'm bringing it". When the
     # food is provided the list is only for extras, so it's always the adder's.
-    if claim or not user.is_admin_or_owner or game_night.food_mode == "provided":
+    if claim or not game_night.managed_by(user) or game_night.food_mode == "provided":
         item.claimed_by = user.id
     db.session.add(item)
     db.session.commit()
@@ -148,8 +148,8 @@ def claim_item(game_night, item, user, claim=True):
 def delete_item(game_night, item, user):
     if not food_open(game_night):
         return False, "This game night is finalized."
-    if not (user.is_admin_or_owner or item.added_by == user.id):
-        return False, "Only an admin or whoever added it can remove it."
+    if not (game_night.managed_by(user) or item.added_by == user.id):
+        return False, "Only the host, an admin or whoever added it can remove it."
     db.session.delete(item)
     db.session.commit()
     return True, f"Removed {item.name}."
@@ -210,7 +210,7 @@ def _parse_covered(game_night, form):
 
 
 def can_edit_expense(expense, user):
-    return user.is_admin_or_owner or expense.created_by == user.id
+    return expense.game_night.managed_by(user) or expense.created_by == user.id
 
 
 def add_expense(game_night, user, form, receipt=None):
@@ -282,7 +282,7 @@ def set_paid(share, user, paid=True):
     expense = share.expense
     if share.person_id == expense.paid_by:
         return False, "That's the buyer's own share."
-    if not (user.is_admin_or_owner or user.id in (share.person_id, expense.paid_by)):
+    if not (expense.game_night.managed_by(user) or user.id in (share.person_id, expense.paid_by)):
         return False, "Only the person who owes it, the buyer or an admin can change that."
     share.paid = paid
     share.paid_at = datetime.utcnow() if paid else None
@@ -318,7 +318,9 @@ def expense_rows(game_night, user):
                     "is_buyer": is_buyer,
                     "mine": mine,
                     "can_toggle": not is_buyer
-                    and (user.is_admin_or_owner or user.id in (share.person_id, expense.paid_by)),
+                    and (
+                        game_night.managed_by(user) or user.id in (share.person_id, expense.paid_by)
+                    ),
                     "pay_options": payment_services.options_for(
                         expense.payer, share.amount_cents, note
                     )

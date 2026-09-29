@@ -22,11 +22,11 @@ def is_player(game_night, user):
 
 
 def can_upload(game_night, user):
-    return user.is_admin_or_owner or is_player(game_night, user)
+    return game_night.managed_by(user) or is_player(game_night, user)
 
 
 def can_delete(photo, user):
-    return photo.uploader_id == user.id or user.is_admin_or_owner
+    return photo.uploader_id == user.id or photo.game_night.managed_by(user)
 
 
 def upload(game_night, user, file_storage, caption=""):
@@ -53,7 +53,7 @@ def upload(game_night, user, file_storage, caption=""):
 
 def delete(photo, user):
     if not can_delete(photo, user):
-        return False, "Only whoever uploaded it or an admin can delete a photo."
+        return False, "Only whoever uploaded it, the host or an admin can delete a photo."
     media_services.delete(photo.path, photo.thumb_path)
     db.session.delete(photo)
     db.session.commit()

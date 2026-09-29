@@ -33,9 +33,9 @@ def _get_session_or_404(session_id):
 
 def _assert_participant_or_admin(session):
     """Abort 403 if current user is not a participant of the session's game night or admin."""
-    if current_user.admin or current_user.owner:
-        return
     gng = session.game_night_game
+    if gng.game_night.managed_by(current_user):
+        return
     is_participant = Player.query.filter_by(
         game_night_id=gng.game_night_id, people_id=current_user.id
     ).first()
@@ -45,7 +45,7 @@ def _assert_participant_or_admin(session):
 
 def _assert_gng_participant_or_admin(gng):
     """Abort 403 if current user is not a participant of this game night or admin."""
-    if current_user.admin or current_user.owner:
+    if gng.game_night.managed_by(current_user):
         return
     is_participant = Player.query.filter_by(
         game_night_id=gng.game_night_id, people_id=current_user.id

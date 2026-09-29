@@ -26,11 +26,15 @@ def game_night_access_required(f):
             flash("Game night ID is required.", "error")
             return redirect(url_for("main.index"))
 
+        from app.extensions import db
+        from app.models import GameNight
+
         is_participant = Player.query.filter_by(
             game_night_id=game_night_id, people_id=current_user.id
         ).first()
+        night = db.session.get(GameNight, game_night_id)
 
-        if not is_participant and not (current_user.admin or current_user.owner):
+        if not is_participant and not (night and night.managed_by(current_user)):
             flash("Access denied. You are not part of this game night.", "error")
             return redirect(url_for("main.index"))
 
@@ -53,3 +57,48 @@ def flash_if_no_action(message="No data provided.", category="error"):
         return decorated_function
 
     return decorator
+
+
+def night_manager_required(f):
+    """The night's host, an admin or the owner (route has game_night_id)."""
+
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        from flask import abort
+
+        from app.extensions import db
+        from app.models import GameNight
+
+        night = db.session.get(GameNight, kwargs.get("game_night_id"))
+        if night is None:
+            abort(404)
+        if not night.managed_by(current_user):
+            flash("Only this night's host or an admin can do that.", "error")
+            return redirect(url_for("game_night.view_game_night", game_night_id=night.id))
+        return f(*args, **kwargs)
+
+    return decorated_function
+
+
+def host_required(f):
+    """People who can start nights: admins, the owner, and anyone with Can host."""
+
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not current_user.is_authenticated or not current_user.can_start_nights:
+            flash("Ask an admin if you'd like to host game nights.", "error")
+            return redirect(url_for("main.index"))
+        return f(*args, **kwargs)
+
+    return decorated_function
+
+
+def owner_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not current_user.is_authenticated or not current_user.owner:
+            flash("Only the site owner can do that.", "error")
+            return redirect(url_for("main.index"))
+        return f(*args, **kwargs)
+
+    return decorated_function

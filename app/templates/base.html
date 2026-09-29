@@ -71,7 +71,7 @@
       </a>
       {% endfor %}
 
-      {% if current_user.is_authenticated and (current_user.admin or current_user.owner) %}
+      {% if current_user.is_authenticated and current_user.can_start_nights %}
       <a href="{{ url_for('polls.poll_list') }}"
          title="Polls{% if active_polls_count > 0 %} ({{ active_polls_count }}){% endif %}"
          class="group relative flex items-center justify-center w-10 h-10 rounded-lg text-stone-500 hover:bg-stone-100 hover:text-red-600 transition-colors">
@@ -82,6 +82,8 @@
           Polls{% if active_polls_count > 0 %} ({{ active_polls_count }}){% endif %}
         </span>
       </a>
+      {% endif %}
+      {% if current_user.is_authenticated and (current_user.admin or current_user.owner) %}
       <a href="{{ url_for('admin.admin_page') }}"
          title="Admin"
          class="group relative flex items-center justify-center w-10 h-10 rounded-lg text-amber-500 hover:bg-amber-50 hover:text-amber-600 transition-colors">

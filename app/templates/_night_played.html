@@ -1,6 +1,6 @@
 {# Games played, with results and host actions. Included from view_game_night.html. #}
   <!-- Games Played -->
-  {% set can_add_game = not game_night.final and (current_user.admin or current_user.owner) %}
+  {% set can_add_game = not game_night.final and can_manage %}
   {% if game_night_games or can_add_game %}
   <div id="played" class="bg-white rounded-xl border border-stone-200 shadow-sm p-5">
     <div class="flex items-center justify-between gap-2 mb-4">
@@ -32,7 +32,7 @@
               {% endif %}
             </p>
 
-            {% if not game_night.final and (current_user.admin or current_user.owner) %}
+            {% if not game_night.final and can_manage %}
             <div class="flex flex-wrap gap-2 mb-3">
               <form action="{{ url_for('game_night.log_results', game_night_id=game_night.id, game_night_game_id=gng.game_night_game_id) }}" method="GET">
                 <button type="submit"

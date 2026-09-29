@@ -180,7 +180,7 @@ def test_admin_results_route_shows_voters(admin_client, open_poll, poll_author):
 def test_admin_results_route_requires_admin(auth_client, open_poll):
     """Non-admin cannot access detailed results."""
     resp = auth_client.get(f"/polls/{open_poll.id}/results")
-    assert resp.status_code in (302, 403)
+    assert resp.status_code in (302, 403, 404)
 
 
 def test_single_select_shows_form_prechecked_after_voting(auth_client, app, db, open_poll):

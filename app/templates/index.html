@@ -21,8 +21,11 @@
   <section>
     <div class="flex items-center justify-between mb-3">
       <h2 class="text-lg font-semibold text-stone-800">Up next</h2>
-      {% if current_user.admin or current_user.owner %}
-      <a href="{{ url_for('game_night.start_game_night') }}" class="text-sm font-medium text-red-600 hover:text-red-700">+ New game night</a>
+      {% if current_user.can_start_nights %}
+      <span class="flex gap-3">
+        <a href="{{ url_for('polls.poll_list') }}" class="text-sm font-medium text-stone-600 hover:text-red-600">Polls</a>
+        <a href="{{ url_for('game_night.start_game_night') }}" class="text-sm font-medium text-red-600 hover:text-red-700">+ New game night</a>
+      </span>
       {% endif %}
     </div>
     {% if upcoming %}
@@ -40,7 +43,7 @@
             {% if gn.notes %}<p class="text-sm text-stone-500 mt-0.5 line-clamp-2">{{ gn.notes }}</p>{% endif %}
           </div>
           {% if not card.is_player %}
-          <span class="shrink-0 rounded-full bg-stone-100 px-2.5 py-0.5 text-xs font-medium text-stone-500">Not playing</span>
+          <span class="shrink-0 rounded-full bg-stone-100 px-2.5 py-0.5 text-xs font-medium text-stone-500">{{ 'You\'re hosting' if gn.host_id == current_user.id else 'Not playing' }}</span>
           {% elif not card.has_rsvp_poll %}
           {% elif card.my_rsvp == "Can Make It" %}<span class="shrink-0 rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">You're in</span>
           {% elif card.my_rsvp == "Maybe" %}<span class="shrink-0 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-800">You're a maybe</span>

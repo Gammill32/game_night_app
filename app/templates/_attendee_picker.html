@@ -14,6 +14,19 @@
 
   <div id="attendeesContainer" class="space-y-1 min-h-[2rem]"></div>
 
+  <details class="mt-3 rounded-lg border border-dashed border-stone-300 p-3" data-quick-add>
+    <summary class="cursor-pointer text-sm text-stone-700 underline">Not on the site? Add them</summary>
+    <p class="mt-1 text-xs text-stone-500">Adds them by name and puts them in this night. Send them the sign-up link so they can claim the account with this exact name.</p>
+    <div class="mt-2 grid grid-cols-2 gap-2">
+      <input data-qa-first placeholder="First name" aria-label="First name" autocomplete="off" class="rounded-lg border border-stone-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500">
+      <input data-qa-last placeholder="Last name" aria-label="Last name" autocomplete="off" class="rounded-lg border border-stone-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500">
+    </div>
+    <div class="mt-2 flex items-center gap-3">
+      <button type="button" data-qa-add class="rounded-lg bg-stone-800 px-3 py-1.5 text-sm font-medium text-white hover:bg-stone-700">Add and invite</button>
+      <span data-qa-msg class="text-xs text-stone-600" role="status"></span>
+    </div>
+  </details>
+
   <div id="pagination" class="flex items-center gap-3 mt-3">
     <button type="button" id="prevPage"
             class="inline-flex items-center rounded-lg border border-stone-300 px-3 py-1.5 text-xs font-medium text-stone-700 hover:bg-stone-50 transition-colors">Previous</button>
@@ -100,6 +113,31 @@
         form.appendChild(input);
       });
     });
+
+    // Quick add: create the person, then select them.
+    const qa = document.querySelector('[data-quick-add]');
+    if (qa) {
+      const first = qa.querySelector('[data-qa-first]'), last = qa.querySelector('[data-qa-last]');
+      const msg = qa.querySelector('[data-qa-msg]');
+      [first, last].forEach(i => i.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); qa.querySelector('[data-qa-add]').click(); } }));
+      qa.querySelector('[data-qa-add]').addEventListener('click', async () => {
+        msg.textContent = '';
+        const body = new URLSearchParams({ first_name: first.value, last_name: last.value });
+        try {
+          const res = await fetch({{ url_for('game_night.quick_add_person') | tojson }}, {
+            method: 'POST', body,
+            headers: { 'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content },
+          });
+          const data = await res.json();
+          if (!res.ok) { msg.textContent = data.error || 'Could not add them.'; return; }
+          if (!people.some(p => p.id === data.id)) people.push({ id: data.id, name: data.name });
+          selected.add(data.id);
+          first.value = ''; last.value = '';
+          msg.textContent = data.message;
+          box.value = ''; box.dispatchEvent(new Event('input'));
+        } catch (e) { msg.textContent = 'Could not add them. Try again.'; }
+      });
+    }
 
     render();
   })();
