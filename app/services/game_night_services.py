@@ -457,7 +457,8 @@ def get_recap_details(game_night_id):
     )
     badges_earned = [
         {
-            "person_name": f"{pb.person.first_name} {pb.person.last_name}",
+            # The recap is public: first name and last initial only.
+            "person_name": f"{pb.person.first_name} {pb.person.last_name[:1]}.",
             "badge_name": pb.badge.name,
             "badge_icon": pb.badge.icon,
             "badge_rule": pb.badge.description,

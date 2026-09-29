@@ -328,3 +328,10 @@ def test_start_and_edit_pages_render(admin_client, make_person, make_night):
         page = admin_client.get(url).get_data(as_text=True)
         assert "attendeesContainer" in page and "Food plan" in page
         assert "O\\u0027Brien" in page or "O'Brien" in page
+
+
+def test_public_recap_shows_first_names_and_initials(client, make_person, make_night):
+    ann = make_person("Ann", "Zebrowski")
+    gn = make_night(ann, final=True)
+    page = client.get(f"/game_night/{gn.id}/recap").get_data(as_text=True)  # not logged in
+    assert "Ann Z." in page and "Zebrowski" not in page
