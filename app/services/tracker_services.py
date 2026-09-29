@@ -17,6 +17,9 @@ _DELTA_MAX = 100
 _NOTES_MAX_LEN = 500
 
 
+DEFAULT_SCORE_LABEL = "Score"
+
+
 def get_or_create_configuring_session(game_night_game_id):
     """Return the existing configuring session or create a fresh one."""
     session = TrackerSession.query.filter_by(
@@ -30,6 +33,18 @@ def get_or_create_configuring_session(game_night_game_id):
         status="configuring",
     )
     db.session.add(session)
+    db.session.flush()
+    # Most games just need a score, so start with one; people can add more.
+    db.session.add(
+        TrackerField(
+            tracker_session_id=session.id,
+            type="counter",
+            label=DEFAULT_SCORE_LABEL,
+            starting_value=0,
+            is_score_field=True,
+            sort_order=0,
+        )
+    )
     db.session.commit()
     return session
 
@@ -54,6 +69,22 @@ def add_field(session_id, *, type, label, starting_value=0, is_score_field=False
     label = label.strip() if label else ""
     if not label:
         raise ValueError("Field label cannot be empty")
+    if is_score_field and type != "counter":
+        raise ValueError("Only a per-player counter can be the score field")
+    replaced = False
+    if is_score_field:
+        # One score field per session: the new one replaces the starting
+        # "Score" field if it's untouched, or else takes over the score role.
+        current = TrackerField.query.filter_by(
+            tracker_session_id=session_id, is_score_field=True
+        ).first()
+        if current is not None:
+            if current.label == DEFAULT_SCORE_LABEL and current.starting_value == 0:
+                db.session.delete(current)
+            else:
+                current.is_score_field = False
+            db.session.flush()
+            replaced = True
     existing_count = TrackerField.query.filter_by(tracker_session_id=session_id).count()
     field = TrackerField(
         tracker_session_id=session_id,
@@ -65,6 +96,7 @@ def add_field(session_id, *, type, label, starting_value=0, is_score_field=False
     )
     db.session.add(field)
     db.session.commit()
+    field.replaced_score_field = replaced  # tells the page to redraw the list
     return field
 
 
@@ -200,9 +232,10 @@ def update_value(session_id, field_id, *, entity_type, entity_id=None, delta=Non
     return tv
 
 
-def compute_rankings(session_id):
+def compute_rankings(session_id, low_wins=False):
     """
-    Return a list of dicts sorted descending by score field value.
+    Return a list of dicts sorted by score field value, highest first (or
+    lowest first when low_wins).
     Each dict: {"player_id", "team_id", "player", "team", "position", "score"}
     Ties share a position with a gap (two 1sts → next is 3rd).
     """
@@ -213,12 +246,12 @@ def compute_rankings(session_id):
         raise ValueError(f"No score field found for session {session_id}")
 
     values = TrackerValue.query.filter_by(tracker_field_id=score_field.id).all()
-    sorted_vals = sorted(values, key=lambda v: int(v.value), reverse=True)
+    sorted_vals = sorted(values, key=lambda v: int(v.value), reverse=not low_wins)
 
     rankings = []
     pos = 1
     for i, v in enumerate(sorted_vals):
-        if i > 0 and int(v.value) < int(sorted_vals[i - 1].value):
+        if i > 0 and int(v.value) != int(sorted_vals[i - 1].value):
             pos = i + 1
         rankings.append(
             {

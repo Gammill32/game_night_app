@@ -1,6 +1,15 @@
 # blueprints/tracker.py
 
-from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
+from flask import (
+    Blueprint,
+    abort,
+    flash,
+    make_response,
+    redirect,
+    render_template,
+    request,
+    url_for,
+)
 from flask_login import current_user, login_required
 
 from app.models import (  # noqa: F401
@@ -70,8 +79,19 @@ def setup_tracker(gng_id):
         .order_by(TrackerField.sort_order)
         .all()
     )
+    from app.services.poll_services import rsvps_for_night
+
+    rsvps = rsvps_for_night(gn)
+    players = sorted(players, key=lambda p: p.person.first_name.lower())
+    playing = {p.id for p in players if rsvps.get(p.people_id) != "Can't Make It"}
     return render_template(
-        "tracker_setup.html", session=session, gng=gng, gn=gn, players=players, fields=fields
+        "tracker_setup.html",
+        session=session,
+        gng=gng,
+        gn=gn,
+        players=players,
+        playing=playing,
+        fields=fields,
     )
 
 
@@ -128,8 +148,15 @@ def live_tracker(session_id):
     all_values = TrackerValue.query.filter_by(tracker_session_id=session_id).all()
     # Build value lookup: {(field_id, player_id, team_id): TrackerValue}
     value_map = {(v.tracker_field_id, v.player_id, v.team_id): v for v in all_values}
+    # Only the players this game was started with (not everyone at the night).
+    seeded = {v.player_id for v in all_values if v.player_id is not None}
     players = (
-        Player.query.filter_by(game_night_id=gn.id).all() if session.mode == "individual" else []
+        sorted(
+            Player.query.filter(Player.id.in_(seeded)).all(),
+            key=lambda p: p.person.first_name.lower(),
+        )
+        if session.mode == "individual"
+        else []
     )
     teams = session.teams if session.mode == "teams" else []
     global_fields = [f for f in session.fields if f.type in ("global_counter", "global_notes")]
@@ -165,7 +192,12 @@ def add_field(session_id):
         )
     except ValueError as e:
         return str(e), 400
-    return render_template("_tracker_field_row.html", field=field, session=session)
+    response = make_response(
+        render_template("_tracker_field_row.html", field=field, session=session)
+    )
+    if getattr(field, "replaced_score_field", False):
+        response.headers["HX-Refresh"] = "true"  # the old score field changed; redraw
+    return response
 
 
 @tracker_bp.route("/tracker/<int:session_id>/value", methods=["POST"])
@@ -178,6 +210,8 @@ def update_value(session_id):
     entity_id = int(request.form["entity_id"]) if request.form.get("entity_id") else None
     delta = int(request.form["delta"]) if request.form.get("delta") else None
     value = request.form.get("value")
+    if request.form.get("kind") == "checkbox":
+        value = "true" if value == "true" else "false"
     try:
         tv = tracker_services.update_value(
             session_id,
@@ -213,7 +247,8 @@ def end_game(session_id):
             )
         )
     try:
-        rankings = tracker_services.compute_rankings(session_id)
+        low_wins = request.args.get("low") == "1"
+        rankings = tracker_services.compute_rankings(session_id, low_wins=low_wins)
     except ValueError:
         flash("No score field configured. Add a score field before ending the game.", "error")
         return redirect(url_for("tracker.live_tracker", session_id=session_id))
@@ -223,6 +258,7 @@ def end_game(session_id):
         "tracker_confirm.html",
         session=session,
         rankings=rankings,
+        low_wins=low_wins,
         has_existing_results=has_existing_results,
     )
 

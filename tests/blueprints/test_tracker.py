@@ -228,6 +228,11 @@ def test_launch_without_score_field_flashes_error(app, db, auth_tracker_client):
     c = auth_tracker_client["client"]
     gng_id = auth_tracker_client["gng_id"]
     session = get_or_create_configuring_session(gng_id)
+    # Sessions start with a "Score" field; remove it to test the no-score path.
+    from app.models import TrackerField
+
+    TrackerField.query.filter_by(tracker_session_id=session.id, is_score_field=True).delete()
+    _db.session.commit()
     # Add a field that is NOT a score field
     add_field(session.id, type="counter", label="HP", starting_value=10, is_score_field=False)
     resp = c.post(
@@ -830,3 +835,27 @@ def test_team_mode_compute_rankings(app, db, team_tracker_client):
     assert rankings[0]["position"] == 1
     assert rankings[1]["score"] == 3
     assert rankings[1]["position"] == 2
+
+
+def test_setup_lists_players_and_low_score_ranking(app, db, auth_tracker_client):
+    from app.services import tracker_services as ts
+
+    c = auth_tracker_client["client"]
+    gng_id = auth_tracker_client["gng_id"]
+    page = c.get(f"/game_night/{gng_id}/tracker/new").get_data(as_text=True)
+    assert "Who&#39;s playing" in page or "Who's playing" in page
+    assert (
+        f'name="player_ids" form="launch-form" value="{auth_tracker_client["player_id"]}"' in page
+    )
+
+    session = ts.get_or_create_configuring_session(gng_id)
+    c.post(
+        f"/game_night/{gng_id}/tracker",
+        data={
+            "session_id": str(session.id),
+            "mode": "individual",
+            "player_ids": [str(auth_tracker_client["player_id"])],
+        },
+    )
+    resp = c.get(f"/tracker/{session.id}/end?low=1")
+    assert b"lowest first" in resp.data and b"Highest score wins instead" in resp.data

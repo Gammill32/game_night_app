@@ -94,11 +94,11 @@
     <p class="text-xs text-stone-500 mb-4">Assign each player to a team.</p>
     <div id="teams-list" class="space-y-4">
       <div class="border border-stone-200 rounded-lg p-3">
-        <input type="text" name="team_names" placeholder="Team name"
+        <input type="text" name="team_names" form="launch-form" placeholder="Team name"
                class="border border-stone-300 rounded px-3 py-1 text-sm mb-2 w-full">
         {% for player in players %}
         <label class="flex items-center gap-2 text-sm">
-          <input type="checkbox" name="team_0_player_ids" value="{{ player.id }}" class="accent-red-600">
+          <input type="checkbox" name="team_0_player_ids" form="launch-form" value="{{ player.id }}" class="accent-red-600">
           {{ player.person.first_name }} {{ player.person.last_name }}
         </label>
         {% endfor %}
@@ -106,13 +106,24 @@
     </div>
   </div>
 
+  <!-- Who's playing (individual mode) -->
+  <div class="bg-white rounded-xl shadow-sm border border-stone-200 p-5 mb-4">
+    <h2 class="font-semibold text-stone-700 mb-1">Who's playing</h2>
+    <p class="text-xs text-stone-500 mb-3">Starts with everyone who didn't say they can't make it.</p>
+    <div class="grid grid-cols-2 gap-2">
+      {% for player in players %}
+      <label class="flex items-center gap-2 text-sm">
+        <input type="checkbox" name="player_ids" form="launch-form" value="{{ player.id }}" {% if player.id in playing %}checked{% endif %} class="h-4 w-4 accent-red-600">
+        {{ player.person.first_name }} {{ player.person.last_name }}
+      </label>
+      {% endfor %}
+    </div>
+  </div>
+
   <!-- Launch Form -->
-  <form action="{{ url_for('tracker.launch_tracker', gng_id=gng.id) }}" method="POST">
+  <form id="launch-form" action="{{ url_for('tracker.launch_tracker', gng_id=gng.id) }}" method="POST">
     <input type="hidden" name="session_id" value="{{ session.id }}">
     <input type="hidden" id="launch-mode" name="mode" value="individual">
-    {% for player in players %}
-    <input type="hidden" name="player_ids" value="{{ player.id }}">
-    {% endfor %}
     <!-- Hidden field order for sort_order -->
     <input type="hidden" id="field-order" name="field_order" value="">
     <div class="flex gap-3">

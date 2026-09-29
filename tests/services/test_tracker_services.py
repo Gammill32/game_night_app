@@ -291,3 +291,37 @@ def test_save_results_upserts_existing_rows(app, db, active_session):
     results = Result.query.filter_by(game_night_game_id=gng_id).all()
     # No duplicate rows
     assert len(results) == 2
+
+
+def test_new_session_starts_with_score_and_can_be_replaced(app, db):
+    """Sessions start with a 'Score' counter; adding another score field
+    replaces it, and only counters can be the score."""
+    import datetime
+
+    import pytest as _pytest
+
+    from app.models import Game, GameNight, GameNightGame, TrackerField
+    from app.services import tracker_services as ts
+
+    game = Game(name="ScoreDefault")
+    gn = GameNight(date=datetime.date(2031, 1, 5))
+    _db.session.add_all([game, gn])
+    _db.session.flush()
+    gng = GameNightGame(game_night_id=gn.id, game_id=game.id, round=1)
+    _db.session.add(gng)
+    _db.session.commit()
+
+    session = ts.get_or_create_configuring_session(gng.id)
+    fields = TrackerField.query.filter_by(tracker_session_id=session.id).all()
+    assert [(f.label, f.is_score_field) for f in fields] == [("Score", True)]
+
+    with _pytest.raises(ValueError):
+        ts.add_field(session.id, type="checkbox", label="Won?", is_score_field=True)
+    vp = ts.add_field(session.id, type="counter", label="VP", is_score_field=True)
+    assert vp.replaced_score_field
+    fields = TrackerField.query.filter_by(tracker_session_id=session.id).all()
+    assert [(f.label, f.is_score_field) for f in fields] == [("VP", True)]
+
+    _db.session.delete(gn)
+    _db.session.delete(game)
+    _db.session.commit()
