@@ -6,6 +6,7 @@ Public API:
 """
 
 import logging
+from datetime import date
 
 from sqlalchemy import func
 from sqlalchemy.orm import joinedload
@@ -809,11 +810,47 @@ def evaluate_badges_for_night(game_night_id: int) -> None:
 
 
 def get_person_badges(person_id: int) -> list:
-    """Return all earned badges for a person, newest first."""
+    """Return all earned badges for a person, newest night first."""
     return (
         db.session.query(PersonBadge)
         .filter_by(person_id=person_id)
-        .options(joinedload(PersonBadge.badge))
-        .order_by(PersonBadge.earned_at.desc())
+        .options(joinedload(PersonBadge.badge), joinedload(PersonBadge.game_night))
+        .outerjoin(GameNight, PersonBadge.game_night_id == GameNight.id)
+        .order_by(GameNight.date.desc().nullslast(), PersonBadge.earned_at.desc())
         .all()
     )
+
+
+def total_badges() -> int:
+    return db.session.query(func.count(Badge.id)).scalar() or 0
+
+
+def earned_on(person_badge) -> date:
+    """The date to show: the night that earned it, or when it was recorded."""
+    if person_badge.game_night is not None:
+        return person_badge.game_night.date
+    return person_badge.earned_at.date()
+
+
+def catalog(viewer_id: int) -> list[dict]:
+    """Every badge with who holds it (earliest first) and the viewer's own award."""
+    awards = (
+        db.session.query(PersonBadge)
+        .options(joinedload(PersonBadge.person), joinedload(PersonBadge.game_night))
+        .all()
+    )
+    by_badge: dict[int, list] = {}
+    for award in awards:
+        by_badge.setdefault(award.badge_id, []).append(award)
+    rows = []
+    for badge in db.session.query(Badge).order_by(Badge.id).all():
+        holders = sorted(by_badge.get(badge.id, []), key=earned_on)
+        rows.append(
+            {
+                "badge": badge,
+                "holders": holders,
+                "mine": next((a for a in holders if a.person_id == viewer_id), None),
+            }
+        )
+    rows.sort(key=lambda r: (r["mine"] is None, -len(r["holders"])))  # type: ignore[arg-type]
+    return rows

@@ -423,42 +423,40 @@ def get_user_stats(
     sort_by="wins",
     sort_order="desc",
 ):
-    # Base query to fetch user's game results
+    """Per-game results for a player, filtered by game, opponents and the
+    date of the game night (not when the result was entered)."""
+    wins = func.sum(case((Result.position == 1, 1), else_=0))
+    plays = func.count(Result.id)
+    win_pct = wins * 100.0 / func.nullif(plays, 0)
     query = (
         db.session.query(
             GameNightGame.game_id,
             Game.name.label("game_name"),
-            func.count(Result.id).label("games_played"),
-            func.sum(case((Result.position == 1, 1), else_=0)).label("wins"),
+            Game.image_url.label("image_url"),
+            plays.label("games_played"),
+            wins.label("wins"),
+            win_pct.label("win_pct"),
             func.avg(Result.position).label("average_position"),
-            func.max(GameNightGame.created_at).label("last_played"),
+            func.max(GameNight.date).label("last_played"),
         )
         .join(Result, GameNightGame.id == Result.game_night_game_id)
         .join(Player, Result.player_id == Player.id)
         .join(Game, GameNightGame.game_id == Game.id)
+        .join(GameNight, GameNightGame.game_night_id == GameNight.id)
         .filter(Player.people_id == user_id)
     )
 
-    # Apply game filter
     if game_ids:
         query = query.filter(GameNightGame.game_id.in_(game_ids))
 
-    # Apply date filters
-    if start_date:
-        try:
-            start = datetime.strptime(start_date, "%Y-%m-%d")
-            query = query.filter(GameNightGame.created_at >= start)
-        except ValueError:
-            pass  # Invalid date format; ignore filter
+    for raw, op in ((start_date, "ge"), (end_date, "le")):
+        if raw:
+            try:
+                day = datetime.strptime(raw, "%Y-%m-%d").date()
+            except ValueError:
+                continue  # Invalid date format; ignore filter
+            query = query.filter(GameNight.date >= day if op == "ge" else GameNight.date <= day)
 
-    if end_date:
-        try:
-            end = datetime.strptime(end_date, "%Y-%m-%d")
-            query = query.filter(GameNightGame.created_at <= end)
-        except ValueError:
-            pass  # Invalid date format; ignore filter
-
-    # Apply opponent filter
     if opponent_ids:
         subquery = (
             db.session.query(Result.game_night_game_id)
@@ -468,27 +466,39 @@ def get_user_stats(
             .having(func.count(distinct(Player.people_id)) == len(opponent_ids))
             .subquery()
         )
-
         query = query.filter(GameNightGame.id.in_(subquery))
 
-    # Group by game
-    query = query.group_by(GameNightGame.game_id, Game.name)
+    query = query.group_by(GameNightGame.game_id, Game.name, Game.image_url)
 
-    # Apply sorting
     sort_column = {
-        "wins": func.sum(case((Result.position == 1, 1), else_=0)).label("wins"),
-        "games_played": func.count(Result.id),
+        "wins": wins,
+        "games_played": plays,
+        "win_pct": win_pct,
         "average_position": func.avg(Result.position),
-        "last_played": func.max(GameNightGame.created_at),
+        "last_played": func.max(GameNight.date),
         "game_name": Game.name,
-    }.get(sort_by, func.sum(case((Result.position == 1, 1), else_=0)).label("wins"))
+    }.get(sort_by, wins)
 
     if sort_order == "asc":
-        query = query.order_by(sort_column.asc())
+        query = query.order_by(sort_column.asc().nullslast(), Game.name)
     else:
-        query = query.order_by(sort_column.desc())
+        query = query.order_by(sort_column.desc().nullslast(), Game.name)
 
     return query.all()
+
+
+def summarize_user_stats(rows):
+    """Totals for the tiles above the table (respecting the same filters)."""
+    played = sum(r.games_played for r in rows)
+    wins = sum(r.wins or 0 for r in rows)
+    positions = sum((r.average_position or 0) * r.games_played for r in rows)
+    return {
+        "games_played": played,
+        "wins": wins,
+        "win_pct": round(wins * 100 / played) if played else 0,
+        "average_position": round(positions / played, 2) if played else None,
+        "distinct_games": len(rows),
+    }
 
 
 def get_selected_games(game_ids):

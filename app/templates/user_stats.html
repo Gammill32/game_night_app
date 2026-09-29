@@ -1,27 +1,41 @@
 {% extends "base.html" %}
-{% block title %}Player Statistics{% endblock %}
+{% block title %}Your Stats{% endblock %}
 {% block content %}
+{% set filtered = selected_game_ids or selected_opponent_ids or request.args.get('start_date') or request.args.get('end_date') %}
+{% macro sort_link(col, label, extra='') %}
+<th class="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-stone-500 {{ extra }}">
+  <a href="{{ url_for('games.user_stats', game_ids=request.args.getlist('game_ids'), opponent_ids=request.args.getlist('opponent_ids'),
+              start_date=request.args.get('start_date'), end_date=request.args.get('end_date'), sort_by=col,
+              sort_order='asc' if sort_by == col and sort_order == 'desc' else 'desc') }}"
+     class="hover:text-stone-800 {{ 'text-stone-800' if sort_by == col else '' }}">
+    {{ label }}{% if sort_by == col %} {{ '▲' if sort_order == 'asc' else '▼' }}{% endif %}
+  </a>
+</th>
+{% endmacro %}
 
-<h1 class="text-2xl font-bold text-stone-800 mb-6">Player Statistics</h1>
+<div class="max-w-4xl mx-auto space-y-6">
+  <div class="flex flex-wrap items-end justify-between gap-3">
+    <div>
+      <h1 class="text-2xl font-bold text-stone-800">Your Stats</h1>
+      <p class="text-sm text-stone-500">{% if filtered %}Filtered — <a href="{{ url_for('games.user_stats') }}" class="underline">clear filters</a>{% else %}Every game night you've played{% endif %}</p>
+    </div>
+    <a href="{{ url_for('games.badges') }}" class="inline-flex items-center rounded-lg border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50">🏅 All badges</a>
+  </div>
 
-<div class="mb-8">
-  <h2 class="text-xl font-semibold text-gray-800 mb-4">Badges</h2>
-  {% if badges %}
-  <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-    {% for pb in badges %}
-    <div class="bg-white rounded-lg shadow p-4 flex flex-col items-center text-center">
-      <span class="text-3xl mb-2">{{ pb.badge.icon }}</span>
-      <span class="font-semibold text-gray-800 text-sm">{{ pb.badge.name }}</span>
-      <span class="text-xs text-gray-500 mt-1">{{ pb.earned_at.strftime('%b %d, %Y') }}</span>
+  <!-- Summary -->
+  <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+    {% for value, label in [(summary.games_played, 'Games played'), (summary.wins, 'Wins'), (summary.win_pct ~ '%', 'Win rate'), (summary.average_position or '–', 'Avg finish')] %}
+    <div class="rounded-xl border border-stone-200 bg-white p-4 text-center shadow-sm">
+      <p class="text-2xl font-bold text-stone-800">{{ value }}</p>
+      <p class="text-xs font-medium uppercase tracking-wide text-stone-500 mt-1">{{ label }}</p>
     </div>
     {% endfor %}
   </div>
-  {% else %}
-  <p class="text-sm text-gray-500">No badges earned yet. Keep playing!</p>
-  {% endif %}
-</div>
 
-<form method="get" class="bg-white rounded-xl border border-stone-200 shadow-sm p-5 mb-6" id="userStatsForm">
+  <!-- Filters -->
+  <details class="rounded-xl border border-stone-200 bg-white p-5 shadow-sm" {% if filtered %}open{% endif %}>
+    <summary class="cursor-pointer text-sm font-semibold text-stone-700">Filter by game, opponent or date</summary>
+    <form method="get" class="pt-4" id="userStatsForm">
   <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
 
     <!-- Game filter -->
@@ -101,50 +115,66 @@
     <a href="{{ url_for('games.user_stats') }}" class="inline-flex items-center rounded-lg border border-stone-300 px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50 transition-colors">Clear Filters</a>
   </div>
 </form>
+  </details>
 
-<!-- Results Table -->
-<div class="bg-white rounded-xl border border-stone-200 shadow-sm overflow-hidden">
-  <div class="overflow-x-auto">
-    <table class="w-full text-sm">
-      <thead class="bg-stone-50 border-b border-stone-200">
-        <tr>
-          {% for col, label in [ ('game_name', 'Game'), ('games_played', 'Plays'),
-          ('wins', 'Wins'), ('win_pct', 'Win %'), ('average_position', 'Avg Pos'),
-          ('last_played', 'Last Played')] %}
-          <th class="text-left text-xs font-semibold text-stone-500 uppercase tracking-wide pb-2 px-2 py-3">
-            <a
-              href="{{ url_for('games.user_stats',
-              game_ids=request.args.getlist('game_ids'),
-              opponent_ids=request.args.getlist('opponent_ids'),
-              start_date=request.args.get('start_date'),
-              end_date=request.args.get('end_date'),
-              sort_by=col,
-              sort_order='desc' if sort_by == col and sort_order == 'asc' else 'asc') }}"
-              class="hover:text-stone-700 transition-colors"
-            >
-              {{ label }}{% if sort_by == col %} {{ '▲' if sort_order == 'asc' else '▼' }}{% endif %}
-            </a>
-          </th>
+  <!-- Per game -->
+  <section class="rounded-xl border border-stone-200 bg-white shadow-sm overflow-hidden">
+    <h2 class="px-5 pt-4 text-lg font-semibold text-stone-800">By game <span class="text-sm font-normal text-stone-500">({{ summary.distinct_games }})</span></h2>
+    {% if stats %}
+    <div class="overflow-x-auto mt-2">
+      <table class="w-full text-sm">
+        <thead class="border-y border-stone-200 bg-stone-50">
+          <tr>
+            {{ sort_link('game_name', 'Game') }}
+            {{ sort_link('games_played', 'Plays') }}
+            {{ sort_link('wins', 'Wins') }}
+            {{ sort_link('win_pct', 'Win %') }}
+            {{ sort_link('average_position', 'Avg', 'hidden sm:table-cell') }}
+            {{ sort_link('last_played', 'Last played', 'hidden sm:table-cell') }}
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-stone-100">
+          {% for row in stats %}
+          <tr class="hover:bg-stone-50">
+            <td class="px-3 py-2">
+              <a href="{{ url_for('games.view_game', game_id=row.game_id) }}" class="flex items-center gap-2 font-medium text-stone-800 hover:text-red-600">
+                {% if row.image_url %}<img src="{{ row.image_url }}" alt="" class="h-8 w-8 rounded object-cover border border-stone-200">{% endif %}
+                {{ row.game_name }}
+              </a>
+            </td>
+            <td class="px-3 py-2 text-stone-700">{{ row.games_played }}</td>
+            <td class="px-3 py-2 text-stone-700">{{ row.wins }}</td>
+            <td class="px-3 py-2 text-stone-700">{{ "%.0f"|format(row.win_pct or 0) }}%</td>
+            <td class="px-3 py-2 text-stone-700 hidden sm:table-cell">{{ "%.2f"|format(row.average_position or 0) }}</td>
+            <td class="px-3 py-2 text-stone-700 hidden sm:table-cell whitespace-nowrap">{{ row.last_played.strftime('%b %-d, %Y') if row.last_played else '' }}</td>
+          </tr>
           {% endfor %}
-        </tr>
-      </thead>
-      <tbody>
-        {% for row in stats %}
-        <tr class="border-t border-stone-100 hover:bg-stone-50 transition-colors">
-          <td class="py-2 px-2 text-stone-700">{{ row.game_name }}</td>
-          <td class="py-2 px-2 text-stone-700">{{ row.games_played }}</td>
-          <td class="py-2 px-2 text-stone-700">{{ row.wins }}</td>
-          <td class="py-2 px-2 text-stone-700">{{ "%.0f"|format(row.win_pct or 0) }}%</td>
-          <td class="py-2 px-2 text-stone-700">{{ "%.2f"|format(row.average_position or 0) }}</td>
-          <td class="py-2 px-2 text-stone-700">
-            {{ row.last_played.strftime('%b %e, %Y') if row.last_played else '' }}
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="px-5 pb-5 pt-2 text-sm text-stone-500">No games {{ 'match these filters' if filtered else 'played yet' }}.</p>
+    {% endif %}
+  </section>
+
+  <!-- Badges -->
+  <section>
+    <div class="flex items-baseline justify-between mb-3">
+      <h2 class="text-lg font-semibold text-stone-800">Badges <span class="text-sm font-normal text-stone-500">({{ badges|length }} of {{ badge_count }})</span></h2>
+      <span class="text-xs text-stone-500">Tap one to see what it's for and where you earned it</span>
+    </div>
+    {% if badges %}
+    <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+      {% for pb in badges %}
+        {% with mine = True %}{% include "_badge_button.html" %}{% endwith %}
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-sm text-stone-500">No badges yet. <a href="{{ url_for('games.badges') }}" class="underline">See how to earn them</a>.</p>
+    {% endif %}
+  </section>
 </div>
+{% include "_badge_dialog.html" %}
 
 <!-- Script: Autocomplete logic -->
 <script>

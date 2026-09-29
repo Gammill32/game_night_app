@@ -383,6 +383,7 @@ def get_view_game_night_details(game_night_id, current_user_id):
         "owned_game_ids": owned_game_ids,
         "user_ratings_by_game_id": user_ratings_by_game_id,
         "availability_poll": game_night.availability_poll,
+        "night_badges": night_badges(game_night_id) if game_night.final else [],
         "rsvps": rsvps,
         "rsvp_in_count": sum(1 for p in players if rsvps.get(p.people_id) == "Can Make It"),
     }
@@ -422,6 +423,16 @@ def get_filtered_games_for_game_night(
     return [{"game": game, "in_wishlist": game.id in wishlist_game_ids} for game in games]
 
 
+def night_badges(game_night_id):
+    """Badges awarded when this night was finalized, grouped by person."""
+    awards = (
+        PersonBadge.query.filter_by(game_night_id=game_night_id)
+        .options(joinedload(PersonBadge.person), joinedload(PersonBadge.badge))
+        .all()
+    )
+    return sorted(awards, key=lambda a: (a.person.first_name.lower(), a.badge.name))
+
+
 def get_recap_details(game_night_id):
     """Fetch data for the public game night recap page."""
     game_night = GameNight.query.get_or_404(game_night_id)
@@ -459,6 +470,7 @@ def get_recap_details(game_night_id):
             "person_name": f"{pb.person.first_name} {pb.person.last_name}",
             "badge_name": pb.badge.name,
             "badge_icon": pb.badge.icon,
+            "badge_rule": pb.badge.description,
         }
         for pb in raw_badges
     ]

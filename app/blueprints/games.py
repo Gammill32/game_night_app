@@ -275,6 +275,19 @@ def user_stats():
         selected_game_names=selected_games,
         selected_opponent_names=selected_opponents,
         badges=badge_services.get_person_badges(current_user.id),
+        badge_count=badge_services.total_badges(),
+        earned_on=badge_services.earned_on,
+        summary=games_services.summarize_user_stats(stats),
+    )
+
+
+@games_bp.route("/badges")
+@login_required
+def badges():
+    return render_template(
+        "badges.html",
+        rows=badge_services.catalog(current_user.id),
+        earned_on=badge_services.earned_on,
     )
 
 

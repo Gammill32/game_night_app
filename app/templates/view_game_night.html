@@ -432,6 +432,26 @@
   </div>
   {% endif %}
 
+  <!-- Badges earned this night -->
+  {% if night_badges %}
+  <div id="badges" class="bg-white rounded-xl border border-stone-200 shadow-sm p-5">
+    <h2 class="text-lg font-semibold text-stone-800 mb-3">🏅 Badges earned this night</h2>
+    <ul class="grid gap-2 sm:grid-cols-2">
+      {% for pb in night_badges %}
+      <li class="flex items-start gap-3 rounded-lg px-3 py-2 {{ 'bg-green-50 ring-1 ring-green-200' if pb.person_id == current_user.id else 'bg-stone-50' }}">
+        <span class="text-2xl leading-none" aria-hidden="true">{{ pb.badge.icon }}</span>
+        <span class="text-sm">
+          <strong class="text-stone-800">{{ 'You' if pb.person_id == current_user.id else pb.person.first_name }}</strong>
+          <span class="text-stone-500">earned</span> <strong class="text-stone-800">{{ pb.badge.name }}</strong>
+          <span class="block text-xs text-stone-500">{{ pb.badge.description }}</span>
+        </span>
+      </li>
+      {% endfor %}
+    </ul>
+    <a href="{{ url_for('games.badges') }}" class="mt-3 inline-block text-xs text-stone-500 underline hover:text-red-600">All badges</a>
+  </div>
+  {% endif %}
+
   <!-- Photos -->
   {% set photos = game_night.photos %}
   {% if photos or can_upload_photos %}
