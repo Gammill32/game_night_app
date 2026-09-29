@@ -1,0 +1,30 @@
+{# Players and their RSVPs. Included from view_game_night.html. #}
+  <!-- Players -->
+  <div class="bg-white rounded-xl border border-stone-200 shadow-sm p-5">
+    <div class="flex items-baseline justify-between gap-2 mb-3">
+      <h2 class="text-lg font-semibold text-stone-800">Players</h2>
+      {% if availability_poll %}
+      <span class="text-xs text-stone-500">{{ rsvp_in_count }} of {{ players | length }} can make it</span>
+      {% endif %}
+    </div>
+    <ul class="flex flex-wrap gap-2">
+      {% for player in players %}
+        {% set answer = rsvps.get(player.people_id) %}
+        <li class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-stone-100 text-stone-700">
+          {{ player.person.first_name }} {{ player.person.last_name }}
+          {% if availability_poll %}
+            {% if answer == "Can Make It" %}<span class="rounded-full bg-green-100 px-1.5 text-green-800">In</span>
+            {% elif answer == "Maybe" %}<span class="rounded-full bg-amber-100 px-1.5 text-amber-800">Maybe</span>
+            {% elif answer == "Can't Make It" %}<span class="rounded-full bg-red-100 px-1.5 text-red-800">Out</span>
+            {% elif answer %}<span class="rounded-full bg-stone-200 px-1.5 text-stone-700">{{ answer }}</span>
+            {% else %}<span class="text-stone-400">no reply</span>{% endif %}
+          {% endif %}
+        </li>
+      {% else %}
+        <li class="text-sm text-stone-500">No players found.</li>
+      {% endfor %}
+    </ul>
+    {% if availability_poll and availability_poll.id in (night_polls | map(attribute="poll.id") | list) %}
+    <p class="text-xs text-stone-500 mt-3">RSVPs come from the <a href="#polls" class="underline">availability poll</a> below.</p>
+    {% endif %}
+  </div>

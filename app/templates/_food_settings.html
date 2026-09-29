@@ -27,18 +27,24 @@
              class="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent">
     </div>
   </div>
-  <p class="text-xs text-stone-500">
-    <strong>Provided</strong>: someone has it covered. <strong>Sign-up list</strong>: add items on the night page and players claim them or add what they're bringing.
-    <strong>Split the cost</strong>: whoever buys logs it on the night page and it's split among the players who can make it, with pay links to the buyer's Venmo/Cash App/etc.
-  </p>
+  <p id="foodHelp" class="text-xs text-stone-500"></p>
 </div>
 <script>
   (function () {
     const mode = document.getElementById('foodMode');
+    const help = {
+      none: 'Nothing about food shows on the night.',
+      provided: 'The night page shows who is providing food and your note.',
+      signup: 'Players see a list of who is bringing what. Add items on the night page for people to claim, or let them add their own.',
+      split: "Whoever buys food logs the cost on the night page. It's split evenly among the players who can make it, and each person gets a pay link to the buyer's Venmo, Cash App or PayPal.",
+      both: 'A sign-up list for what people bring, plus split costs for anything someone buys.',
+    };
     function sync() {
+      document.getElementById('foodHelp').textContent = help[mode.value] || '';
       document.getElementById('foodProviderField').classList.toggle('hidden', mode.value !== 'provided');
       document.getElementById('foodNoteField').classList.toggle('hidden', mode.value === 'none');
     }
     mode.addEventListener('change', sync);
+    sync();
   })();
 </script>

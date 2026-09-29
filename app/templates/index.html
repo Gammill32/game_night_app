@@ -54,6 +54,8 @@
           {% if card.bringing %}<span class="text-green-700">You're bringing {{ card.bringing|join(', ') }}</span>{% endif %}
           {% if card.next_step == 'nominate' %}<span class="font-medium text-amber-700">👉 Nominate a game</span>
           {% elif card.next_step == 'rank' %}<span class="font-medium text-amber-700">👉 Rank your top 3 games</span>{% endif %}
+          {% if card.owed_to_me %}{% set total = card.owed_to_me | sum(attribute='amount_cents') %}
+          <span class="font-medium text-green-700">{% if card.owed_to_me|length == 1 %}{{ card.owed_to_me[0].person.first_name }} owes{% else %}{{ card.owed_to_me|length }} people owe{% endif %} you {{ total|money }}</span>{% endif %}
           {% for share, expense in card.owed %}<span class="text-amber-700 font-medium">You owe {{ expense.payer.first_name }} {{ share.amount_cents|money }}</span>{% endfor %}
         </div>
       </a>

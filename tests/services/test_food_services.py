@@ -173,3 +173,27 @@ def test_reminder_email_lists_food_and_what_you_owe(app, make_person, make_night
     reminders_services.check_and_send_reminders()
     assert "Chips: Ann" in sent[ann.email]
     assert "You owe Ann $10.00 for Pizza" in sent[bo.email]
+
+
+def test_pay_back_flow_on_the_page(client, make_person, make_night):
+    ann, bo = make_person("Ann"), make_person("Bo")
+    gn = make_night(ann, bo, food_mode="split", date=__import__("datetime").date(2031, 9, 5))
+    food_services.add_expense(
+        gn, ann, MultiDict({"description": "Pizza", "amount": "20", "paid_by": str(ann.id)})
+    )
+    payment_services.add_handle(ann, "venmo", "@Ann-T")
+    login(client, bo)
+    page = " ".join(client.get(f"/game_night/{gn.id}").get_data(as_text=True).split())
+    assert "You owe Ann $10.00" in page and "Pay with Venmo" in page and "I've paid Ann" in page
+    share = next(
+        s
+        for s in FoodExpense.query.filter_by(game_night_id=gn.id).one().shares
+        if s.person_id == bo.id
+    )
+    client.post(f"/game_night/{gn.id}/food/shares/{share.id}/paid", data={"paid": "1"})
+    page = " ".join(client.get(f"/game_night/{gn.id}").get_data(as_text=True).split())
+    assert "all paid up ✓" in page and "You owe Ann" not in page
+
+    from app.services import food_services as fs
+
+    assert fs.owed_to(gn, ann) == []

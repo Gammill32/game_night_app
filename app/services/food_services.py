@@ -342,6 +342,17 @@ def my_food_summary(game_night, user):
     ]
 
 
+def owed_to(game_night, user):
+    """Unpaid shares other people owe this user (as the buyer) on this night."""
+    return [
+        s
+        for e in game_night.food_expenses
+        if e.paid_by == user.id
+        for s in e.shares
+        if not s.paid and s.person_id != user.id
+    ]
+
+
 def reminder_lines(game_night):
     """Plain lines for the reminder email."""
     lines = []
