@@ -117,9 +117,18 @@ def launch_tracker(gng_id):
     teams_data = []
     if mode == "teams":
         team_names = request.form.getlist("team_names")
-        for i, name in enumerate(team_names):
-            t_player_ids = [int(pid) for pid in request.form.getlist(f"team_{i}_player_ids")]
-            teams_data.append({"name": name, "player_ids": t_player_ids})
+        teams_data = [{"name": name, "player_ids": []} for name in team_names]
+        # Each player picks one team: team_of_<player_id> = team index ('' = sitting out).
+        # (team_<i>_player_ids is the older form, still accepted.)
+        for key, value in request.form.items():
+            if key.startswith("team_of_") and value.isdigit() and int(value) < len(teams_data):
+                teams_data[int(value)]["player_ids"].append(int(key[len("team_of_") :]))
+        for i, team in enumerate(teams_data):
+            team["player_ids"] += [int(pid) for pid in request.form.getlist(f"team_{i}_player_ids")]
+        teams_data = [t for t in teams_data if t["player_ids"]]
+        if len(teams_data) < 2:
+            flash("Put players on at least two teams.", "error")
+            return redirect(url_for("tracker.setup_tracker", gng_id=gng_id))
 
     try:
         tracker_services.launch_session(

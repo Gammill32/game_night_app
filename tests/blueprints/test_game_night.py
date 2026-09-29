@@ -335,3 +335,11 @@ def test_public_recap_shows_first_names_and_initials(client, make_person, make_n
     gn = make_night(ann, final=True)
     page = client.get(f"/game_night/{gn.id}/recap").get_data(as_text=True)  # not logged in
     assert "Ann Z." in page and "Zebrowski" not in page
+
+
+def test_recap_has_share_button_and_link_preview(client, make_person, make_night):
+    ann = make_person("Ann", "Zebrowski")
+    gn = make_night(ann, final=True)
+    page = client.get(f"/game_night/{gn.id}/recap").get_data(as_text=True)
+    assert "data-share" in page and 'property="og:title"' in page
+    assert f"/game_night/{gn.id}/recap" in page

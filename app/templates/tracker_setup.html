@@ -21,12 +21,10 @@
     <div class="flex gap-4">
       <label class="flex items-center gap-2 cursor-pointer">
         <input type="radio" name="mode_choice" value="individual" checked
-               onchange="document.getElementById('teams-section').classList.add('hidden')"
                class="accent-red-600"> Individual
       </label>
       <label class="flex items-center gap-2 cursor-pointer">
         <input type="radio" name="mode_choice" value="teams"
-               onchange="document.getElementById('teams-section').classList.remove('hidden')"
                class="accent-red-600"> Teams
       </label>
     </div>
@@ -88,26 +86,54 @@
     </div>
   </div>
 
-  <!-- Teams section (hidden by default) -->
-  <div id="teams-section" class="hidden bg-white rounded-xl shadow-sm border border-stone-200 p-5">
-    <h2 class="font-semibold text-stone-700 mb-3">Teams</h2>
-    <p class="text-xs text-stone-500 mb-4">Assign each player to a team.</p>
-    <div id="teams-list" class="space-y-4">
-      <div class="border border-stone-200 rounded-lg p-3">
-        <input type="text" name="team_names" form="launch-form" placeholder="Team name"
-               class="border border-stone-300 rounded px-3 py-1 text-sm mb-2 w-full">
-        {% for player in players %}
-        <label class="flex items-center gap-2 text-sm">
-          <input type="checkbox" name="team_0_player_ids" form="launch-form" value="{{ player.id }}" class="accent-red-600">
-          {{ player.person.first_name }} {{ player.person.last_name }}
-        </label>
-        {% endfor %}
+  <!-- Teams (teams mode) -->
+  {% set team_colors = ['bg-red-600', 'bg-blue-600', 'bg-emerald-600', 'bg-amber-500', 'bg-purple-600', 'bg-pink-600'] %}
+  <div id="teams-section" hidden class="bg-white rounded-xl shadow-sm border border-stone-200 p-5 space-y-4">
+    <div>
+      <h2 class="font-semibold text-stone-700">Teams</h2>
+      <p class="text-xs text-stone-500">Name the teams, then tap each player's team. Scores are kept per team, and everyone on the winning team shares the win.</p>
+    </div>
+    <div class="space-y-2" data-team-names>
+      {% for i in range(6) %}
+      <div data-team-slot="{{ i }}" {% if i >= 2 %}hidden{% endif %} class="flex items-center gap-2">
+        <span class="h-4 w-4 shrink-0 rounded-full {{ team_colors[i] }}" aria-hidden="true"></span>
+        <input type="text" name="team_names" form="launch-form" value="Team {{ i + 1 }}" maxlength="40" aria-label="Team {{ i + 1 }} name"
+               {% if i >= 2 %}disabled{% endif %}
+               class="flex-1 rounded-lg border border-stone-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-500">
       </div>
+      {% endfor %}
+      <div class="flex gap-3 text-sm">
+        <button type="button" data-team-add class="text-red-600 underline">+ Add a team</button>
+        <button type="button" data-team-remove class="text-stone-500 underline">Remove last team</button>
+      </div>
+    </div>
+    <div>
+      <h3 class="text-sm font-semibold text-stone-700 mb-1">Who's on which team</h3>
+      <ul class="divide-y divide-stone-100">
+        {% for player in players %}
+        {% set default_team = '' if player.id not in playing else loop.index0 % 2 %}
+        <li class="flex flex-wrap items-center justify-between gap-2 py-2">
+          <span class="text-sm text-stone-800">{{ player.person.first_name }} {{ player.person.last_name }}</span>
+          <span class="flex flex-wrap gap-1" role="radiogroup" aria-label="{{ player.person.first_name }}'s team">
+            {% for i in range(6) %}
+            <label data-team-option="{{ i }}" {% if i >= 2 %}hidden{% endif %} class="cursor-pointer">
+              <input type="radio" name="team_of_{{ player.id }}" form="launch-form" value="{{ i }}" {% if default_team == i %}checked{% endif %} class="peer sr-only">
+              <span class="inline-flex h-8 min-w-[2rem] items-center justify-center rounded-lg border border-stone-300 px-2 text-xs font-semibold text-stone-600 peer-checked:border-transparent peer-checked:{{ team_colors[i] }} peer-checked:text-white peer-focus-visible:ring-2 peer-focus-visible:ring-red-400" data-team-label="{{ i }}">T{{ i + 1 }}</span>
+            </label>
+            {% endfor %}
+            <label class="cursor-pointer">
+              <input type="radio" name="team_of_{{ player.id }}" form="launch-form" value="" {% if default_team == '' %}checked{% endif %} class="peer sr-only">
+              <span class="inline-flex h-8 items-center rounded-lg border border-stone-300 px-2 text-xs text-stone-500 peer-checked:bg-stone-200 peer-checked:text-stone-700 peer-focus-visible:ring-2 peer-focus-visible:ring-red-400">Sit out</span>
+            </label>
+          </span>
+        </li>
+        {% endfor %}
+      </ul>
     </div>
   </div>
 
   <!-- Who's playing (individual mode) -->
-  <div class="bg-white rounded-xl shadow-sm border border-stone-200 p-5 mb-4">
+  <div id="players-section" class="bg-white rounded-xl shadow-sm border border-stone-200 p-5 mb-4">
     <h2 class="font-semibold text-stone-700 mb-1">Who's playing</h2>
     <p class="text-xs text-stone-500 mb-3">Starts with everyone who didn't say they can't make it.</p>
     <div class="grid grid-cols-2 gap-2">
@@ -139,12 +165,42 @@
 </div>
 
 <script>
-  // Keep mode hidden input in sync with radio
+  // Mode: show the teams builder or the player list, and tell the server.
   document.querySelectorAll('[name="mode_choice"]').forEach(r => {
     r.addEventListener('change', () => {
+      const teams = r.value === 'teams';
       document.getElementById('launch-mode').value = r.value;
+      document.getElementById('teams-section').hidden = !teams;
+      document.getElementById('players-section').hidden = teams;
+      document.querySelectorAll('#players-section input').forEach(i => { i.disabled = teams; });
     });
   });
+  // Teams: 2 to 6; button labels follow the team names.
+  (function () {
+    let count = 2;
+    const slots = [...document.querySelectorAll('[data-team-slot]')];
+    function sync() {
+      slots.forEach((slot, i) => {
+        const on = i < count;
+        slot.hidden = !on;
+        slot.querySelector('input').disabled = !on;
+      });
+      document.querySelectorAll('[data-team-option]').forEach(opt => {
+        const i = +opt.dataset.teamOption, on = i < count;
+        opt.hidden = !on;
+        const radio = opt.querySelector('input');
+        if (!on && radio.checked) opt.parentElement.querySelector('input[value=""]').checked = true;
+      });
+      document.querySelectorAll('[data-team-label]').forEach(el => {
+        const name = slots[+el.dataset.teamLabel].querySelector('input').value.trim();
+        el.textContent = name || 'T' + (+el.dataset.teamLabel + 1);
+      });
+    }
+    document.querySelector('[data-team-add]').addEventListener('click', () => { if (count < 6) { count++; sync(); } });
+    document.querySelector('[data-team-remove]').addEventListener('click', () => { if (count > 2) { count--; sync(); } });
+    slots.forEach(slot => slot.querySelector('input').addEventListener('input', sync));
+    sync();
+  })();
   // Hide/show Starting Value based on field type
   (function () {
     const typeSelect = document.getElementById('new-field-type');

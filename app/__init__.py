@@ -111,6 +111,18 @@ def create_app(config_class=None):
 
     app.jinja_env.filters["youtube_id"] = youtube_id
 
+    def player_range(game):
+        """'2–5 players', '4 players', or '' when unknown."""
+        lo, hi = game.min_players, game.max_players
+        if not lo and not hi:
+            return ""
+        if lo and hi and lo != hi:
+            return f"{lo}–{hi} players"
+        n = lo or hi
+        return f"{n} player{'s' if n != 1 else ''}"
+
+    app.jinja_env.filters["player_range"] = player_range
+
     @app.errorhandler(413)
     def upload_too_large(_error):
         from flask import flash, redirect, request, url_for

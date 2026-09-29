@@ -7,7 +7,7 @@
   </a>
   <div class="min-w-0 flex-1">
     <a href="{{ url_for('games.view_game', game_id=game.id) }}" class="block truncate font-semibold text-stone-800 hover:text-red-600">{{ game.name }}</a>
-    <p class="text-xs text-stone-500">{{ game.min_players or '?' }}–{{ game.max_players or '?' }} players{% if game.playtime %} · {{ game.playtime }} min{% endif %}</p>
+    <p class="text-xs text-stone-500">{{ [game|player_range, (game.playtime ~ ' min') if game.playtime else ''] | select | join(' · ') }}</p>
     {% if wanters %}<p class="text-xs text-stone-600"><strong>{{ wanters|length }}</strong> want{{ 's' if wanters|length == 1 }} it: {% for p in wanters %}{{ 'you' if p.id == current_user.id else p.first_name }}{% if not loop.last %}, {% endif %}{% endfor %}</p>{% endif %}
     {% if owners %}<p class="text-xs text-green-700">{{ owners|map(attribute='first_name')|join(', ') }} {{ 'owns' if owners|length == 1 else 'own' }} it now</p>{% endif %}
     <div class="mt-1.5 flex flex-wrap items-center gap-1.5">{{ caller() }}</div>

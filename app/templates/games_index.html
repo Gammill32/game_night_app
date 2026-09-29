@@ -52,7 +52,7 @@
         </a>
         <div class="min-w-0 flex-1">
           <a href="{{ url_for('games.view_game', game_id=g.game_id) }}" class="block truncate font-semibold text-stone-800 hover:text-red-600">{{ g.game_name }}</a>
-          <p class="text-xs text-stone-500">{{ g.min_players or '?' }}–{{ g.max_players or '?' }} players{% if g.playtime %} · {{ g.playtime }} min{% endif %}{% if item.user_rating is not none %} · you rate it {{ item.user_rating }}{% endif %}</p>
+          <p class="text-xs text-stone-500">{{ [g|player_range, (g.playtime ~ ' min') if g.playtime else ''] | select | join(' · ') }}{% if item.user_rating is not none %} · you rate it {{ item.user_rating }}{% endif %}</p>
           <p class="truncate text-xs text-stone-400">{% if g.owner_names %}{{ g.owner_names }}{% else %}Nobody owns it{% endif %}</p>
           <div class="mt-1.5 flex flex-wrap items-center gap-1.5">
             {% if stat %}

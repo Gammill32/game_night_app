@@ -36,7 +36,7 @@
           {% else %}<span class="flex h-16 w-16 shrink-0 items-center justify-center rounded-lg bg-stone-100 text-2xl">🎲</span>{% endif %}
           <span class="min-w-0 flex-1">
             <span class="block font-semibold text-stone-800">{{ g.name }}</span>
-            <span class="block text-xs text-stone-500">{{ g.min_players or '?' }}–{{ g.max_players or '?' }} players{% if g.playtime %} · {{ g.playtime }} min{% endif %}{% if item.avg_rating is not none %} · ★ {{ item.avg_rating }}{% endif %}</span>
+            <span class="block text-xs text-stone-500">{{ [g|player_range, (g.playtime ~ ' min') if g.playtime else ''] | select | join(' · ') }}{% if item.avg_rating is not none %} · ★ {{ item.avg_rating }}{% endif %}</span>
             <span class="block text-xs text-stone-400 truncate">Owned by {{ item.owners|join(', ') }}</span>
             {% if item.nominated_by or item.in_wishlist %}
             <span class="mt-1 flex flex-wrap gap-1">

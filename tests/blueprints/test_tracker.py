@@ -859,3 +859,69 @@ def test_setup_lists_players_and_low_score_ranking(app, db, auth_tracker_client)
     )
     resp = c.get(f"/tracker/{session.id}/end?low=1")
     assert b"lowest first" in resp.data and b"Highest score wins instead" in resp.data
+
+
+def test_launch_teams_from_team_picker(app, db, auth_tracker_client, make_person):
+    """Each player is put on one team with team_of_<player_id>; sitting out is ''."""
+    from app.models import Player, TrackerSession
+    from app.services import tracker_services as ts
+
+    c = auth_tracker_client["client"]
+    gng_id = auth_tracker_client["gng_id"]
+    me = auth_tracker_client["player_id"]
+    gn_id = _db.session.get(Player, me).game_night_id
+    others = []
+    for name in ("Bo", "Cy", "Di"):
+        person = make_person(name)
+        pl = Player(game_night_id=gn_id, people_id=person.id)
+        _db.session.add(pl)
+        _db.session.flush()
+        others.append(pl.id)
+    _db.session.commit()
+
+    page = c.get(f"/game_night/{gng_id}/tracker/new").get_data(as_text=True)
+    assert (
+        f'name="team_of_{me}"' in page
+        and "Who&#39;s on which team" in page
+        or "Who's on which team" in page
+    )
+
+    session = ts.get_or_create_configuring_session(gng_id)
+    resp = c.post(
+        f"/game_night/{gng_id}/tracker",
+        data={
+            "session_id": str(session.id),
+            "mode": "teams",
+            "team_names": ["Red", "Blue"],
+            f"team_of_{me}": "0",
+            f"team_of_{others[0]}": "1",
+            f"team_of_{others[1]}": "0",
+            f"team_of_{others[2]}": "",
+        },
+    )
+    assert "/tracker/" in resp.headers["Location"]
+    s = _db.session.get(TrackerSession, session.id)
+    teams = {t.name: sorted(p.id for p in t.players) for t in s.teams}
+    assert teams == {"Red": sorted([me, others[1]]), "Blue": [others[0]]}
+    page = c.get(f"/tracker/{session.id}").get_data(as_text=True)
+    assert "Red" in page and "Blue" in page
+    _db.session.delete(s)
+    _db.session.commit()
+
+
+def test_launch_teams_needs_two_teams(app, db, auth_tracker_client):
+    from app.services import tracker_services as ts
+
+    c = auth_tracker_client["client"]
+    gng_id = auth_tracker_client["gng_id"]
+    session = ts.get_or_create_configuring_session(gng_id)
+    resp = c.post(
+        f"/game_night/{gng_id}/tracker",
+        data={
+            "session_id": str(session.id),
+            "mode": "teams",
+            "team_names": ["Red", "Blue"],
+            f"team_of_{auth_tracker_client['player_id']}": "0",
+        },
+    )
+    assert "/tracker/new" in resp.headers["Location"]

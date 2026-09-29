@@ -46,6 +46,7 @@
           <td class="px-4 py-3 font-semibold text-stone-100 text-sm">
             {% if session.mode == 'teams' %}
               {{ entity.name }}
+              <span class="block text-xs font-normal text-stone-400">{{ entity.players | map(attribute='person.first_name') | join(', ') }}</span>
             {% else %}
               {{ entity.person.first_name }} {{ entity.person.last_name }}
             {% endif %}

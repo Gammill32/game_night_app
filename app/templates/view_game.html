@@ -11,7 +11,7 @@
     {% else %}<span class="flex h-40 w-40 shrink-0 items-center justify-center rounded-xl bg-stone-100 text-5xl">🎲</span>{% endif %}
     <div class="min-w-0 flex-1">
       <h1 class="text-2xl font-bold text-stone-800">{{ game.name }}</h1>
-      <p class="mt-1 text-sm text-stone-600">{{ game.min_players or '?' }}–{{ game.max_players or '?' }} players{% if game.playtime %} · {{ game.playtime }} min{% endif %}
+      <p class="mt-1 text-sm text-stone-600">{{ [game|player_range, (game.playtime ~ ' min') if game.playtime else ''] | select | join(' · ') }}
         {% if group_rating.average is not none %} · ★ {{ group_rating.average }} <span class="text-stone-400">({{ group_rating.count }} rating{{ 's' if group_rating.count != 1 }})</span>{% endif %}</p>
       <p class="text-sm text-stone-500">{% if game.owners %}Owned by {{ game.owners | map(attribute='person.first_name') | join(', ') }}{% else %}Nobody in the group owns it yet{% endif %}</p>
       {% if game_stat %}<p class="text-sm text-stone-500">Played {{ game_stat.play_count }} time{{ 's' if game_stat.play_count != 1 }}, last on {{ game_stat.last_played.strftime('%B %-d, %Y') }}{% if (today - game_stat.last_played).days <= 30 %} <span class="ml-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-800">Played recently</span>{% endif %}</p>
