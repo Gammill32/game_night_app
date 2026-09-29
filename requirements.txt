@@ -16,3 +16,5 @@ Flask-Migrate==4.0.7
 cachetools==5.3.3
 defusedxml==0.7.1
 Flask-WTF==1.2.1
+Pillow==12.3.0
+pillow-heif==1.8.0

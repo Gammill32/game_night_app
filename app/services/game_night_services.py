@@ -100,8 +100,12 @@ def delete_game_night(game_night_id):
     if game_night.final:
         return False, "You cannot delete a finalized game night."
 
+    from app.services import media_services, photo_services
+
+    files = photo_services.files_for_night(game_night)
     db.session.delete(game_night)
     db.session.commit()
+    media_services.delete(*files)
     return True, "Game night deleted successfully."
 
 

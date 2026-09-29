@@ -1,4 +1,5 @@
 import os
+import tempfile
 import unittest.mock
 
 import pytest
@@ -19,6 +20,7 @@ class TestConfig(Config):
     LOGIN_DISABLED = False
     SQLALCHEMY_DATABASE_URI = os.environ.get("TEST_DATABASE_URL")
     BCRYPT_LOG_ROUNDS = 4  # fast hashing in tests
+    MEDIA_DIR = tempfile.mkdtemp(prefix="gamenight_media_")
 
 
 @pytest.fixture(scope="session")
@@ -207,3 +209,33 @@ def make_person(app, db):
 def login(client, person, password="password"):
     client.post("/logout")
     client.post("/login", data={"email": person.email, "password": password})
+
+
+@pytest.fixture()
+def make_night(app, db):
+    """Create game nights with the given people as players; deleted afterwards."""
+    import datetime
+
+    from app.models import GameNight, Player
+
+    made = []
+
+    def _make(*people, date=None, **fields):
+        gn = GameNight(date=date or datetime.date.today(), **fields)
+        _db.session.add(gn)
+        _db.session.flush()
+        _db.session.add_all([Player(game_night_id=gn.id, people_id=p.id) for p in people])
+        _db.session.commit()
+        made.append(gn.id)
+        return gn
+
+    yield _make
+
+    _db.session.rollback()
+    for gid in made:
+        gn = _db.session.get(GameNight, gid)
+        if gn is not None:
+            for poll in gn.polls:
+                _db.session.delete(poll)
+            _db.session.delete(gn)
+    _db.session.commit()

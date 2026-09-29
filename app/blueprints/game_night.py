@@ -4,7 +4,7 @@ from flask import Blueprint, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 
 from app.models import GameNightGame, TrackerSession
-from app.services import admin_services, game_night_services, poll_services
+from app.services import admin_services, game_night_services, photo_services, poll_services
 from app.utils import admin_required, flash_if_no_action, game_night_access_required
 
 game_night_bp = Blueprint("game_night", __name__)
@@ -58,6 +58,8 @@ def view_game_night(game_night_id):
         for poll in context["game_night"].polls
         if poll_services.can_view(poll, current_user)
     ]
+    context["can_upload_photos"] = photo_services.can_upload(context["game_night"], current_user)
+    context["can_delete_photo"] = photo_services.can_delete
     return render_template("view_game_night.html", **context)
 
 

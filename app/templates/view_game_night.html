@@ -224,6 +224,55 @@
   </div>
   {% endif %}
 
+  <!-- Photos -->
+  {% set photos = game_night.photos %}
+  {% if photos or can_upload_photos %}
+  <div id="photos" class="bg-white rounded-xl border border-stone-200 shadow-sm p-5">
+    <h2 class="text-lg font-semibold text-stone-800 mb-3">Photos</h2>
+    {% if photos %}
+    <ul class="grid grid-cols-3 sm:grid-cols-4 gap-2">
+      {% for ph in photos %}
+      <li class="relative">
+        <button type="button" data-photo="{{ url_for('photos.image', game_night_id=game_night.id, photo_id=ph.id, size='full') }}" data-caption="{{ ph.caption or '' }}" data-by="{{ ph.uploader.first_name if ph.uploader else '' }}"
+                class="block w-full overflow-hidden rounded-lg bg-stone-100 aspect-square" aria-label="Open photo{% if ph.caption %}: {{ ph.caption }}{% endif %}">
+          <img src="{{ url_for('photos.image', game_night_id=game_night.id, photo_id=ph.id, size='thumb') }}" alt="{{ ph.caption or 'Photo from the night' }}" loading="lazy" class="h-full w-full object-cover">
+        </button>
+        {% if ph.caption %}<p class="mt-0.5 truncate text-xs text-stone-600">{{ ph.caption }}</p>{% endif %}
+        {% if can_delete_photo(ph, current_user) %}
+        <form method="POST" action="{{ url_for('photos.delete', game_night_id=game_night.id, photo_id=ph.id) }}" onsubmit="return confirm('Delete this photo?')" class="absolute right-1 top-1">
+          <button class="rounded-full bg-black/60 px-1.5 text-xs text-white" aria-label="Delete photo">✕</button>
+        </form>
+        {% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="text-sm text-stone-500">No photos yet.</p>
+    {% endif %}
+    {% if can_upload_photos %}
+    <form method="POST" action="{{ url_for('photos.upload', game_night_id=game_night.id) }}" enctype="multipart/form-data" class="mt-4 flex flex-wrap items-end gap-2">
+      <label class="text-sm font-medium text-stone-700">Add a photo
+        <input type="file" name="photo" required accept="image/jpeg,image/png,image/heic,image/heif,.heic,.heif" class="mt-1 block text-sm">
+      </label>
+      <label class="text-sm font-medium text-stone-700">Caption <span class="font-normal text-stone-500">(optional)</span>
+        <input name="caption" maxlength="200" class="mt-1 block w-56 max-w-full rounded-lg border border-stone-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent">
+      </label>
+      <button class="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 transition-colors">Upload</button>
+      <p class="w-full text-xs text-stone-500">JPEG, PNG or HEIC (iPhone), up to {{ config.MAX_UPLOAD_BYTES // (1024 * 1024) }} MB. Location and other photo metadata are stripped.</p>
+    </form>
+    {% endif %}
+  </div>
+  <dialog id="lightbox" class="max-w-[95vw] rounded-xl bg-black p-0 text-white backdrop:bg-black/80">
+    <figure class="relative">
+      <img alt="" class="max-h-[80vh] max-w-[95vw] object-contain" data-lightbox-img>
+      <figcaption class="px-4 py-2 text-sm" data-lightbox-caption></figcaption>
+      <button type="button" data-lightbox-close class="absolute right-2 top-2 rounded-full bg-black/60 px-3 py-1 text-lg" aria-label="Close">✕</button>
+      <button type="button" data-lightbox-prev class="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-black/60 px-3 py-2 text-lg" aria-label="Previous photo">‹</button>
+      <button type="button" data-lightbox-next class="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-black/60 px-3 py-2 text-lg" aria-label="Next photo">›</button>
+    </figure>
+  </dialog>
+  {% endif %}
+
   <!-- Polls linked to this night -->
   {% set can_add_availability = (current_user.admin or current_user.owner) and not availability_poll and not game_night.closed %}
   {% if night_polls or can_add_availability %}
@@ -295,4 +344,8 @@
   {% endif %}
 
 </div>
+{% endblock %}
+
+{% block scripts %}
+{% if game_night.photos %}<script src="{{ url_for('static', filename='js/gallery.js') }}"></script>{% endif %}
 {% endblock %}

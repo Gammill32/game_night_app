@@ -37,6 +37,14 @@ services:
       - FLASK_APP
       - BGG_API_TOKEN
       - SESSION_TYPE
+      - MAX_UPLOAD_MB
+      - MEDIA_DIR=/app/media
+    volumes:
+      # Night photos and food receipts. Create the dataset before the first
+      # deploy, or Docker makes a root-owned plain directory here instead:
+      #   zfs create -o mountpoint=/vault/game_night_media vault/game_night_media
+      #   chown 1000:1000 /vault/game_night_media
+      - /vault/game_night_media:/app/media
     restart: always
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/')"]

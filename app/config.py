@@ -41,3 +41,9 @@ class Config:
 
     # Timezone Configuration
     APP_TIMEZONE = os.getenv("APP_TIMEZONE", "America/Chicago")
+
+    # Uploads (night photos, food receipts). Production bind-mounts the
+    # vault/game_night_media ZFS dataset here.
+    MEDIA_DIR = os.getenv("MEDIA_DIR", "/app/media")
+    MAX_UPLOAD_BYTES = int(os.getenv("MAX_UPLOAD_MB", 20)) * 1024 * 1024
+    MAX_CONTENT_LENGTH = MAX_UPLOAD_BYTES + 1024 * 1024

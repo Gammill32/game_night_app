@@ -12,3 +12,4 @@ __pycache__
 .pre-commit-config.yaml
 pyproject.toml
 requirements-dev.txt
+media/

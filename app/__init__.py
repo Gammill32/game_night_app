@@ -41,6 +41,7 @@ def register_blueprints(app):
     app.register_blueprint(blueprints.api_bp)
     app.register_blueprint(blueprints.polls_bp)
     app.register_blueprint(blueprints.tracker_bp)
+    app.register_blueprint(blueprints.photos_bp)
     # test_bp removed — was a debug artifact registered unconditionally
 
 
@@ -96,6 +97,14 @@ def create_app(config_class=None):
     start_schedulers(app)
 
     app.jinja_env.filters["strip_html"] = _strip_html
+
+    @app.errorhandler(413)
+    def upload_too_large(_error):
+        from flask import flash, redirect, request, url_for
+
+        limit_mb = app.config["MAX_UPLOAD_BYTES"] // (1024 * 1024)
+        flash(f"That file is too big; the limit is {limit_mb} MB.", "error")
+        return redirect(request.referrer or url_for("main.index"))
 
     @app.after_request
     def set_security_headers(response):

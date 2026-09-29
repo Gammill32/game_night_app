@@ -25,6 +25,12 @@ class GameNight(db.Model):
         "GameNominations", back_populates="game_night", cascade="all, delete-orphan"
     )
     votes = db.relationship("GameVotes", back_populates="game_night", cascade="all, delete-orphan")
+    photos = db.relationship(
+        "GameNightPhoto",
+        back_populates="game_night",
+        cascade="all, delete-orphan",
+        order_by="GameNightPhoto.created_at",
+    )
     polls = db.relationship("Poll", back_populates="game_night", order_by="Poll.created_at")
 
     @property
@@ -545,3 +551,23 @@ class PaymentHandle(db.Model):
     created_at = db.Column(db.DateTime, server_default=func.now())
 
     person = relationship("Person", back_populates="payment_handles")
+
+
+class GameNightPhoto(db.Model):
+    """A photo from a game night. The files live under MEDIA_DIR; only people
+    who can see the night can load them."""
+
+    __tablename__ = "game_night_photos"
+
+    id = db.Column(db.Integer, primary_key=True)
+    game_night_id = db.Column(
+        db.Integer, db.ForeignKey("gamenights.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    uploader_id = db.Column(db.Integer, db.ForeignKey("people.id", ondelete="SET NULL"))
+    path = db.Column(db.String, nullable=False)
+    thumb_path = db.Column(db.String, nullable=False)
+    caption = db.Column(db.String)
+    created_at = db.Column(db.DateTime, server_default=func.now())
+
+    game_night = relationship("GameNight", back_populates="photos")
+    uploader = relationship("Person")
