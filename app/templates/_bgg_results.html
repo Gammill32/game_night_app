@@ -1,26 +1,41 @@
-{% if results %}
-<ul class="divide-y divide-stone-100 rounded-xl border border-stone-200 bg-white overflow-hidden">
-  {% for game in results %}
-  <li>
-    <!-- thumbnail is always "" from BGG search — only /thing returns images -->
-    <button type="button"
-            class="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-stone-50 transition-colors"
-            hx-get="{{ url_for('games.bgg_search', select=game.bgg_id, name=game.name, year=game.year, thumbnail=game.thumbnail) }}"
-            hx-target="#bgg-search-widget"
-            hx-swap="outerHTML">
-      {% if game.thumbnail %}
-      <img src="{{ game.thumbnail }}" alt="" class="h-10 w-10 object-contain rounded flex-shrink-0" />
-      {% else %}
-      <div class="h-10 w-10 bg-stone-100 rounded flex-shrink-0"></div>
-      {% endif %}
-      <div>
-        <div class="text-sm font-medium text-stone-800">{{ game.name }}</div>
-        {% if game.year %}<div class="text-xs text-stone-500">{{ game.year }}</div>{% endif %}
-      </div>
-    </button>
-  </li>
-  {% endfor %}
+{# Search results for the find-a-game widget. local: games already in the
+   group's library; bgg: BoardGameGeek results (with .local if we have it). #}
+{% macro status_badges(st) %}
+  {% if st.yours %}<span class="rounded-full bg-green-100 px-2 py-0.5 text-[11px] font-medium text-green-800">You own it</span>
+  {% elif st.wishlisted %}<span class="rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-blue-700">On your wishlist</span>
+  {% elif st.owners %}<span class="rounded-full bg-stone-100 px-2 py-0.5 text-[11px] font-medium text-stone-600">{{ st.owners|join(', ') }} {{ 'owns' if st.owners|length == 1 else 'own' }} it</span>
+  {% else %}<span class="rounded-full bg-stone-100 px-2 py-0.5 text-[11px] font-medium text-stone-600">In the library</span>{% endif %}
+{% endmacro %}
+{% macro row(select_args, name, sub, image, st) %}
+{% set is_blocked = st and (st.yours or (mode == 'wish' and st.wishlisted)) %}
+<li>
+  <button type="button" {% if is_blocked %}disabled{% endif %}
+          class="flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors {{ 'opacity-60 cursor-not-allowed' if is_blocked else 'hover:bg-red-50' }}"
+          hx-get="{{ url_for('games.bgg_search', mode=mode, **select_args) }}"
+          hx-target="#bgg-search-widget" hx-swap="outerHTML">
+    {% if image %}<img src="{{ image }}" alt="" class="h-10 w-10 shrink-0 rounded object-cover">
+    {% else %}<span class="flex h-10 w-10 shrink-0 items-center justify-center rounded bg-stone-100 text-lg">🎲</span>{% endif %}
+    <span class="min-w-0 flex-1">
+      <span class="block truncate text-sm font-medium text-stone-800">{{ name }}</span>
+      <span class="flex flex-wrap items-center gap-1.5 text-xs text-stone-500">{% if sub %}{{ sub }}{% endif %}{% if st %}{{ status_badges(st) }}{% endif %}</span>
+    </span>
+    {% if not is_blocked %}<span class="text-xs font-medium text-red-600">Choose</span>{% endif %}
+  </button>
+</li>
+{% endmacro %}
+
+{% if local %}
+<p class="mt-1 mb-1 text-xs font-semibold uppercase tracking-wide text-stone-500">Already in the group's library</p>
+<ul class="divide-y divide-stone-100 overflow-hidden rounded-xl border border-stone-200 bg-white">
+  {% for g in local %}{{ row({'select_game': g.game_id, 'name': g.name, 'image': g.image_url or ''}, g.name, '', g.image_url, g) }}{% endfor %}
 </ul>
-{% else %}
-<p class="text-sm text-stone-500 px-1">No results found for "{{ query }}".</p>
+{% endif %}
+{% if bgg %}
+<p class="mt-3 mb-1 text-xs font-semibold uppercase tracking-wide text-stone-500">From BoardGameGeek</p>
+<ul class="divide-y divide-stone-100 overflow-hidden rounded-xl border border-stone-200 bg-white">
+  {% for r in bgg %}{{ row({'select': r.bgg_id, 'name': r.name, 'year': r.year or ''}, r.name, r.year, None, r.local) }}{% endfor %}
+</ul>
+{% endif %}
+{% if not local and not bgg %}
+<p class="px-1 text-sm text-stone-500">{% if query|length < 3 %}Keep typing…{% else %}No games found for "{{ query }}". Check the spelling, or add it by name below.{% endif %}</p>
 {% endif %}

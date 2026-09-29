@@ -58,16 +58,18 @@ def games_index():
 @login_required
 def add_game():
     if request.method == "POST":
-        name = request.form.get("name", "").strip()
-        bgg_id = request.form.get("bgg_id", "").strip()
-
-        success, message = games_services.add_game(current_user.id, name, bgg_id)
+        form = request.form
+        success, message, game = games_services.add_game(
+            current_user.id,
+            form.get("name", "").strip(),
+            form.get("bgg_id", "").strip(),
+            form.get("game_id", "").strip(),
+        )
         flash(message, "success" if success else "error")
-
+        if game is not None:
+            return redirect(url_for("games.view_game", game_id=game.id))
         return redirect(url_for("games.add_game"))
-
-    context = {}
-    return render_template("add_game.html", **context)
+    return render_template("add_game.html")
 
 
 @games_bp.route("/game/<int:game_id>")
@@ -154,16 +156,18 @@ def my_wishlist():
 @login_required
 def add_to_wishlist():
     if request.method == "POST":
-        name = request.form.get("name", "").strip()
-        bgg_id = request.form.get("bgg_id", "").strip()
-
-        success, message = games_services.add_game_to_wishlist(current_user.id, name, bgg_id)
+        form = request.form
+        success, message, game = games_services.add_game_to_wishlist(
+            current_user.id,
+            form.get("name", "").strip(),
+            form.get("bgg_id", "").strip(),
+            form.get("game_id", "").strip(),
+        )
         flash(message, "success" if success else "error")
-
-        return redirect(url_for("games.my_wishlist"))
-
-    context = {}
-    return render_template("add_to_wishlist.html", **context)
+        if success:
+            return redirect(url_for("games.my_wishlist"))
+        return redirect(url_for("games.add_to_wishlist"))
+    return render_template("add_to_wishlist.html")
 
 
 @games_bp.route("/wishlist/remove/<int:game_id>", methods=["POST"])
@@ -301,21 +305,26 @@ def badges():
 @games_bp.route("/games/bgg-search")
 @login_required
 def bgg_search():
-    query = request.args.get("q", "").strip()
-    if request.args.get("select"):
+    """HTMX: the find-a-game widget (search results, a chosen game, or reset)."""
+    args = request.args
+    mode = "wish" if args.get("mode") == "wish" else "own"
+    if args.get("select") or args.get("select_game"):
         return render_template(
             "_bgg_selected.html",
-            bgg_id=request.args.get("select", ""),
-            name=request.args.get("name", ""),
-            year=request.args.get("year", ""),
-            thumbnail=request.args.get("thumbnail", ""),
+            bgg_id=args.get("select", ""),
+            game_id=args.get("select_game", ""),
+            name=args.get("name", ""),
+            year=args.get("year", ""),
+            image=args.get("image", ""),
+            mode=mode,
         )
-    if request.args.get("reset"):
-        return render_template("_bgg_widget_blank.html")
-    if len(query) < 3:
+    if args.get("reset"):
+        return render_template("_bgg_widget_blank.html", mode=mode)
+    query = args.get("q", "").strip()
+    if len(query) < 2:
         return ""
-    results = BGGService.search(query)
-    return render_template("_bgg_results.html", results=results, query=query)
+    found = games_services.search_for_adding(query, current_user.id)
+    return render_template("_bgg_results.html", query=query, mode=mode, **found)
 
 
 @games_bp.route("/games/<int:game_id>/bgg-details")

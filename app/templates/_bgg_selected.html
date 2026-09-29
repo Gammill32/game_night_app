@@ -1,17 +1,14 @@
-<div id="bgg-search-widget" class="flex items-center gap-3 p-3 rounded-xl border border-green-200 bg-green-50">
-  {% if thumbnail %}
-  <img src="{{ thumbnail }}" alt="" class="h-12 w-12 object-contain rounded flex-shrink-0" />
-  {% endif %}
-  <div class="flex-1">
-    <div class="text-sm font-semibold text-stone-800">{{ name }}</div>
-    {% if year %}<div class="text-xs text-stone-500">{{ year }}</div>{% endif %}
+{# The game chosen in the find-a-game widget. #}
+<div id="bgg-search-widget" class="flex items-center gap-3 rounded-xl border border-green-200 bg-green-50 p-3">
+  {% if image %}<img src="{{ image }}" alt="" class="h-12 w-12 shrink-0 rounded object-cover">
+  {% else %}<span class="flex h-12 w-12 shrink-0 items-center justify-center rounded bg-white text-2xl">🎲</span>{% endif %}
+  <div class="min-w-0 flex-1">
+    <p class="text-sm font-semibold text-stone-800">{{ name }}</p>
+    <p class="text-xs text-stone-500">{% if game_id %}From the group's library{% else %}From BoardGameGeek{% if year %} · {{ year }}{% endif %}; details and picture are filled in automatically{% endif %}</p>
   </div>
-  <button type="button"
-          class="text-xs text-stone-500 hover:text-red-600 underline"
-          hx-get="{{ url_for('games.bgg_search', reset='1') }}"
-          hx-target="#bgg-search-widget"
-          hx-swap="outerHTML">
-    Change
-  </button>
-  <input type="hidden" name="bgg_id" value="{{ bgg_id }}" />
+  <button type="button" class="text-xs text-stone-500 underline hover:text-red-600"
+          hx-get="{{ url_for('games.bgg_search', reset='1', mode=mode) }}"
+          hx-target="#bgg-search-widget" hx-swap="outerHTML">Change</button>
+  <input type="hidden" name="bgg_id" value="{{ bgg_id }}">
+  <input type="hidden" name="game_id" value="{{ game_id }}">
 </div>

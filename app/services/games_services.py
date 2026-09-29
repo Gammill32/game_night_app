@@ -158,31 +158,77 @@ def get_filtered_games(
     return filtered_games
 
 
-def add_game(user_id, game_name, bgg_id=None):
-    """Add a game manually or fetch details from BoardGameGeek, assigning ownership."""
-    game, error = get_or_create_game(game_name, bgg_id)
+def _resolve_game(game_name, bgg_id=None, game_id=None):
+    """A game picked from the library (game_id), from BoardGameGeek (bgg_id),
+    or typed by name; created if it isn't in the library yet."""
+    if game_id:
+        game = db.session.get(Game, int(game_id))
+        return (game, None) if game else (None, "That game isn't in the library any more.")
+    return get_or_create_game(game_name, bgg_id)
+
+
+def add_game(user_id, game_name, bgg_id=None, game_id=None):
+    """Add a game to the user's collection. Returns (success, message, game)."""
+    game, error = _resolve_game(game_name, bgg_id, game_id)
     if error:
-        return False, error
+        return False, error, None
+    success, message = modify_ownership(user_id, game.id, add=True)
+    return success, message, game
 
-    return modify_ownership(user_id, game.id, add=True)
 
-
-def add_game_to_wishlist(user_id, game_name, bgg_id=None):
-    """Adds a game to the user's wishlist by name and optional BGG ID.
-
-    If the game does not exist, it is created first.
-    """
-    game, error = get_or_create_game(game_name, bgg_id)
+def add_game_to_wishlist(user_id, game_name, bgg_id=None, game_id=None):
+    """Add a game to the user's wishlist. Returns (success, message, game)."""
+    game, error = _resolve_game(game_name, bgg_id, game_id)
     if error:
-        return False, error
-
-    wishlist_entry = Wishlist.query.filter_by(game_id=game.id, person_id=user_id).first()
-    if wishlist_entry:
-        return False, "Game is already in your wishlist."
-
+        return False, error, None
+    if OwnedBy.query.filter_by(game_id=game.id, person_id=user_id).first():
+        return False, f'You already own "{game.name}".', game
+    if Wishlist.query.filter_by(game_id=game.id, person_id=user_id).first():
+        return False, f'"{game.name}" is already on your wishlist.', game
     db.session.add(Wishlist(game_id=game.id, person_id=user_id))
     db.session.commit()
-    return True, f'Game "{game.name}" added to your wishlist.'
+    return True, f'Added "{game.name}" to your wishlist.', game
+
+
+def search_for_adding(query, user_id):
+    """Games matching a search, for the add-a-game and add-to-wishlist pages:
+    what's already in the group's library first, then BoardGameGeek results
+    (each marked if it's already in the library)."""
+    query = (query or "").strip()
+    if len(query) < 2:
+        return {"local": [], "bgg": []}
+    mine = {o.game_id for o in OwnedBy.query.filter_by(person_id=user_id)}
+    wished = {w.game_id for w in Wishlist.query.filter_by(person_id=user_id)}
+
+    def status(game):
+        owners = [o.person.first_name for o in game.owners]
+        return {
+            "game_id": game.id,
+            "name": game.name,
+            "image_url": game.image_url,
+            "yours": game.id in mine,
+            "wishlisted": game.id in wished,
+            "owners": owners,
+        }
+
+    local_games = (
+        Game.query.filter(Game.name.ilike(f"%{query}%")).order_by(Game.name).limit(6).all()
+    )
+    local = [status(g) for g in local_games]
+    bgg = []
+    if len(query) >= 3:
+        results = BGGService.search(query)
+        known = {
+            g.bgg_id: g
+            for g in Game.query.filter(Game.bgg_id.in_([r["bgg_id"] for r in results])).all()
+        }
+        local_ids = {g.id for g in local_games}
+        for r in results[:12]:
+            game = known.get(r["bgg_id"])
+            if game is not None and game.id in local_ids:
+                continue  # already listed under the library
+            bgg.append({**r, "local": status(game) if game else None})
+    return {"local": local, "bgg": bgg}
 
 
 def modify_wishlist(user_id, game_id, add=False, remove=False):

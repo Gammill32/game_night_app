@@ -1,0 +1,17 @@
+<script>
+  // Don't submit until a game is chosen or a name typed; Enter in the search box shouldn't submit.
+  document.querySelectorAll('[data-find-game]').forEach(function (form) {
+    form.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' && e.target.id === 'bgg-query') e.preventDefault();
+    });
+    form.addEventListener('submit', function (e) {
+      const picked = form.querySelector('input[name="bgg_id"][value]:not([value=""]), input[name="game_id"][value]:not([value=""])');
+      const typed = form.querySelector('input[name="name"]');
+      if (!picked && !(typed && typed.value.trim())) {
+        e.preventDefault();
+        const q = form.querySelector('#bgg-query');
+        if (q) { q.focus(); q.classList.add('ring-2', 'ring-amber-400'); }
+      }
+    });
+  });
+</script>
