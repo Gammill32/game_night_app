@@ -101,19 +101,19 @@ def get_filtered_games(
     # Base query
     query = GamesIndex.query
 
-    # If not admin/owner, limit scope to games owned by the user or a site owner
-    if not user.is_admin_or_owner:
-        query = query.filter(
-            db.or_(
-                GamesIndex.owner_ids.contains([user_id]),
-                GamesIndex.player_owner.is_(True),
-            )
-        )
-
+    # Everyone sees every game someone owns; games nobody owns (wishlist-only
+    # or left behind) are an admin tidy-up list.
     if scope == "mine":
         query = query.filter(GamesIndex.owner_ids.contains([user_id]))
-    elif scope == "group":
-        query = query.filter(db.func.cardinality(GamesIndex.owner_ids) > 0)
+    elif scope == "unowned" and user.is_admin_or_owner:
+        query = query.filter(
+            db.or_(
+                GamesIndex.owner_ids.is_(None),
+                db.func.coalesce(db.func.cardinality(GamesIndex.owner_ids), 0) == 0,
+            )
+        )
+    else:
+        query = query.filter(db.func.coalesce(db.func.cardinality(GamesIndex.owner_ids), 0) > 0)
 
     # Apply filters
     if name_filter:

@@ -21,6 +21,9 @@ def game_with_plays(app, db):
     )
     _db.session.add(person)
     _db.session.flush()
+    from app.models import OwnedBy
+
+    _db.session.add(OwnedBy(game_id=game.id, person_id=person.id))  # library lists owned games
 
     nights = []
     gngs = []
@@ -57,6 +60,7 @@ def game_with_plays(app, db):
         _db.session.delete(pl)
     for gn in nights:
         _db.session.delete(gn)
+    OwnedBy.query.filter_by(game_id=game.id).delete()
     Person.query.filter_by(id=person.id).delete()
     _db.session.delete(game)
     _db.session.commit()
@@ -96,7 +100,7 @@ def test_fatigued_game_shows_badge(auth_client, game_with_plays):
     """A game played within 30 days should show the Recently Played badge."""
     resp = auth_client.get("/games/")
     assert resp.status_code == 200
-    assert b"Recently Played" in resp.data
+    assert b"Played recently" in resp.data
 
 
 def test_view_game_shows_play_history(auth_client, game_with_plays):
@@ -227,5 +231,5 @@ def test_bridesmaid_nomination_count(app, bridesmaid_setup):
 def test_games_index_shows_bridesmaid_section(auth_client, bridesmaid_setup):
     resp = auth_client.get("/games/")
     assert resp.status_code == 200
-    assert b"Always Nominated" in resp.data
+    assert b"Always nominated, never played" in resp.data
     assert bridesmaid_setup["bridesmaid"].name.encode() in resp.data

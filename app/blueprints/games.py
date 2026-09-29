@@ -17,37 +17,15 @@ games_bp = Blueprint("games", __name__)
 @games_bp.route("/games", methods=["GET"], strict_slashes=False)
 @login_required
 def games_index():
-    name_filter = request.args.get("name", "").strip()
-    players_filter = (
-        request.args.get("players", type=int) if request.args.get("players_enabled") else None
-    )
-    playtime_filter = (
-        request.args.get("playtime", type=int) if request.args.get("playtime_enabled") else None
-    )
-    min_rating_filter = (
-        request.args.get("min_rating", type=int) if request.args.get("min_rating_enabled") else None
-    )
     scope = request.args.get("scope", "all")
-    if scope not in ("all", "mine", "group"):
+    if scope not in ("all", "mine", "unowned"):
         scope = "all"
-
-    games_with_ownership = games_services.get_filtered_games(
-        current_user.id,
-        name_filter,
-        players_filter,
-        playtime_filter,
-        min_rating_filter,
-        scope=scope,
-    )
-    play_stats = games_services.get_play_stats()
-    bridesmaid_games = games_services.get_bridesmaid_games()
-    recently_played = games_services.get_recently_played_games()
-
+    if scope == "unowned" and not current_user.is_admin_or_owner:
+        scope = "all"
     context = {
-        "games": games_with_ownership,
-        "play_stats": play_stats,
-        "bridesmaid_games": bridesmaid_games,
-        "recently_played": recently_played,
+        "games": games_services.get_filtered_games(current_user.id, scope=scope),
+        "play_stats": games_services.get_play_stats(),
+        "bridesmaid_games": games_services.get_bridesmaid_games(),
         "today": date.today(),
         "scope": scope,
     }

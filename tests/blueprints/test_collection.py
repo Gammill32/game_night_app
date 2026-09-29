@@ -66,19 +66,34 @@ def test_games_scope_mine_filters_to_user_owned(admin_client, db, collection_gam
         _db.session.commit()
 
 
-def test_games_scope_group_excludes_unowned(admin_client, db):
-    """scope=group on games index excludes games with zero owners."""
-    orphan = Game(name=f"Orphan {uuid.uuid4().hex[:6]}", bgg_id=None)
-    _db.session.add(orphan)
+@pytest.fixture()
+def owned_and_orphan(make_person, db):
+    from app.models import OwnedBy
+
+    other = make_person("Other")
+    owned = Game(name=f"Owned {uuid.uuid4().hex[:6]}")
+    orphan = Game(name=f"Orphan {uuid.uuid4().hex[:6]}")
+    _db.session.add_all([owned, orphan])
+    _db.session.flush()
+    _db.session.add(OwnedBy(game_id=owned.id, person_id=other.id))
     _db.session.commit()
-    orphan_id, orphan_name = orphan.id, orphan.name
-    try:
-        resp = admin_client.get("/games?scope=group")
-        assert resp.status_code == 200
-        assert orphan_name.encode() not in resp.data
-    finally:
-        Game.query.filter_by(id=orphan_id).delete()
-        _db.session.commit()
+    yield owned.name, orphan.name
+    OwnedBy.query.filter_by(game_id=owned.id).delete()
+    Game.query.filter(Game.id.in_([owned.id, orphan.id])).delete()
+    _db.session.commit()
+
+
+def test_members_see_everyones_games(auth_client, owned_and_orphan):
+    owned, orphan = owned_and_orphan
+    page = auth_client.get("/games").get_data(as_text=True)
+    assert owned in page and orphan not in page and "scope=unowned" not in page
+    assert orphan not in auth_client.get("/games?scope=unowned").get_data(as_text=True)
+
+
+def test_admin_sees_unowned_games(admin_client, owned_and_orphan):
+    owned, orphan = owned_and_orphan
+    page = admin_client.get("/games?scope=unowned").get_data(as_text=True)
+    assert orphan in page and owned not in page
 
 
 def test_games_scope_toggle_renders(admin_client, db):
@@ -87,7 +102,7 @@ def test_games_scope_toggle_renders(admin_client, db):
     assert resp.status_code == 200
     assert b"scope=all" in resp.data
     assert b"scope=mine" in resp.data
-    assert b"scope=group" in resp.data
+    assert b"scope=unowned" in resp.data
 
 
 def test_old_collection_routes_removed(client):
