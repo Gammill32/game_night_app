@@ -104,6 +104,21 @@ def owner_choices(games):
     )
 
 
+def wisher_choices(items):
+    """Everyone who wants something on the group wishlist, most games first."""
+    counts: dict[int, list] = {}
+    for item in items:
+        for person in item["wanters"]:
+            counts.setdefault(person.id, [person, 0])[1] += 1
+    return sorted(
+        (
+            {"id": p.id, "name": f"{p.first_name} {p.last_name}", "count": n}
+            for p, n in counts.values()
+        ),
+        key=lambda c: (-c["count"], c["name"].lower()),
+    )
+
+
 def get_filtered_games(
     user_id,
     name_filter=None,

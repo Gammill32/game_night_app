@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Game Library{% endblock %}
 
+{% from "_person_filter.html" import person_filter, person_filter_script with context %}
 {% block content %}
 {% set is_admin = current_user.admin or current_user.owner %}
 <div class="max-w-5xl mx-auto">
@@ -34,16 +35,7 @@
         <label class="cursor-pointer"><input type="checkbox" data-lib-unplayed class="peer sr-only"><span class="{{ chip }}">Never played</span></label>
       </div>
       {% if owner_choices %}
-      <details class="mt-2" data-owner-filter>
-        <summary class="cursor-pointer text-sm text-stone-700"><span class="underline">Owned by…</span> <span data-owner-summary class="text-xs text-stone-500"></span></summary>
-        <p class="mt-1 text-xs text-stone-500">Pick people to see which games any of them owns, e.g. who's coming tonight.</p>
-        <div class="mt-2 flex max-h-40 flex-wrap gap-2 overflow-y-auto">
-          {% for o in owner_choices %}
-          <label class="cursor-pointer"><input type="checkbox" name="lib_owner" value="{{ o.id }}" data-owner-name="{{ o.name }}" class="peer sr-only">
-            <span class="{{ chip }}">{{ 'You' if o.id == current_user.id else o.name }} <span class="ml-1 text-xs opacity-60">{{ o.count }}</span></span></label>
-          {% endfor %}
-        </div>
-      </details>
+      <div class="mt-2" data-owner-filter>{{ person_filter("lib_owner", "Owned by", owner_choices, "games") }}</div>
       {% endif %}
     </div>
 
@@ -112,6 +104,7 @@
 {% endblock %}
 
 {% block scripts %}
+{{ person_filter_script() }}
 <script>
   (function () {
     const root = document.querySelector('[data-library]');
@@ -125,8 +118,6 @@
       const t = times.length ? Math.max(...times) : 0;
       const ownerBoxes = [...root.querySelectorAll('input[name="lib_owner"]:checked')];
       const owners = new Set(ownerBoxes.map(i => i.value));
-      const summary = root.querySelector('[data-owner-summary]');
-      if (summary) summary.textContent = ownerBoxes.length ? '(' + ownerBoxes.map(i => i.dataset.ownerName.split(' ')[0]).join(', ') + ')' : '';
       try {  // keep the choice in the address so it can be shared or bookmarked
         const url = new URL(location.href);
         owners.size ? url.searchParams.set('owners', [...owners].join(',')) : url.searchParams.delete('owners');
@@ -146,7 +137,7 @@
     const pre = new URLSearchParams(location.search).get('owners');
     if (pre) {
       pre.split(',').forEach(id => { const box = root.querySelector('input[name="lib_owner"][value="' + id + '"]'); if (box) box.checked = true; });
-      const det = root.querySelector('[data-owner-filter]'); if (det) det.open = true;
+      const pf = root.querySelector('[data-person-filter]'); if (pf && pf.personFilterRender) pf.personFilterRender();
     }
     root.querySelectorAll('input[name="lib_owner"]').forEach(el => el.addEventListener('change', filter));
     search.addEventListener('input', filter);

@@ -1,0 +1,76 @@
+{# A compact multi-person picker for filtering lists; stays small however many
+   people there are. Usage:
+     {% from "_person_filter.html" import person_filter with context %}
+     {{ person_filter("lib_owner", "Owned by", [{"id", "name", "count"}], "games") }}
+   The checkboxes are named `name`, so the page's own filter code reads them and
+   listens for their change events. #}
+{% macro person_filter(name, label, people, count_noun) %}
+<div data-person-filter class="relative">
+  <button type="button" data-pf-toggle aria-expanded="false"
+          class="inline-flex min-h-[2.25rem] items-center gap-1 rounded-full border border-stone-300 bg-white px-3 text-sm text-stone-700 hover:bg-stone-50">
+    {{ label }}: <strong data-pf-summary class="font-medium text-stone-900">Anyone</strong> <span aria-hidden="true">▾</span>
+  </button>
+  <div data-pf-panel hidden class="absolute left-0 z-30 mt-1 w-[min(20rem,calc(100vw-2rem))] rounded-xl border border-stone-200 bg-white p-2 shadow-lg">
+    <input type="search" data-pf-search placeholder="Find a person…" aria-label="Find a person"
+           class="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500">
+    <ul class="mt-1 max-h-64 overflow-y-auto">
+      {% for p in people %}
+      <li data-pf-row data-name="{{ p.name|lower }}">
+        <label class="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-2 text-sm hover:bg-stone-50">
+          <input type="checkbox" name="{{ name }}" value="{{ p.id }}" data-label="{{ 'You' if p.id == current_user.id else p.name }}" class="h-4 w-4 accent-red-600">
+          <span class="flex-1">{{ 'You' if p.id == current_user.id else p.name }}</span>
+          <span class="text-xs text-stone-400">{{ p.count }} {{ count_noun }}</span>
+        </label>
+      </li>
+      {% endfor %}
+    </ul>
+    <div class="mt-1 flex justify-between border-t border-stone-100 pt-2">
+      <button type="button" data-pf-clear class="px-2 text-sm text-stone-600 underline">Clear</button>
+      <button type="button" data-pf-done class="rounded-lg bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700">Done</button>
+    </div>
+  </div>
+  <div data-pf-chips class="mt-2 flex flex-wrap gap-1.5"></div>
+</div>
+{% endmacro %}
+
+{% macro person_filter_script() %}
+<script>
+  document.querySelectorAll('[data-person-filter]').forEach(function (root) {
+    const toggle = root.querySelector('[data-pf-toggle]');
+    const panel = root.querySelector('[data-pf-panel]');
+    const search = root.querySelector('[data-pf-search]');
+    const chips = root.querySelector('[data-pf-chips]');
+    const summary = root.querySelector('[data-pf-summary]');
+    const boxes = [...root.querySelectorAll('input[type=checkbox]')];
+    function open(on) { panel.hidden = !on; toggle.setAttribute('aria-expanded', on); if (on) search.focus(); }
+    function render() {
+      const picked = boxes.filter(b => b.checked);
+      summary.textContent = picked.length === 0 ? 'Anyone' : picked.length === 1 ? picked[0].dataset.label : picked.length + ' people';
+      chips.innerHTML = '';
+      picked.forEach(b => {
+        const chip = document.createElement('button');
+        chip.type = 'button';
+        chip.className = 'inline-flex items-center gap-1 rounded-full bg-red-600 px-2.5 py-1 text-xs font-medium text-white';
+        chip.textContent = b.dataset.label + ' ×';
+        chip.setAttribute('aria-label', 'Remove ' + b.dataset.label);
+        chip.addEventListener('click', () => { b.checked = false; b.dispatchEvent(new Event('change', { bubbles: true })); });
+        chips.appendChild(chip);
+      });
+    }
+    toggle.addEventListener('click', () => open(panel.hidden));
+    root.querySelector('[data-pf-done]').addEventListener('click', () => open(false));
+    root.querySelector('[data-pf-clear]').addEventListener('click', () => {
+      boxes.forEach(b => { if (b.checked) { b.checked = false; b.dispatchEvent(new Event('change', { bubbles: true })); } });
+    });
+    search.addEventListener('input', () => {
+      const q = search.value.trim().toLowerCase();
+      root.querySelectorAll('[data-pf-row]').forEach(r => { r.hidden = q && !r.dataset.name.includes(q); });
+    });
+    document.addEventListener('click', e => { if (!root.contains(e.target)) open(false); });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') open(false); });
+    root.addEventListener('change', render);
+    root.personFilterRender = render;
+    render();
+  });
+</script>
+{% endmacro %}

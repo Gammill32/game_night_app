@@ -19,7 +19,7 @@ def test_bgg_search_short_query_skips_bgg(auth_client, monkeypatch):
 
     assert auth_client.get("/games/bgg-search?q=a").data.strip() == b""
     monkeypatch.setattr(BGGService, "search", classmethod(lambda cls, q: 1 / 0))
-    resp = auth_client.get("/games/bgg-search?q=ab")  # library only, no BGG call
+    resp = auth_client.get("/games/bgg-search?q=zq")  # library only, no BGG call
     assert resp.status_code == 200 and b"Keep typing" in resp.data
 
 

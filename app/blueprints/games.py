@@ -113,7 +113,9 @@ def admin_modify_ownership(game_id):
 @login_required
 def wishlist():
     items = games_services.get_group_wishlist(current_user.id)
-    return render_template("wishlist.html", items=items)
+    return render_template(
+        "wishlist.html", items=items, wisher_choices=games_services.wisher_choices(items)
+    )
 
 
 @games_bp.route("/wishlist/mine", methods=["GET"])

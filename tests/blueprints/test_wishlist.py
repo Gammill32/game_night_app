@@ -177,7 +177,7 @@ def test_wishlist_and_library_have_person_filters(client, make_person):
     wish = client.get("/wishlist").get_data(as_text=True)
     assert f'name="wish_person" value="{ann.id}"' in wish and f'data-wanters="{ann.id}"' in wish
     lib = client.get("/games").get_data(as_text=True)
-    assert f'name="lib_owner" value="{bo.id}"' in lib and "Owned by…" in lib
+    assert f'name="lib_owner" value="{bo.id}"' in lib and "Owned by:" in lib
     Wishlist.query.filter_by(game_id=g.id).delete()
     OwnedBy.query.filter_by(game_id=g.id).delete()
     _db.session.delete(g)

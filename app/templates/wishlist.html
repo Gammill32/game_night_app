@@ -1,15 +1,17 @@
 {% extends "base.html" %}
 {% from "_wishlist_row.html" import wishlist_row with context %}
+{% from "_person_filter.html" import person_filter, person_filter_script with context %}
 {% block title %}Wishlist{% endblock %}
 
 {% block scripts %}
+{{ person_filter_script() }}
 <script>
   (function () {
     const root = document.querySelector('[data-wish-filter]');
     if (!root) return;
     const items = [...document.querySelectorAll('[data-wish-item]')];
     function filter() {
-      const picked = new Set([...root.querySelectorAll('input:checked')].map(i => i.value));
+      const picked = new Set([...root.querySelectorAll('input[name="wish_person"]:checked')].map(i => i.value));
       items.forEach(li => { li.hidden = picked.size > 0 && !li.dataset.wanters.split(',').some(id => picked.has(id)); });
       try {
         const url = new URL(location.href);
@@ -19,6 +21,7 @@
     }
     const pre = new URLSearchParams(location.search).get('people');
     if (pre) pre.split(',').forEach(id => { const box = root.querySelector('input[value="' + id + '"]'); if (box) box.checked = true; });
+    const pf = root.querySelector('[data-person-filter]'); if (pre && pf && pf.personFilterRender) pf.personFilterRender();
     root.addEventListener('change', filter);
     filter();
   })();
@@ -27,18 +30,9 @@
 {% block content %}
 <div class="max-w-5xl mx-auto">
   {% with active = 'group' %}{% include "_wishlist_header.html" %}{% endwith %}
-  {% set people = {} %}
-  {% for item in items %}{% for p in item.wanters %}{% set _ = people.update({p.id: (p, people.get(p.id, (p, 0))[1] + 1)}) %}{% endfor %}{% endfor %}
-  {% if people %}
+  {% if wisher_choices %}
   <div class="mt-4" data-wish-filter>
-    <p class="text-sm font-medium text-stone-700">Show what's on someone's list</p>
-    <div class="mt-1.5 flex flex-wrap gap-2">
-      {% for pid, pair in people.items() | sort(attribute='1.1', reverse=true) %}
-      {% set p = pair[0] %}
-      <label class="cursor-pointer"><input type="checkbox" name="wish_person" value="{{ p.id }}" class="peer sr-only">
-        <span class="inline-flex min-h-[2.25rem] items-center rounded-full border border-stone-300 bg-white px-3 text-sm text-stone-700 peer-checked:border-red-600 peer-checked:bg-red-600 peer-checked:text-white peer-focus-visible:ring-2 peer-focus-visible:ring-red-400">{{ 'You' if p.id == current_user.id else p.first_name ~ ' ' ~ p.last_name }} <span class="ml-1 text-xs opacity-60">{{ pair[1] }}</span></span></label>
-      {% endfor %}
-    </div>
+    {{ person_filter("wish_person", "Wanted by", wisher_choices, "games") }}
   </div>
   {% endif %}
   <ul class="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
