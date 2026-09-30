@@ -3,7 +3,9 @@ services:
   postgres:
     image: postgres:16
     container_name: game_night_postgres
-    # No host port: the app reaches it over web_network as game_night_postgres:5432.
+    # No host port, and only on the private game_night_internal network: the
+    # app reaches it there as game_night_postgres:5432. (It used to sit on
+    # web_network, where anything behind Traefik could reach it.)
     environment:
       - POSTGRES_USER
       - POSTGRES_PASSWORD
@@ -12,7 +14,7 @@ services:
       - /vault/game_night_db/init_db:/docker-entrypoint-initdb.d
     restart: unless-stopped
     networks:
-      - web_network
+      - game_night_internal
 
   game_night_app:
     build: .
@@ -54,9 +56,12 @@ services:
       start_period: 15s
     networks:
       - web_network
+      - game_night_internal
     labels:
       - "com.centurylinklabs.watchtower.enable=false"
       - "traefik.enable=true"
+      # Two networks: tell Traefik which one to reach the app on.
+      - "traefik.docker.network=web_network"
 
       # Router for game night app
       - "traefik.http.routers.game_night.rule=Host(`gamenight.sgammill.com`)"
@@ -68,4 +73,7 @@ services:
 
 networks:
   web_network:
+    external: true
+  # Create once: docker network create --internal game_night_internal
+  game_night_internal:
     external: true
