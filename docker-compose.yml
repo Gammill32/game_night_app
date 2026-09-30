@@ -74,6 +74,7 @@ services:
 networks:
   web_network:
     external: true
-  # Create once: docker network create --internal game_night_internal
+  # Create once: docker network create --internal --subnet 10.34.0.0/16 game_night_internal
+  # (always a 10.x --subnet: Docker's fallback 192.168.x/20 pools cover the VLANs)
   game_night_internal:
     external: true
