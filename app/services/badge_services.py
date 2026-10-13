@@ -8,7 +8,8 @@ Public API:
 import logging
 from datetime import date
 
-from sqlalchemy import func
+from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import joinedload
 
 from app.extensions import db
@@ -26,13 +27,19 @@ from app.models import (
 
 logger = logging.getLogger(__name__)
 
-# ---------------------------------------------------------------------------
-# Badge definitions — single source of truth for key → uses_night_id mapping
-# ---------------------------------------------------------------------------
+
+def _nights_through(game_night_id: int):
+    """Finalized nights dated on or before this one: all a badge judged here may count.
+
+    Without the date bound, re-finalizing an old night would count results from
+    later nights and date the badge to the old one.
+    """
+    cutoff = select(GameNight.date).where(GameNight.id == game_night_id).scalar_subquery()
+    return select(GameNight.id).where(GameNight.final.is_(True), GameNight.date <= cutoff)
 
 
 # ---------------------------------------------------------------------------
-# Checker stubs — each returns bool
+# Checkers — each returns bool
 # ---------------------------------------------------------------------------
 
 
@@ -40,12 +47,10 @@ def _check_first_blood(person_id: int, game_night_id: int) -> bool:
     return (
         db.session.query(Result)
         .join(Player, Result.player_id == Player.id)
-        .join(GameNightGame, Result.game_night_game_id == GameNightGame.id)
-        .join(GameNight, GameNightGame.game_night_id == GameNight.id)
         .filter(
             Player.people_id == person_id,
             Result.position == 1,
-            GameNight.final.is_(True),
+            Player.game_night_id.in_(_nights_through(game_night_id)),
         )
         .first()
     ) is not None
@@ -69,52 +74,56 @@ def _check_hat_trick(person_id: int, game_night_id: int) -> bool:
 def _check_veteran(person_id: int, game_night_id: int) -> bool:
     count = (
         db.session.query(func.count(Player.id))
-        .join(GameNight, Player.game_night_id == GameNight.id)
-        .filter(Player.people_id == person_id, GameNight.final.is_(True))
+        .filter(
+            Player.people_id == person_id,
+            Player.game_night_id.in_(_nights_through(game_night_id)),
+        )
         .scalar()
     )
     return (count or 0) >= 25
 
 
-def _check_kingslayer(person_id: int, game_night_id: int) -> bool:
-    top = (
+def _win_counts(game_night_id: int) -> dict[int, int]:
+    """person_id -> games won, over nights through this one."""
+    return dict(
         db.session.query(Player.people_id, func.count(Result.id))
         .join(Result, Player.id == Result.player_id)
-        .join(GameNightGame, Result.game_night_game_id == GameNightGame.id)
-        .join(GameNight, GameNightGame.game_night_id == GameNight.id)
-        .filter(Result.position == 1, GameNight.final.is_(True))
-        .group_by(Player.people_id)
-        .order_by(func.count(Result.id).desc())
-        .first()
-    )
-    if not top or top.people_id == person_id:
-        return False
-
-    top_winner_id = top.people_id
-    top_results = {
-        r.game_night_game_id: r.position
-        for r in (
-            db.session.query(Result.game_night_game_id, Result.position)
-            .join(Player, Result.player_id == Player.id)
-            .filter(Player.people_id == top_winner_id, Result.position.isnot(None))
-            .all()
-        )
-    }
-    person_tonight = (
-        db.session.query(Result.game_night_game_id, Result.position)
-        .join(Player, Result.player_id == Player.id)
-        .join(GameNightGame, Result.game_night_game_id == GameNightGame.id)
         .filter(
-            Player.people_id == person_id,
-            GameNightGame.game_night_id == game_night_id,
-            Result.position.isnot(None),
+            Result.position == 1,
+            Player.game_night_id.in_(_nights_through(game_night_id)),
         )
+        .group_by(Player.people_id)
         .all()
     )
-    for gng_id, pos in person_tonight:
-        if gng_id in top_results and pos < top_results[gng_id]:
-            return True
-    return False
+
+
+def _check_kingslayer(person_id: int, game_night_id: int) -> bool:
+    wins = _win_counts(game_night_id)
+    if not wins:
+        return False
+    top = max(wins.values())
+    # Everyone tied for the most wins is a king; you can't slay yourself.
+    kings = {pid for pid, n in wins.items() if n == top} - {person_id}
+    if not kings:
+        return False
+
+    me = db.aliased(Player)
+    them = db.aliased(Player)
+    my_result = db.aliased(Result)
+    their_result = db.aliased(Result)
+    return (
+        db.session.query(my_result.id)
+        .join(me, my_result.player_id == me.id)
+        .join(their_result, their_result.game_night_game_id == my_result.game_night_game_id)
+        .join(them, their_result.player_id == them.id)
+        .filter(
+            me.people_id == person_id,
+            me.game_night_id == game_night_id,
+            them.people_id.in_(kings),
+            my_result.position < their_result.position,
+        )
+        .first()
+    ) is not None
 
 
 def _check_collector(person_id: int, game_night_id: int) -> bool:
@@ -126,8 +135,10 @@ def _check_variety_pack(person_id: int, game_night_id: int) -> bool:
         db.session.query(func.count(func.distinct(GameNightGame.game_id)))
         .join(Result, GameNightGame.id == Result.game_night_game_id)
         .join(Player, Result.player_id == Player.id)
-        .join(GameNight, GameNightGame.game_night_id == GameNight.id)
-        .filter(Player.people_id == person_id, GameNight.final.is_(True))
+        .filter(
+            Player.people_id == person_id,
+            Player.game_night_id.in_(_nights_through(game_night_id)),
+        )
         .scalar()
     )
     return (count or 0) >= 10
@@ -143,16 +154,16 @@ def _check_nemesis(person_id: int, game_night_id: int) -> bool:
         db.session.query(func.count().label("beat_count"))
         .select_from(person_result)
         .join(person_alias, person_result.player_id == person_alias.id)
+        .join(GameNightGame, person_result.game_night_game_id == GameNightGame.id)
         .join(opp_result, person_result.game_night_game_id == opp_result.game_night_game_id)
         .join(opp_alias, opp_result.player_id == opp_alias.id)
         .filter(
             person_alias.people_id == person_id,
+            person_alias.game_night_id.in_(_nights_through(game_night_id)),
             opp_alias.people_id != person_id,
             opp_result.position < person_result.position,
-            person_result.position.isnot(None),
-            opp_result.position.isnot(None),
         )
-        .group_by(opp_alias.people_id)
+        .group_by(opp_alias.people_id, GameNightGame.game_id)  # same person, same game
         .having(func.count() >= 5)
         .first()
     )
@@ -176,13 +187,12 @@ def _check_redemption_arc(person_id: int, game_night_id: int) -> bool:
             db.session.query(func.count(Result.id))
             .join(GameNightGame, Result.game_night_game_id == GameNightGame.id)
             .join(Player, Result.player_id == Player.id)
-            .join(GameNight, GameNightGame.game_night_id == GameNight.id)
             .filter(
                 Player.people_id == person_id,
                 GameNightGame.game_id == game_id,
-                GameNightGame.game_night_id != game_night_id,
+                Player.game_night_id != game_night_id,
+                Player.game_night_id.in_(_nights_through(game_night_id)),
                 Result.position != 1,
-                GameNight.final.is_(True),
             )
             .scalar()
         )
@@ -201,7 +211,7 @@ def _check_night_owl(person_id: int, game_night_id: int) -> bool:
         .join(GameNight, Player.game_night_id == GameNight.id)
         .filter(
             Player.people_id == person_id,
-            GameNight.final.is_(True),
+            GameNight.id.in_(_nights_through(game_night_id)),
             func.extract("year", GameNight.date) == year,
             func.extract("month", GameNight.date) == month,
         )
@@ -211,32 +221,35 @@ def _check_night_owl(person_id: int, game_night_id: int) -> bool:
 
 
 def _check_gracious_host(person_id: int, game_night_id: int) -> bool:
+    """Attended every night of some finished calendar year.
+
+    Judged only once a year is over (from a night in a later year): mid-year,
+    everyone who came to the year's first night has a perfect record so far.
+    """
     current = db.session.get(GameNight, game_night_id)
     if not current:
         return False
-    year = current.date.year
-    # Count only finalized nights that had at least one player (active nights).
-    # This avoids phantom finalized nights with no participants skewing the
-    # denominator and causing false negatives in perfect-attendance checks.
-    active_nights_in_year = (
-        db.session.query(func.count(func.distinct(GameNight.id)))
+    year = func.extract("year", GameNight.date)
+    # Nights with at least one player, so an empty finalized night can't block everyone.
+    nights_per_year = {
+        y: n
+        for y, n in db.session.query(year, func.count(func.distinct(GameNight.id)))
         .join(Player, Player.game_night_id == GameNight.id)
-        .filter(GameNight.final.is_(True), func.extract("year", GameNight.date) == year)
-        .scalar()
-    )
-    if not active_nights_in_year:
-        return False
-    attended_in_year = (
-        db.session.query(func.count(func.distinct(GameNight.id)))
+        .filter(GameNight.final.is_(True), year < current.date.year)
+        .group_by(year)
+    }
+    attended_per_year = (
+        db.session.query(year, func.count(func.distinct(GameNight.id)))
         .join(Player, Player.game_night_id == GameNight.id)
         .filter(
             Player.people_id == person_id,
             GameNight.final.is_(True),
-            func.extract("year", GameNight.date) == year,
+            year < current.date.year,
         )
-        .scalar()
+        .group_by(year)
+        .all()
     )
-    return attended_in_year == active_nights_in_year
+    return any(n == nights_per_year.get(y) for y, n in attended_per_year)
 
 
 def _check_jack_of_all_trades(person_id: int, game_night_id: int) -> bool:
@@ -319,6 +332,7 @@ def _check_upset_special(person_id: int, game_night_id: int) -> bool:
             .join(opp_alias, o_result.player_id == opp_alias.id)
             .filter(
                 person_alias.people_id == person_id,
+                person_alias.game_night_id.in_(_nights_through(game_night_id)),
                 opp_alias.people_id == opp_id,
                 p_result.game_night_game_id.notin_(tonight_gng_ids),
                 p_result.position.isnot(None),
@@ -366,7 +380,10 @@ def _check_grudge_match(person_id: int, game_night_id: int) -> bool:
         for r in (
             db.session.query(Result.game_night_game_id)
             .join(Player, Result.player_id == Player.id)
-            .filter(Player.people_id == person_id)
+            .filter(
+                Player.people_id == person_id,
+                Player.game_night_id.in_(_nights_through(game_night_id)),
+            )
             .all()
         )
     ]
@@ -396,8 +413,11 @@ def _check_the_closer(person_id: int, game_night_id: int) -> bool:
     attended = (
         db.session.query(GameNight.id)
         .join(Player, GameNight.id == Player.game_night_id)
-        .filter(Player.people_id == person_id, GameNight.final.is_(True))
-        .order_by(GameNight.date)
+        .filter(
+            Player.people_id == person_id,
+            GameNight.id.in_(_nights_through(game_night_id)),
+        )
+        .order_by(GameNight.date, GameNight.id)
         .all()
     )
     if len(attended) < 5:
@@ -464,8 +484,11 @@ def _check_winning_streak(person_id: int, game_night_id: int) -> bool:
     attended = (
         db.session.query(GameNight.id)
         .join(Player, GameNight.id == Player.game_night_id)
-        .filter(Player.people_id == person_id, GameNight.final.is_(True))
-        .order_by(GameNight.date)
+        .filter(
+            Player.people_id == person_id,
+            GameNight.id.in_(_nights_through(game_night_id)),
+        )
+        .order_by(GameNight.date, GameNight.id)
         .all()
     )
     if len(attended) < 3:
@@ -506,89 +529,74 @@ def _check_the_diplomat(person_id: int, game_night_id: int) -> bool:
         .first()
     ):
         return False
-    games = db.session.query(GameNightGame).filter_by(game_night_id=game_night_id).all()
-    if not games:
-        return False
-    for gng in games:
-        # Must have at least one result recorded — a game with no results doesn't qualify
-        has_results = (
-            db.session.query(Result)
-            .filter(Result.game_night_game_id == gng.id, Result.position.isnot(None))
-            .first()
-        )
-        if not has_results:
-            return False
-        non_first = (
-            db.session.query(Result)
-            .filter(
-                Result.game_night_game_id == gng.id,
-                Result.position != 1,
-                Result.position.isnot(None),
-            )
-            .first()
-        )
-        if non_first:
-            return False
-    return True
+    firsts_per_game = (
+        db.session.query(func.count(Result.id).filter(Result.position == 1))
+        .select_from(GameNightGame)
+        .outerjoin(Result, Result.game_night_game_id == GameNightGame.id)
+        .filter(GameNightGame.game_night_id == game_night_id)
+        .group_by(GameNightGame.id)
+        .all()
+    )
+    # A lone winner (or a lone result) isn't a tie.
+    return bool(firsts_per_game) and all(n >= 2 for (n,) in firsts_per_game)
 
 
 def _check_early_bird(person_id: int, game_night_id: int) -> bool:
-    # First registered player per finalized night (use Player.id as proxy for insertion order)
-    first_player_per_night = (
-        db.session.query(
-            Player.game_night_id,
-            func.min(Player.id).label("first_player_id"),
+    """Hosted 10 game nights.
+
+    Was "first to join 10 nights", but join order isn't recorded: players are
+    saved from a set, so it went to whoever had the lowest user id.
+    """
+    hosted = (
+        db.session.query(func.count(GameNight.id))
+        .filter(
+            GameNight.host_id == person_id,
+            GameNight.id.in_(_nights_through(game_night_id)),
         )
-        .join(GameNight, Player.game_night_id == GameNight.id)
-        .filter(GameNight.final.is_(True))
-        .group_by(Player.game_night_id)
-        .subquery()
-    )
-    first_count = (
-        db.session.query(func.count())
-        .select_from(Player)
-        .join(first_player_per_night, Player.id == first_player_per_night.c.first_player_id)
-        .filter(Player.people_id == person_id)
         .scalar()
     )
-    return (first_count or 0) >= 10
+    return (hosted or 0) >= 10
+
+
+def _games_played(person_id: int, game_night_id: int) -> set[int]:
+    return {
+        game_id
+        for (game_id,) in db.session.query(GameNightGame.game_id)
+        .join(Result, Result.game_night_game_id == GameNightGame.id)
+        .join(Player, Result.player_id == Player.id)
+        .filter(Player.people_id == person_id, Player.game_night_id == game_night_id)
+    }
 
 
 def _check_the_rematch(person_id: int, game_night_id: int) -> bool:
-    prev_player = (
-        db.session.query(Player)
-        .join(GameNight, Player.game_night_id == GameNight.id)
+    current = db.session.get(GameNight, game_night_id)
+    if not current:
+        return False
+    prev = (
+        db.session.query(GameNight.id)
+        .join(Player, Player.game_night_id == GameNight.id)
         .filter(
             Player.people_id == person_id,
-            GameNight.id != game_night_id,
             GameNight.final.is_(True),
+            (GameNight.date < current.date)
+            | ((GameNight.date == current.date) & (GameNight.id < game_night_id)),
         )
-        .order_by(GameNight.date.desc())
+        .order_by(GameNight.date.desc(), GameNight.id.desc())
         .first()
     )
-    if not prev_player:
+    if not prev:
         return False
-
-    current_game_ids = {
-        r.game_id
-        for r in db.session.query(GameNightGame).filter_by(game_night_id=game_night_id).all()
-    }
-    prev_game_ids = {
-        r.game_id
-        for r in db.session.query(GameNightGame)
-        .filter_by(game_night_id=prev_player.game_night_id)
-        .all()
-    }
-    return bool(current_game_ids & prev_game_ids)
+    return bool(_games_played(person_id, game_night_id) & _games_played(person_id, prev.id))
 
 
 def _check_century_club(person_id: int, game_night_id: int) -> bool:
     count = (
         db.session.query(func.count(Result.id))
         .join(Player, Result.player_id == Player.id)
-        .join(GameNightGame, Result.game_night_game_id == GameNightGame.id)
-        .join(GameNight, GameNightGame.game_night_id == GameNight.id)
-        .filter(Player.people_id == person_id, GameNight.final.is_(True))
+        .filter(
+            Player.people_id == person_id,
+            Player.game_night_id.in_(_nights_through(game_night_id)),
+        )
         .scalar()
     )
     return (count or 0) >= 100
@@ -622,27 +630,37 @@ def _check_dark_horse(person_id: int, game_night_id: int) -> bool:
             )
             .scalar()
         )
-        if row.position != max_pos:
+        # max_pos <= 1: you were the only result (or everyone tied first), not last
+        if max_pos is None or max_pos <= 1 or row.position != max_pos:
             return False
     return results[-1].position == 1
 
 
 def _check_social_butterfly(person_id: int, game_night_id: int) -> bool:
-    all_people_count = db.session.query(Person).count()
-    distinct_partners = (
-        db.session.query(func.count(func.distinct(Player.people_id)))
-        .join(Result, Player.id == Result.player_id)
-        .filter(
-            Player.people_id != person_id,
-            Result.game_night_game_id.in_(
-                db.session.query(Result.game_night_game_id)
-                .join(Player, Result.player_id == Player.id)
-                .filter(Player.people_id == person_id)
-            ),
-        )
-        .scalar()
+    """Shared a game with every active person who has played one."""
+    nights = _nights_through(game_night_id)
+    everyone = {
+        pid
+        for (pid,) in db.session.query(Player.people_id)
+        .join(Result, Result.player_id == Player.id)
+        .join(Person, Person.id == Player.people_id)
+        .filter(Player.game_night_id.in_(nights), Person.active.is_(True))
+        .distinct()
+    }
+    my_games = (
+        select(Result.game_night_game_id)
+        .join(Player, Result.player_id == Player.id)
+        .where(Player.people_id == person_id, Player.game_night_id.in_(nights))
     )
-    return (distinct_partners or 0) >= all_people_count - 1
+    partners = {
+        pid
+        for (pid,) in db.session.query(Player.people_id)
+        .join(Result, Result.player_id == Player.id)
+        .filter(Result.game_night_game_id.in_(my_games))
+        .distinct()
+    }
+    others = everyone - {person_id}
+    return bool(others) and others <= partners
 
 
 def _check_the_oracle(person_id: int, game_night_id: int) -> bool:
@@ -664,7 +682,7 @@ def _check_the_oracle(person_id: int, game_night_id: int) -> bool:
             nom_player.people_id == person_id,
             win_player.people_id == person_id,
             Result.position == 1,
-            GameNight.final.is_(True),
+            GameNight.id.in_(_nights_through(game_night_id)),
         )
         .scalar()
     )
@@ -672,42 +690,30 @@ def _check_the_oracle(person_id: int, game_night_id: int) -> bool:
 
 
 def _check_founding_member(person_id: int, game_night_id: int) -> bool:
-    first_night = (
-        db.session.query(GameNight)
+    """Among the first 5 people to play, by the date of their first night.
+
+    Everyone debuting on the same night ties, so a big first night can make
+    more than five founders; row order (the old tie-break) was arbitrary.
+    """
+    debut = (
+        db.session.query(Player.people_id, func.min(GameNight.date).label("first"))
+        .join(GameNight, GameNight.id == Player.game_night_id)
         .filter(GameNight.final.is_(True))
-        .order_by(GameNight.date, GameNight.id)
-        .first()
+        .group_by(Player.people_id)
+        .subquery()
     )
-    if first_night is None:
+    mine = db.session.query(debut.c.first).filter(debut.c.people_id == person_id).scalar()
+    if mine is None:
         return False
-    first_five = (
-        db.session.query(Player.people_id)
-        .filter_by(game_night_id=first_night.id)
-        .order_by(Player.id)
-        .limit(5)
-        .all()
+    earlier = (
+        db.session.query(func.count()).select_from(debut).filter(debut.c.first < mine).scalar()
     )
-    return any(pid == person_id for (pid,) in first_five)
+    return earlier < 5
 
 
 def _check_most_wins(person_id: int, game_night_id: int) -> bool:
-    rows = (
-        db.session.query(Player.people_id, func.count(Result.id).label("wins"))
-        .join(Result, Player.id == Result.player_id)
-        .join(GameNightGame, Result.game_night_game_id == GameNightGame.id)
-        .join(GameNight, GameNightGame.game_night_id == GameNight.id)
-        .filter(Result.position == 1, GameNight.final.is_(True))
-        .group_by(Player.people_id)
-        .order_by(func.count(Result.id).desc())
-        .all()
-    )
-    if not rows:
-        return False
-    max_wins = rows[0].wins
-    if max_wins == 0:
-        return False
-    person_wins = next((r.wins for r in rows if r.people_id == person_id), 0)
-    return person_wins == max_wins
+    wins = _win_counts(game_night_id)
+    return bool(wins) and wins.get(person_id, 0) == max(wins.values())
 
 
 # ---------------------------------------------------------------------------
@@ -756,8 +762,6 @@ def evaluate_badges_for_night(game_night_id: int) -> None:
     Relies on the uq_person_badge unique constraint to prevent duplicates;
     does NOT use an application-level pre-check (which would be a race condition).
     """
-    from sqlalchemy.exc import IntegrityError
-
     try:
         game_night = db.session.get(GameNight, game_night_id)
         if game_night is None or not game_night.final:
@@ -778,7 +782,10 @@ def evaluate_badges_for_night(game_night_id: int) -> None:
 
             for person_id in person_ids:
                 try:
-                    earned = checker_fn(person_id, game_night_id)
+                    # Savepoint: a failed query aborts the Postgres transaction, which
+                    # would otherwise take every later check and award down with it.
+                    with db.session.begin_nested():
+                        earned = checker_fn(person_id, game_night_id)
                 except Exception:
                     logger.exception(
                         "Badge checker %s failed for person %s night %s",
