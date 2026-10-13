@@ -1,16 +1,104 @@
-/* Custom overrides — Tailwind handles the rest */
+/* Custom overrides and the animations used by static/js/juice.js. Tailwind handles the rest.
+   Motion runs only with prefers-reduced-motion: no-preference; otherwise a plain fade or nothing. */
 
-/* Sidebar width token used in layout */
 :root {
   --sidebar-width: 4rem;
 }
 
-/* Flash message animation */
-.flash-message {
-  animation: slideIn 0.2s ease-out;
+/* ---- Base states (no motion) ---- */
+.gn-out { opacity: 0; transition: opacity .3s; }
+.gn-toast {
+  position: fixed; left: 50%; bottom: 5.5rem; z-index: 60; transform: translateX(-50%);
+  max-width: calc(100vw - 2rem); padding: .625rem 1rem; border-radius: .75rem;
+  background: #292524; color: #fff; font-size: .875rem; font-weight: 500;
+  box-shadow: 0 10px 25px -5px rgb(0 0 0 / .25); animation: gn-fade .2s ease-out;
+}
+@media (min-width: 768px) { .gn-toast { bottom: 1.5rem; } }
+.gn-leader { border-left-color: #f59e0b !important; }
+.gn-float {
+  position: absolute; left: 50%; top: -.25rem; pointer-events: none;
+  font-size: .8125rem; font-weight: 700; animation: gn-float .6s ease-out forwards;
+}
+.gn-confetti { position: absolute; left: 50%; top: 40%; pointer-events: none; }
+.gn-confetti i {
+  position: absolute; width: 7px; height: 11px; border-radius: 2px;
+  animation: gn-confetti 1.1s cubic-bezier(.2, .7, .3, 1) forwards;
+}
+.gn-check path { stroke-dasharray: 24; stroke-dashoffset: 0; }
+.gn-stamp { transition: opacity .25s ease-out, transform .25s ease-out; }
+.htmx-added .gn-stamp { opacity: 0; }
+.gn-heart-dots { position: relative; }
+.gn-podium-card { position: relative; }
+
+@keyframes gn-fade { from { opacity: 0; } to { opacity: 1; } }
+
+@media (prefers-reduced-motion: no-preference) {
+  .flash-message { animation: gn-slide-in .2s ease-out; }
+  .gn-out { transform: translateY(-4px); transition: opacity .3s, transform .3s; }
+
+  /* Podium: 3rd, 2nd, 1st rise in turn; 1st pops */
+  .gn-podium-reveal [data-place] { animation: gn-rise .3s ease-out both; }
+  .gn-podium-reveal [data-place="3"] { animation-delay: 0ms; }
+  .gn-podium-reveal [data-place="2"] { animation-delay: 140ms; }
+  .gn-podium-reveal [data-place="1"] { animation: gn-rise .3s ease-out 280ms both, gn-pop .32s ease-out 580ms; }
+
+  /* New badge: icon pops, one shine sweep */
+  .gn-badge-new[open] .gn-badge-icon { animation: gn-pop-big .5s cubic-bezier(.3, 1.6, .5, 1) both; }
+  .gn-badge-new[open] .gn-badge-icon::after,
+  .gn-shimmer::after {
+    content: ""; position: absolute; inset: 0; pointer-events: none;
+    background: linear-gradient(100deg, transparent 30%, rgb(255 255 255 / .85) 50%, transparent 70%);
+    animation: gn-shine .9s ease-out .35s both;
+  }
+  .gn-shimmer { position: relative; overflow: hidden; }
+
+  /* Tracker taps */
+  .gn-bump { animation: gn-bump .18s ease-out; }
+
+  /* Poll answer stamp: fade/scale in, ✓ drawn */
+  .htmx-added .gn-stamp { transform: scale(.94); }
+  .gn-check path { stroke-dashoffset: 24; animation: gn-draw .4s ease-out .15s forwards; }
+
+  /* Nomination locked in */
+  .gn-pop { animation: gn-pop-big .45s cubic-bezier(.3, 1.6, .5, 1) both; }
+  .gn-pulse-once { animation: gn-pulse-ring 1s ease-out 2; }
+
+  /* Tonight card: the die wiggles once */
+  .gn-wiggle { display: inline-block; animation: gn-wiggle .7s ease-in-out .4s 1; }
+
+  /* Wishlist heart + "I bought it" */
+  .gn-heart-pop [data-heart] { display: inline-block; animation: gn-pop-big .45s cubic-bezier(.3, 1.6, .5, 1); }
+  .gn-heart-pop [data-heart]::before, .gn-heart-pop [data-heart]::after {
+    content: ""; position: absolute; left: 50%; top: 50%; width: 4px; height: 4px; border-radius: 9999px;
+    box-shadow: 0 -12px #dc2626, 11px -6px #f59e0b, 11px 6px #dc2626, 0 12px #f59e0b, -11px 6px #dc2626, -11px -6px #f59e0b;
+    animation: gn-dots .5s ease-out forwards;
+  }
+  .gn-heart-pop [data-heart] { position: relative; }
+  .gn-leave { animation: gn-leave .3s ease-in forwards; }
+
+  /* Back from the tracker: highlight sweep over the winner row */
+  .gn-sweep {
+    background-image: linear-gradient(90deg, transparent 0%, rgb(252 211 77 / .55) 50%, transparent 100%);
+    background-size: 200% 100%; background-repeat: no-repeat; animation: gn-sweep 1.1s ease-out .2s both;
+  }
+
+  .gn-bar { transition: width .35s ease-out; }
 }
 
-@keyframes slideIn {
-  from { opacity: 0; transform: translateY(-8px); }
-  to   { opacity: 1; transform: translateY(0); }
+@keyframes gn-slide-in { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: none; } }
+@keyframes gn-rise { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: none; } }
+@keyframes gn-pop { 50% { transform: scale(1.06); } }
+@keyframes gn-pop-big { 0% { transform: scale(.4); } 60% { transform: scale(1.15); } 100% { transform: scale(1); } }
+@keyframes gn-shine { from { transform: translateX(-110%); } to { transform: translateX(110%); } }
+@keyframes gn-bump { 50% { transform: scale(1.18); } }
+@keyframes gn-float { from { opacity: 1; transform: translate(-50%, 0); } to { opacity: 0; transform: translate(-50%, -26px); } }
+@keyframes gn-confetti {
+  from { opacity: 1; transform: translate(0, 0) rotate(0); }
+  to { opacity: 0; transform: translate(var(--x), var(--y)) rotate(var(--r)); }
 }
+@keyframes gn-draw { to { stroke-dashoffset: 0; } }
+@keyframes gn-pulse-ring { from { box-shadow: 0 0 0 0 rgb(245 158 11 / .55); } to { box-shadow: 0 0 0 12px rgb(245 158 11 / 0); } }
+@keyframes gn-wiggle { 0%, 100% { transform: rotate(0); } 25% { transform: rotate(-16deg); } 50% { transform: rotate(12deg); } 75% { transform: rotate(-6deg); } }
+@keyframes gn-dots { from { opacity: 1; transform: scale(.4); } to { opacity: 0; transform: scale(1.5); } }
+@keyframes gn-leave { to { opacity: 0; transform: translateX(48px); } }
+@keyframes gn-sweep { from { background-position: 150% 0; } to { background-position: -50% 0; } }

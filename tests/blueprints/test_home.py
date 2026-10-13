@@ -31,3 +31,29 @@ def test_home_shows_upcoming_and_open_polls(app, client, make_person, make_night
     for poll in (general, answered):
         _db.session.delete(poll)
     _db.session.commit()
+
+
+def test_home_rejects_bad_month_or_year(client, make_person):
+    login(client, make_person("Ann"))
+    for query in ("month=13", "month=0", "year=0", "year=99999", "month=12&year=9999"):
+        assert client.get(f"/?{query}").status_code == 400, query
+    assert client.get("/?month=2&year=2026").status_code == 200
+
+
+def test_favicon_redirects_to_the_static_icon(client):
+    resp = client.get("/favicon.ico")
+    assert resp.status_code == 301 and resp.location.endswith("/static/images/favicon.ico")
+
+
+def test_logged_out_recap_shows_no_app_nav(app, db, client):
+    from tests.night_world import World
+
+    w = World()
+    try:
+        gn = w.night(w.person("Ann"), final=True)
+        client.post("/logout")
+        resp = client.get(f"/game_night/{gn.id}/recap")
+        assert resp.status_code == 200
+        assert 'aria-label="Main"' not in resp.get_data(as_text=True)
+    finally:
+        w.cleanup()

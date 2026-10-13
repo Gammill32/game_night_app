@@ -40,19 +40,19 @@
     {% set game = item.game %}
     {% call wishlist_row(game, item.wanters, item.owners, item.wanters | map(attribute='id') | join(',')) %}
       {% if item.user_wishlisted %}
-        <span class="rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-blue-700">♥ On your list</span>
+        <span class="inline-flex min-h-[2.25rem] items-center rounded-full bg-blue-50 px-3 text-xs font-medium text-blue-700">♥ On your list</span>
       {% else %}
       <form action="{{ url_for('games.vote_wishlist', game_id=game.id) }}" method="POST">
         {% if item.user_voted %}
-        <button class="rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-blue-700 hover:bg-blue-100" title="Tap to undo">✓ You want it too</button>
+        <button class="inline-flex min-h-[2.25rem] items-center rounded-full bg-blue-50 px-3 text-xs font-medium text-blue-700 hover:bg-blue-100" title="Tap to undo">✓ You want it too</button>
         {% else %}
-        <button class="rounded-full border border-stone-300 px-2 py-0.5 text-[11px] font-medium text-stone-700 hover:bg-stone-50">+ Me too</button>
+        <button class="inline-flex min-h-[2.25rem] items-center rounded-full border border-stone-300 px-3 text-xs font-medium text-stone-700 hover:bg-stone-50">+ Me too</button>
         {% endif %}
       </form>
       {% endif %}
       {% if not item.owners or current_user.id not in item.owners|map(attribute='id')|list %}
-      <form action="{{ url_for('games.claim_game', game_id=game.id) }}" method="POST">
-        <button class="rounded-full border border-stone-300 px-2 py-0.5 text-[11px] font-medium text-stone-700 hover:bg-stone-50">I bought it</button>
+      <form action="{{ url_for('games.claim_game', game_id=game.id) }}" method="POST" data-juice="bought">
+        <button class="inline-flex min-h-[2.25rem] items-center rounded-full border border-stone-300 px-3 text-xs font-medium text-stone-700 hover:bg-stone-50">I bought it</button>
       </form>
       {% endif %}
     {% endcall %}

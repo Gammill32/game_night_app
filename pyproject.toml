@@ -35,3 +35,6 @@ python_classes = ["Test*"]
 python_functions = ["test_*"]
 timeout = 30
 timeout_method = "thread"
+markers = [
+    "real_commits: commit for real instead of inside the per-test rolled-back transaction (the test cleans up after itself)",
+]

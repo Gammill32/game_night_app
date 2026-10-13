@@ -6,10 +6,11 @@ from flask import Blueprint, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 
 from app.extensions import db
-from app.models import Game, OwnedBy
+from app.models import Game
 from app.services import badge_services, games_services
 from app.services.bgg_service import BGGService
 from app.utils import admin_required
+from app.utils.dates import local_today
 
 games_bp = Blueprint("games", __name__)
 
@@ -28,7 +29,7 @@ def games_index():
         "owner_choices": games_services.owner_choices(games) if scope == "all" else [],
         "play_stats": games_services.get_play_stats(),
         "bridesmaid_games": games_services.get_bridesmaid_games(),
-        "today": date.today(),
+        "today": local_today(),
         "scope": scope,
     }
     return render_template("games_index.html", **context)
@@ -55,34 +56,33 @@ def add_game():
 @games_bp.route("/game/<int:game_id>")
 @login_required
 def view_game(game_id):
-    from app.models import Person
-
     context = games_services.get_game_details(game_id, current_user.id)
-    game = context["game"]
     assignable_owners = []
     if current_user.is_admin_or_owner:
-        owned_ids = {ob.person_id for ob in game.owners}
-        assignable_owners = [
-            p
-            for p in Person.query.filter_by(active=True)
-            .order_by(Person.first_name, Person.last_name)
-            .all()
-            if p.id not in owned_ids
-        ]
+        assignable_owners = games_services.assignable_owners(context["game"])
     context.update(
         game_stat=games_services.get_play_stats().get(game_id),
-        today=date.today(),
+        today=local_today(),
         assignable_owners=assignable_owners,
     )
     return render_template("view_game.html", **context)
+
+
+def _toggled(ok, message, fallback):
+    """Answer a small toggle. juice.js posts the heart and "I bought it" in the
+    background (X-Background: 1) and animates on 204 or shows the message on
+    400; a plain form post gets the usual flash and redirect."""
+    if request.headers.get("X-Background"):
+        return ("", 204) if ok else (message, 400)
+    flash(message, "success" if ok else "error")
+    return redirect(request.referrer or fallback)
 
 
 @games_bp.route("/game/<int:game_id>/claim", methods=["POST"])
 @login_required
 def claim_game(game_id):
     success, message = games_services.modify_ownership(current_user.id, game_id, add=True)
-    flash(message, "success" if success else "error")
-    return redirect(request.referrer or url_for("games.games_index"))
+    return _toggled(success, message, url_for("games.games_index"))
 
 
 @games_bp.route("/game/<int:game_id>/remove_ownership", methods=["POST"])
@@ -164,22 +164,8 @@ def vote_wishlist(game_id):
 @games_bp.route("/wishlist/toggle/<int:game_id>", methods=["POST"])
 @login_required
 def toggle_wishlist(game_id):
-    from app.models import Wishlist
-
-    # If already owned, prevent wishlisting
-    owns_game = OwnedBy.query.filter_by(game_id=game_id, person_id=current_user.id).first()
-    if owns_game:
-        flash("You already own this game — no need to wishlist it.", "info")
-        return redirect(request.referrer or url_for("games.my_wishlist"))
-
-    existing = Wishlist.query.filter_by(game_id=game_id, person_id=current_user.id).first()
-    if existing:
-        success, message = games_services.modify_wishlist(current_user.id, game_id, remove=True)
-    else:
-        success, message = games_services.modify_wishlist(current_user.id, game_id, add=True)
-
-    flash(message, "success" if success else "error")
-    return redirect(request.referrer or url_for("games.my_wishlist"))
+    category, message = games_services.toggle_wishlist(current_user.id, game_id)
+    return _toggled(category != "error", message, url_for("games.my_wishlist"))
 
 
 @games_bp.route("/game/<int:game_id>/rating", methods=["POST"])
@@ -230,7 +216,7 @@ def user_stats():
     all_games = games_services.get_user_stats(user_id, sort_by="games_played")
     all_opponents = games_services.get_head_to_head(user_id)
 
-    today = date.today()
+    today = local_today()
     presets = [
         ("All time", "", ""),
         ("This year", date(today.year, 1, 1).isoformat(), ""),

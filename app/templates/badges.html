@@ -1,41 +1,80 @@
 {% extends "base.html" %}
 {% block title %}Badges{% endblock %}
 {% block content %}
-{% set earned = rows | selectattr('mine') | list | length %}
-<div class="max-w-4xl mx-auto">
-  <div class="flex flex-wrap items-end justify-between gap-3 mb-6">
+{% set earned_rows = rows | selectattr('mine') | list %}
+{% set todo_rows = rows | rejectattr('mine') | list %}
+{% set pct = (earned_rows | length * 100 / (rows | length)) | round(1) if rows else 0 %}
+{% macro holders_text(row) -%}
+  {%- if row.holders -%}
+  {{ row.holders | length }} {{ 'person has' if row.holders | length == 1 else 'people have' }} it:
+  {% for a in row.holders %}{{ 'you' if a.person_id == current_user.id else a.person.first_name ~ ' ' ~ a.person.last_name }}{% if not loop.last %}, {% endif %}{% endfor %}
+  {%- else -%}Nobody has earned this yet.{%- endif -%}
+{%- endmacro %}
+<div class="max-w-4xl mx-auto" data-badge-page>
+  <a href="{{ url_for('games.user_stats') }}" class="inline-flex min-h-[2.75rem] items-center text-sm text-stone-500 hover:text-red-600">&larr; Your stats</a>
+  <div class="mb-6 flex items-center gap-4">
+    {# Progress ring: a conic gradient with the count in the middle #}
+    <div class="relative flex h-20 w-20 shrink-0 items-center justify-center rounded-full"
+         style="background: conic-gradient(#dc2626 {{ pct }}%, #e7e5e4 0)"
+         role="img" aria-label="{{ earned_rows | length }} of {{ rows | length }} badges earned">
+      <div class="flex h-[3.75rem] w-[3.75rem] flex-col items-center justify-center rounded-full bg-stone-50">
+        <span class="text-lg font-bold leading-none text-stone-800">{{ earned_rows | length }}<span class="text-sm font-medium text-stone-500">/{{ rows | length }}</span></span>
+      </div>
+    </div>
     <div>
       <h1 class="text-2xl font-bold text-stone-800">Badges</h1>
-      <p class="text-sm text-stone-500">You have {{ earned }} of {{ rows|length }}. Badges are awarded when a game night is finalized.</p>
+      <p class="text-sm text-stone-500">You have {{ earned_rows | length }} of {{ rows | length }}. Badges are awarded when a game night is finalized.</p>
     </div>
-    <a href="{{ url_for('games.user_stats') }}" class="text-sm text-stone-500 hover:text-red-600">&larr; Your stats</a>
   </div>
 
+  {% if earned_rows %}
+  <h2 class="mb-2 text-sm font-semibold uppercase tracking-wide text-stone-500">Earned</h2>
   <ul class="grid gap-3 sm:grid-cols-2">
-    {% for row in rows %}
+    {% for row in earned_rows %}
     {% set b = row.badge %}
-    <li class="flex gap-4 rounded-xl border bg-white p-4 shadow-sm {{ 'border-green-200' if row.mine else 'border-stone-200' }}">
-      <span class="text-4xl leading-none {{ '' if row.mine else 'grayscale opacity-40' }}" aria-hidden="true">{{ b.icon }}</span>
+    <li data-pb-id="{{ row.mine.id }}" class="flex gap-4 rounded-xl border border-green-200 bg-white p-4 shadow-sm">
+      <span class="text-4xl leading-none" aria-hidden="true">{{ b.icon }}</span>
       <div class="min-w-0 flex-1">
-        <div class="flex flex-wrap items-center gap-2">
-          <h2 class="font-semibold text-stone-800">{{ b.name }}</h2>
-          {% if row.mine %}
-          <span class="rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800">Earned {{ earned_on(row.mine).strftime('%b %-d, %Y') }}</span>
-          {% endif %}
-        </div>
-        <p class="text-sm text-stone-600 mt-0.5">{{ b.description }}</p>
-        {% if row.mine and row.mine.game_night %}
-        <a href="{{ url_for('game_night.view_game_night', game_night_id=row.mine.game_night_id) }}#badges" class="mt-1 inline-block text-xs font-medium text-red-600 underline">Earned at the {{ row.mine.game_night.date.strftime('%B %-d, %Y') }} game night</a>
-        {% endif %}
-        <p class="text-xs text-stone-500 mt-1.5">
-          {% if row.holders %}
-          {{ row.holders|length }} {{ 'person has' if row.holders|length == 1 else 'people have' }} it:
-          {% for a in row.holders %}{{ 'you' if a.person_id == current_user.id else a.person.first_name ~ ' ' ~ a.person.last_name }}{% if not loop.last %}, {% endif %}{% endfor %}
-          {% else %}Nobody has earned this yet.{% endif %}
-        </p>
+        <h3 class="font-semibold text-stone-800">{{ b.name }}</h3>
+        <p class="mt-0.5 text-sm text-stone-600">{{ b.description }}</p>
+        <p class="mt-1 text-xs text-stone-500">
+          {%- if row.mine.game_night %}<a href="{{ url_for('game_night.view_game_night', game_night_id=row.mine.game_night_id) }}#badges" class="underline decoration-stone-300 hover:text-red-600">Earned {{ earned_on(row.mine).strftime('%b %-d, %Y') }}</a>
+          {%- else %}Earned {{ earned_on(row.mine).strftime('%b %-d, %Y') }}{% endif %}</p>
+        <p class="mt-1.5 text-xs text-stone-500">{{ holders_text(row) }}</p>
       </div>
     </li>
     {% endfor %}
   </ul>
+  {% endif %}
+
+  {% if todo_rows %}
+  <h2 class="mb-2 mt-6 text-sm font-semibold uppercase tracking-wide text-stone-500">Still to earn</h2>
+  <ul class="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6">
+    {% for row in todo_rows %}
+    {% set b = row.badge %}
+    <li>
+      <button type="button" data-badge-icon="{{ b.icon }}" data-badge-name="{{ b.name }}" data-badge-rule="{{ b.description }}"
+              data-badge-when="{{ holders_text(row) }}"
+              class="flex h-full w-full flex-col items-center rounded-xl border border-stone-200 bg-white px-1.5 py-3 text-center hover:border-red-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-400">
+        <span class="text-3xl leading-none opacity-50 grayscale" aria-hidden="true">{{ b.icon }}</span>
+        <span class="mt-1.5 text-xs font-medium leading-tight text-stone-600">{{ b.name }}</span>
+      </button>
+    </li>
+    {% endfor %}
+  </ul>
+  <p class="mt-2 text-xs text-stone-500">Tap one to see how to earn it.</p>
+  {% endif %}
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // Badges earned since this browser last looked shimmer once (same record as the "New badge!" dialog).
+  (function () {
+    if (!window.GN || GN.calm) return;
+    document.querySelectorAll('[data-pb-id]').forEach(function (el) {
+      if (+el.dataset.pbId > GN.seenBadge) el.classList.add('gn-shimmer');
+    });
+  })();
+</script>
 {% endblock %}

@@ -44,7 +44,7 @@ def test_finalize_route_triggers_badge_evaluation(admin_client, app, db):
     pl_id = pl.id
     op_id = op.id
 
-    resp = admin_client.post(f"/game_night/{gn_id}/toggle/final")
+    resp = admin_client.post(f"/game_night/{gn_id}/finalize")
     assert resp.status_code in (200, 302)
 
     from app.models import Badge
@@ -75,7 +75,7 @@ def test_finalize_succeeds_even_if_badge_evaluation_raises(admin_client, app, db
     import uuid
 
     from app.extensions import db as _db
-    from app.models import Game, GameNight, Person, Player
+    from app.models import Game, GameNight, GameNightGame, Person, Player, Result
 
     game = Game(name=f"SafeGame {uuid.uuid4().hex[:6]}", bgg_id=None)
     person = Person(
@@ -86,12 +86,17 @@ def test_finalize_succeeds_even_if_badge_evaluation_raises(admin_client, app, db
     _db.session.add_all([game, person])
     _db.session.flush()
 
-    gn = GameNight(date=datetime.date.today(), final=False)
+    gn = GameNight(date=datetime.date(2024, 1, 1), final=False)
     _db.session.add(gn)
     _db.session.flush()
 
     pl = Player(game_night_id=gn.id, people_id=person.id)
     _db.session.add(pl)
+    _db.session.flush()
+    gng = GameNightGame(game_night_id=gn.id, game_id=game.id, round=1)
+    _db.session.add(gng)
+    _db.session.flush()
+    _db.session.add(Result(game_night_game_id=gng.id, player_id=pl.id, position=1))
     _db.session.commit()
 
     gn_id = gn.id
@@ -107,17 +112,22 @@ def test_finalize_succeeds_even_if_badge_evaluation_raises(admin_client, app, db
         lambda _: (_ for _ in ()).throw(RuntimeError("boom")),
     )
 
-    resp = admin_client.post(f"/game_night/{gn_id}/toggle/final")
+    resp = admin_client.post(f"/game_night/{gn_id}/finalize")
     assert resp.status_code in (200, 302)
 
     from app.models import GameNight as GN
 
-    updated = GN.query.get(gn_id)
+    updated = _db.session.get(GN, gn_id)
     assert (
         updated.final is True
     ), "Game night must be marked final even when badge evaluation raises"
 
+    Result.query.filter_by(player_id=pl_id).delete()
+    GameNightGame.query.filter_by(game_night_id=gn_id).delete()
     Player.query.filter_by(id=pl_id).delete()
+    from app.models import PersonBadge
+
+    PersonBadge.query.filter_by(game_night_id=gn_id).delete()
     GameNight.query.filter_by(id=gn_id).delete()
     Person.query.filter_by(id=person_id).delete()
     Game.query.filter_by(id=game_id).delete()
@@ -151,50 +161,10 @@ def test_toggle_invalid_field_is_rejected(admin_client, app, db):
     # Confirm id was not modified
     from app.models import GameNight as GN
 
-    fresh = GN.query.get(gn_id)
+    fresh = _db.session.get(GN, gn_id)
     assert fresh.id == gn_id
 
     Player.query.filter_by(id=pl_id).delete()
-    GameNight.query.filter_by(id=gn_id).delete()
-    Person.query.filter_by(id=person_id).delete()
-    _db.session.commit()
-
-
-def test_toggle_closed_auto_closes_availability_poll(admin_client, app, db):
-    """Closing voting on a game night should auto-close its availability poll."""
-    import datetime
-    import uuid
-
-    from app.extensions import db as _db
-    from app.models import GameNight, Person
-    from app.services.poll_services import create_availability_poll
-
-    person = Person(
-        first_name="P", last_name="Q", email=f"avclose_{uuid.uuid4().hex[:6]}@test.invalid"
-    )
-    _db.session.add(person)
-    _db.session.flush()
-    gn = GameNight(date=datetime.date.today(), closed=False, final=False)
-    _db.session.add(gn)
-    _db.session.commit()
-    create_availability_poll(gn.id, person.id)
-    poll = gn.availability_poll
-    gn_id, person_id, poll_id = gn.id, person.id, poll.id
-    assert poll.closed is False
-
-    resp = admin_client.post(f"/game_night/{gn_id}/toggle/closed")
-    assert resp.status_code in (200, 302)
-
-    from app.models import Poll
-
-    refreshed = Poll.query.get(poll_id)
-    assert refreshed.closed is True, "Availability poll must auto-close when voting closes"
-
-    from app.models import PollOption, PollResponse
-
-    PollResponse.query.filter_by(poll_id=poll_id).delete()
-    PollOption.query.filter_by(poll_id=poll_id).delete()
-    Poll.query.filter_by(id=poll_id).delete()
     GameNight.query.filter_by(id=gn_id).delete()
     Person.query.filter_by(id=person_id).delete()
     _db.session.commit()

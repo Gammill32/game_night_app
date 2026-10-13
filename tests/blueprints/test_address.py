@@ -30,9 +30,20 @@ def test_address_is_private_and_deleted_on_finalize(admin_client, client, make_p
         as_text=True
     )
 
-    from app.services.game_night_services import toggle_game_night_field
+    from app.models import Game, GameNightGame, Player, Result
+    from app.services.game_night_services import finalize
 
-    toggle_game_night_field(gn.id, "final")
+    gn.date = dt.date(2024, 1, 1)  # the night has happened and a game has results
+    game = Game(name="Address test game")
+    _db.session.add(game)
+    _db.session.flush()
+    gng = GameNightGame(game_night_id=gn.id, game_id=game.id, round=1)
+    _db.session.add(gng)
+    _db.session.flush()
+    player = Player.query.filter_by(game_night_id=gn.id, people_id=ann.id).one()
+    _db.session.add(Result(game_night_game_id=gng.id, player_id=player.id, position=1))
+    _db.session.commit()
+    finalize(gn.id)
     _db.session.refresh(gn)
     assert gn.final and gn.address is None
     recap = client.get(f"/game_night/{gn.id}/recap").get_data(as_text=True)

@@ -122,3 +122,17 @@ def test_picked_dates(admin_client):
     assert [o.option_date for o in poll.options] == [dt.date(2031, 5, 2), dt.date(2031, 5, 16)]
     _db.session.delete(poll)
     _db.session.commit()
+
+
+def test_summary_past_uses_the_app_timezone(make_person, monkeypatch):
+    """At 8pm Central the UTC date is already tomorrow; today's option isn't past yet."""
+    poll = _poll(make_person("Adm"))
+    first = poll.options[0]
+    monkeypatch.setattr(dps, "local_today", lambda: first.option_date)
+    rows = {r["option"].id: r for r in dps.summary(poll)}
+    assert rows[first.id]["past"] is False
+    monkeypatch.setattr(dps, "local_today", lambda: first.option_date + dt.timedelta(days=1))
+    rows = {r["option"].id: r for r in dps.summary(poll)}
+    assert rows[first.id]["past"] is True
+    _db.session.delete(poll)
+    _db.session.commit()

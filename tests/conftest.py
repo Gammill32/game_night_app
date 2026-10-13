@@ -3,6 +3,8 @@ import tempfile
 import unittest.mock
 
 import pytest
+from flask_sqlalchemy.session import Session as FsaSession
+from sqlalchemy import orm as sa_orm
 
 from app import create_app
 from app.config import Config
@@ -20,7 +22,9 @@ class TestConfig(Config):
     LOGIN_DISABLED = False
     SQLALCHEMY_DATABASE_URI = os.environ.get("TEST_DATABASE_URL")
     BCRYPT_LOG_ROUNDS = 4  # fast hashing in tests
+    AUTH_THROTTLE = False  # the suite logs in many times; throttle tests turn it on
     MEDIA_DIR = tempfile.mkdtemp(prefix="gamenight_media_")
+    MAIL_DEFAULT_SENDER = "gamenight@test.invalid"  # CI has no .env; share emails need a sender
 
 
 @pytest.fixture(scope="session")
@@ -47,6 +51,87 @@ def db(app):
         yield _db
         _db.session.remove()
         _db.engine.dispose()
+
+
+class _ConnectionBoundSession(FsaSession):
+    """Flask-SQLAlchemy's Session.get_bind() picks an engine from db.engines and
+    never looks at Session.bind, so passing bind=connection alone would be ignored
+    and every query would check out a fresh pooled connection outside the test's
+    transaction. Route everything through the bound connection instead."""
+
+    def get_bind(self, mapper=None, clause=None, bind=None, **kwargs):  # type: ignore[override]
+        return bind if bind is not None else self.bind
+
+
+class _OneSessionPerTest(sa_orm.scoped_session):
+    """db.session for one test: the same Session in every app context and thread.
+
+    Flask-SQLAlchemy scopes db.session to the app context and removes it when a
+    context is torn down. Many tests open nested `with app.app_context():`
+    blocks (and one runs the app in a thread); with a session per context, two
+    Sessions would share the test connection and interleave their savepoints
+    (one's ROLLBACK TO SAVEPOINT destroys the other's), and tearing an inner
+    context down would close objects the test still holds. So every context gets
+    this one Session, and remove() waits for the end of the test.
+    """
+
+    def remove(self) -> None:
+        pass
+
+    def remove_for_real(self) -> None:
+        super().remove()
+
+
+@pytest.fixture(autouse=True)
+def _rollback_after_test(request, db):
+    """Run each test inside one outer transaction that is rolled back afterwards.
+
+    SQLAlchemy 2.0's recipe "Joining a Session into an External Transaction (such
+    as for test suites)": begin a transaction on a Connection, bind the Session
+    to that connection with join_transaction_mode="create_savepoint", and roll
+    the outer transaction back at the end. The Session then runs its own
+    begin/commit/rollback as SAVEPOINT / RELEASE / ROLLBACK TO SAVEPOINT, so
+    app code and tests commit and roll back as before (rollback() goes back to
+    the last commit), begin_nested() nests further savepoints, and nothing a
+    test writes - even if it fails before its own cleanup - outlives it.
+
+    db.session is an attribute that everything (Model.query, app code, tests)
+    looks up on each use, so swapping it for the test and restoring it
+    afterwards is enough. The Session comes from Flask-SQLAlchemy's own factory
+    (same class family, query class and db), with two changes: a get_bind() that
+    honours bind= (_ConnectionBoundSession) and one Session for the whole test
+    (_OneSessionPerTest).
+
+    Tests marked real_commits opt out and commit for real (and clean up by hand):
+    they let a second connection see their rows, which uncommitted data in this
+    outer transaction can't do.
+
+    Server-side now() is the transaction's start time, so it stays fixed for the
+    whole test; nothing should rely on it advancing between commits.
+    """
+    if request.node.get_closest_marker("real_commits"):
+        yield
+        return
+
+    connection = _db.engine.connect()
+    outer = connection.begin()
+    factory = _db._make_session_factory(
+        {
+            "bind": connection,
+            "join_transaction_mode": "create_savepoint",
+            "class_": _ConnectionBoundSession,
+        }
+    )
+    test_session = _OneSessionPerTest(factory, scopefunc=lambda: None)
+    real_session = _db.session
+    _db.session = test_session
+    try:
+        yield
+    finally:
+        test_session.remove_for_real()
+        _db.session = real_session
+        outer.rollback()
+        connection.close()
 
 
 @pytest.fixture(autouse=True)

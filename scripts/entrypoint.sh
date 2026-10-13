@@ -34,9 +34,21 @@ else:
     sys.exit(1)
 EOF
 
+# The compose game_night_scheduler service runs this image with "scheduler" as
+# its command: just the daily reminder job, no web server. It leaves migrations
+# to the web container (two containers upgrading at once would race).
+if [ "$1" = "scheduler" ]; then
+    echo "Starting the reminder scheduler..."
+    exec python -m app.scheduler
+fi
+
 echo "Running database migrations..."
 flask db upgrade
 
 echo "Starting gunicorn..."
-# -w 1: Single worker required — APScheduler runs in-process and must not be duplicated
-exec gunicorn -w 1 -b 0.0.0.0:8000 "app:create_app()"
+# One worker process with 4 threads (gthread): requests no longer queue behind
+# one slow one (a photo upload, an email), and in-process state (the BGG
+# cache, the session files) is still shared by everything. The web container
+# sets ENABLE_SCHEDULER=false; if it doesn't, the reminder job still runs only
+# once because there is one process. Don't raise -w without that setting.
+exec gunicorn -w 1 -k gthread --threads 4 -b 0.0.0.0:8000 "app:create_app()"

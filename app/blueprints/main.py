@@ -1,15 +1,21 @@
 # blueprints/main.py
 
 import calendar
-from datetime import date, datetime
+from datetime import date
 
-import pytz
-from flask import Blueprint, current_app, render_template, request
+from flask import Blueprint, abort, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 
 from app.services import index_services
+from app.utils.dates import local_today
 
 main_bp = Blueprint("main", __name__)
+
+
+@main_bp.route("/favicon.ico")
+def favicon():
+    """Browsers ask for /favicon.ico on pages without a <link rel=icon> (error pages)."""
+    return redirect(url_for("static", filename="images/favicon.ico"), code=301)
 
 
 @main_bp.route("/")
@@ -17,13 +23,14 @@ main_bp = Blueprint("main", __name__)
 def index():
     """Homepage with a calendar of game nights using SQL views."""
 
-    # Define Central Time Zone
-    central_timezone = pytz.timezone(current_app.config["APP_TIMEZONE"])
-    today_central = datetime.now(central_timezone).date()
+    today_central = local_today()
 
     # Get year and month from query parameters or default to current date
     year = request.args.get("year", type=int, default=today_central.year)
     month = request.args.get("month", type=int, default=today_central.month)
+    # A hand-edited URL (?month=13, ?year=0) would otherwise be a 500.
+    if not (1 <= month <= 12 and 1900 <= year <= 9000):
+        abort(400)
 
     # Define start and end dates for the month
     start_date = date(year, month, 1)
@@ -73,9 +80,8 @@ def index():
 @login_required
 def all_game_nights():
     """Displays all game nights based on user role."""
-    tz = pytz.timezone(current_app.config["APP_TIMEZONE"])
     return render_template(
         "all_game_nights.html",
         cards=index_services.get_all_night_cards(current_user),
-        today=datetime.now(tz).date(),
+        today=local_today(),
     )

@@ -7,7 +7,7 @@
   </div>
   <h1 class="text-2xl font-bold text-stone-800">{{ poll.title }}</h1>
   {% if poll.description %}<p class="text-sm text-stone-500 mt-1">{{ poll.description }}</p>{% endif %}
-  <p class="text-xs text-stone-400 mt-2">{{ respondents }} {{ 'person has' if respondents == 1 else 'people have' }} answered{% if poll.closed %} · closed{% endif %}</p>
+  <p class="text-xs text-stone-500 mt-2">{{ respondents }} {{ 'person has' if respondents == 1 else 'people have' }} answered{% if poll.closed %} · closed{% endif %}</p>
 
   {% if poll.picked_game_night %}
   <div class="mt-4 rounded-lg px-4 py-3 text-sm bg-green-50 text-green-800 border border-green-200">

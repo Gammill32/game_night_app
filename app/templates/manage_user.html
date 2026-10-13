@@ -10,7 +10,12 @@
     <h1 class="text-2xl font-bold text-stone-800">{{ person.first_name }} {{ person.last_name }}</h1>
     <p class="text-sm text-stone-500">Your account and how you get paid back.</p>
   </div>
-  <a href="{{ url_for('games.user_stats') }}" class="inline-flex items-center rounded-lg border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50">📊 Your stats &amp; badges</a>
+  <div class="flex flex-wrap gap-2">
+    {% if person.can_start_nights %}
+    <a href="{{ url_for('admin.invites') }}" class="inline-flex items-center rounded-lg border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50">Invite people</a>
+    {% endif %}
+    <a href="{{ url_for('games.user_stats') }}" class="inline-flex items-center rounded-lg border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50">📊 Your stats &amp; badges</a>
+  </div>
 </div>
 
 <!-- Account Settings -->
@@ -35,13 +40,13 @@
 
     <div>
       <label for="new_password" class="block text-sm font-medium text-stone-700 mb-1">New Password <span class="font-normal text-stone-500">(leave blank to keep it)</span></label>
-      <input type="password" name="new_password" id="new_password" autocomplete="new-password"
+      <input type="password" name="new_password" id="new_password" minlength="8" autocomplete="new-password"
              class="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent">
     </div>
 
     <div>
       <label for="confirm_password" class="block text-sm font-medium text-stone-700 mb-1">Confirm New Password</label>
-      <input type="password" name="confirm_password" id="confirm_password" autocomplete="new-password"
+      <input type="password" name="confirm_password" id="confirm_password" minlength="8" autocomplete="new-password"
              class="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent">
     </div>
 

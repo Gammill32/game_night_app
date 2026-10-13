@@ -24,9 +24,10 @@ class Config:
     MAIL_DEFAULT_SENDER = os.getenv("MAIL_DEFAULT_SENDER")
 
     # Flask Session Configuration
-    # NOTE: SESSION_TYPE defaults to "filesystem", which is not shared across
-    # Gunicorn workers. For multi-worker production deployments set
-    # SESSION_TYPE=redis and configure SESSION_REDIS.
+    # SESSION_TYPE defaults to "filesystem": session files in the container,
+    # shared by every gunicorn worker and thread in it. Only more than one
+    # container behind the proxy would need a shared store (SESSION_TYPE=redis
+    # and SESSION_REDIS).
     SESSION_TYPE = os.getenv("SESSION_TYPE", "filesystem")
     SESSION_PERMANENT = True
     PERMANENT_SESSION_LIFETIME = timedelta(days=14)

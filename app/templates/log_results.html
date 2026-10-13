@@ -47,6 +47,7 @@
       </table>
     </div>
 
+    <p id="resultsError" role="alert" class="mb-3 hidden rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700"></p>
     <div class="flex flex-wrap gap-3">
       <button type="submit" id="submitResults"
               class="inline-flex items-center rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 transition-colors">
@@ -73,6 +74,12 @@
     });
   }));
 
+  function showError(message) {
+    const box = document.getElementById("resultsError");
+    box.textContent = message;
+    box.classList.remove("hidden");
+  }
+
   document.getElementById("resultsForm").addEventListener("submit", function(event) {
     event.preventDefault();
 
@@ -98,15 +105,16 @@
       },
       body: JSON.stringify(formData)
     })
-    .then(response => {
-      if (response.redirected) {
-        window.location.href = response.url;
+    .then(async response => {
+      const json = (response.headers.get("Content-Type") || "").includes("json")
+        ? await response.json() : null;
+      if (response.ok && json && json.redirect) {
+        window.location.href = json.redirect;
         return;
       }
-      return response.text();
+      showError((json && json.error) || "Couldn't save the results.");
     })
-    .then(data => console.log("Response:", data))
-    .catch(error => console.error("Error:", error));
+    .catch(() => showError("Couldn't save the results. Check your connection and try again."));
   });
 </script>
 {% endblock %}

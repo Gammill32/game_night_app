@@ -100,5 +100,5 @@ def test_deleting_night_removes_photo_files(app, client, make_person, make_night
     photo = GameNightPhoto.query.filter_by(game_night_id=gn.id).one()
     full = os.path.join(app.config["MEDIA_DIR"], photo.path)
 
-    assert game_night_services.delete_game_night(gn.id)[0]
+    game_night_services.delete_game_night(gn.id)
     assert not os.path.exists(full)

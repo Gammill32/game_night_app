@@ -13,3 +13,4 @@ __pycache__
 pyproject.toml
 requirements-dev.txt
 media/
+.cache/

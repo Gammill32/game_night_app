@@ -151,18 +151,25 @@
       <li>
         <a href="{{ url_for('games.user_stats', opponent_ids=[] if on else [h.person_id], game_ids=selected_game_ids, start_date=start_date or None, end_date=end_date or None) }}"
            class="flex items-center gap-3 px-5 py-2.5 hover:bg-stone-50 {{ 'bg-red-50' if on else '' }}">
-          <span class="w-28 shrink-0 truncate text-sm font-medium text-stone-800">{{ h.name }}</span>
-          <span class="flex h-2.5 flex-1 overflow-hidden rounded-full bg-stone-100" title="{{ h.ahead }} ahead · {{ h.ties }} tied · {{ h.behind }} behind">
-            <span class="bg-green-500" style="width: {{ (h.ahead * 100 / h.games)|round(1) }}%"></span>
-            <span class="bg-stone-300" style="width: {{ (h.ties * 100 / h.games)|round(1) }}%"></span>
-            <span class="bg-red-400" style="width: {{ (h.behind * 100 / h.games)|round(1) }}%"></span>
+          <span class="w-24 shrink-0 truncate text-sm font-medium text-stone-800 sm:w-28">{{ h.name }}</span>
+          {# Numbers sit in the segments and "them ahead" is striped, so it reads without colour. #}
+          <span class="flex h-6 flex-1 gap-px overflow-hidden rounded-full bg-stone-100 text-[11px] font-bold leading-6 text-white"
+                role="img" aria-label="{{ h.ahead }} you ahead, {{ h.ties }} tied, {{ h.behind }} them ahead">
+            {% if h.ahead %}<span class="min-w-[1.5rem] bg-green-600 text-center" style="width: {{ (h.ahead * 100 / h.games)|round(1) }}%">{{ h.ahead }}</span>{% endif %}
+            {% if h.ties %}<span class="min-w-[1.5rem] bg-stone-300 text-center text-stone-700" style="width: {{ (h.ties * 100 / h.games)|round(1) }}%">{{ h.ties }}</span>{% endif %}
+            {% if h.behind %}<span class="min-w-[1.5rem] bg-red-600 text-center" style="width: {{ (h.behind * 100 / h.games)|round(1) }}%; background-image: repeating-linear-gradient(135deg, rgb(255 255 255 / .35) 0 3px, transparent 3px 7px)">{{ h.behind }}</span>{% endif %}
           </span>
-          <span class="w-28 shrink-0 text-right text-xs text-stone-600"><strong class="text-green-700">{{ h.ahead }}</strong>–<strong class="text-red-600">{{ h.behind }}</strong>{% if h.ties %}–{{ h.ties }}{% endif %} <span class="text-stone-400">of {{ h.games }}</span></span>
+          <span class="w-12 shrink-0 text-right text-xs text-stone-500">of {{ h.games }}</span>
         </a>
       </li>
       {% endfor %}
     </ul>
-    <p class="px-5 py-3 text-xs text-stone-500"><span class="text-green-700 font-medium">You ahead</span> – <span class="text-red-600 font-medium">them ahead</span> – tied. Tap someone to see only games with them.</p>
+    <p class="flex flex-wrap items-center gap-x-3 gap-y-1 px-5 py-3 text-xs text-stone-500">
+      <span class="inline-flex items-center gap-1"><span class="h-3 w-5 rounded-sm bg-green-600"></span><span class="font-medium text-green-800">You ahead</span></span>
+      <span class="inline-flex items-center gap-1"><span class="h-3 w-5 rounded-sm bg-stone-300"></span>Tied</span>
+      <span class="inline-flex items-center gap-1"><span class="h-3 w-5 rounded-sm bg-red-600" style="background-image: repeating-linear-gradient(135deg, rgb(255 255 255 / .35) 0 3px, transparent 3px 7px)"></span><span class="font-medium text-red-700">Them ahead</span></span>
+      <span>Tap someone to see only games with them.</span>
+    </p>
     {% else %}
     <p class="px-5 pb-5 pt-2 text-sm text-stone-500">No shared games {{ 'match these filters' if filtered else 'yet' }}.</p>
     {% endif %}
@@ -185,7 +192,6 @@
     {% endif %}
   </section>
 </div>
-{% include "_badge_dialog.html" %}
 
 <script>
   (function () {

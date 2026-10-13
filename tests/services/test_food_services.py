@@ -1,8 +1,10 @@
+import pytest
 from werkzeug.datastructures import MultiDict
 
 from app.extensions import db as _db
 from app.models import FoodExpense, FoodItem
 from app.services import food_services, payment_services
+from app.services.food_services import FoodError
 from app.services.poll_services import create_availability_poll, submit_response
 from tests.conftest import login
 
@@ -29,39 +31,39 @@ def test_signup_list_claims(make_person, make_night):
     admin, ann, bo = make_person("Adm", admin=True), make_person("Ann"), make_person("Bo")
     gn = make_night(ann, bo, food_mode="signup")
 
-    ok, _ = food_services.add_item(gn, admin, "Chips")
-    assert ok
+    food_services.add_item(gn, admin, "Chips")
     chips = FoodItem.query.filter_by(game_night_id=gn.id, name="Chips").one()
     assert chips.claimed_by is None  # admin builds the list
 
-    assert food_services.add_item(gn, bo, "Salsa")[0]
+    food_services.add_item(gn, bo, "Salsa")
     assert FoodItem.query.filter_by(name="Salsa", game_night_id=gn.id).one().claimed_by == bo.id
 
-    assert food_services.claim_item(gn, chips, ann)[0]
-    ok, msg = food_services.claim_item(gn, chips, bo)
-    assert not ok and "Ann" in msg
-    assert not food_services.delete_item(gn, chips, bo)[0]  # not the adder or an admin
-    assert food_services.claim_item(gn, chips, ann, claim=False)[0]
+    food_services.claim_item(gn, chips, ann)
+    with pytest.raises(FoodError, match="Ann"):
+        food_services.claim_item(gn, chips, bo)
+    with pytest.raises(FoodError):
+        food_services.delete_item(gn, chips, bo)  # not the adder or an admin
+    food_services.claim_item(gn, chips, ann, claim=False)
     assert chips.claimed_by is None
 
     gn.final = True
     _db.session.commit()
-    assert not food_services.add_item(gn, ann, "Soda")[0]
+    with pytest.raises(FoodError):
+        food_services.add_item(gn, ann, "Soda")
 
 
 def test_split_cost_defaults_to_rsvp_in_and_tracks_payment(make_person, make_night):
     ann, bo, cy = make_person("Ann"), make_person("Bo"), make_person("Cy")
     gn = make_night(ann, bo, cy, food_mode="split")
-    ok, _ = create_availability_poll(gn.id, ann.id)
+    create_availability_poll(gn.id, ann.id)
     poll = gn.availability_poll
     submit_response(poll, [poll.options[0].id], ann.id)  # can make it
     submit_response(poll, [poll.options[0].id], bo.id)  # can make it
     submit_response(poll, [poll.options[2].id], cy.id)  # can't
 
-    ok, msg = food_services.add_expense(
+    food_services.add_expense(
         gn, ann, MultiDict({"description": "Pizza", "amount": "30.01", "paid_by": str(ann.id)})
     )
-    assert ok, msg
     expense = FoodExpense.query.filter_by(game_night_id=gn.id).one()
     shares = {s.person_id: s for s in expense.shares}
     assert set(shares) == {ann.id, bo.id}  # Cy said no
@@ -75,8 +77,9 @@ def test_split_cost_defaults_to_rsvp_in_and_tracks_payment(make_person, make_nig
     assert bo_row["pay_options"][0]["url"].startswith("https://venmo.com/Ann-T?txn=pay&amount=15.0")
     assert food_services.my_food_summary(gn, bo)
 
-    assert not food_services.set_paid(shares[bo.id], cy)[0]  # a bystander can't
-    assert food_services.set_paid(shares[bo.id], bo)[0]
+    with pytest.raises(FoodError):
+        food_services.set_paid(shares[bo.id], cy)  # a bystander can't
+    food_services.set_paid(shares[bo.id], bo)
     assert food_services.expense_rows(gn, bo)[0]["outstanding"] == 0
     assert not food_services.my_food_summary(gn, bo)
 
@@ -102,8 +105,9 @@ def test_changing_covered_keeps_paid_shares(make_person, make_night):
     food_services.set_paid(bo_share, bo)
 
     form = MultiDict([("covered", str(ann.id)), ("covered", str(bo.id)), ("covered", str(cy.id))])
-    assert not food_services.set_covered(gn, expense, cy, form)[0]  # not the logger
-    assert food_services.set_covered(gn, expense, ann, form)[0]
+    with pytest.raises(FoodError):
+        food_services.set_covered(gn, expense, cy, form)  # not the logger
+    food_services.set_covered(gn, expense, ann, form)
     by_person = {s.person_id: s for s in expense.shares}
     assert len(by_person) == 3 and by_person[bo.id].paid and not by_person[cy.id].paid
 
@@ -124,6 +128,19 @@ def test_food_routes_and_page(client, make_person, make_night):
     resp = client.post(f"/game_night/{gn.id}/food/items", data={"name": "Nope"})
     assert resp.status_code == 302
     assert FoodItem.query.filter_by(game_night_id=gn.id, name="Nope").count() == 0
+
+
+def test_refused_food_route_flashes_and_returns_to_the_food_section(
+    client, make_person, make_night
+):
+    ann = make_person("Ann")
+    gn = make_night(ann, food_mode="both")
+    login(client, ann)
+    resp = client.post(f"/game_night/{gn.id}/food/items", data={"name": "  "})
+    assert resp.status_code == 302
+    assert resp.location.endswith(f"/game_night/{gn.id}#food")
+    with client.session_transaction() as sess:
+        assert ("error", "Say what the item is, e.g. chips or a 12-pack.") in sess["_flashes"]
 
 
 def test_start_night_with_provided_food(client, make_person):
@@ -214,13 +231,13 @@ def test_provided_night_takes_extras_without_splitting(
     gn.food_provider_id = adm.id
     _db.session.commit()
 
-    assert food_services.add_item(gn, ann, "Cornbread")[0]
-    assert food_services.add_item(gn, adm, "Beer")[0]  # even the host's extras are theirs
+    food_services.add_item(gn, ann, "Cornbread")
+    food_services.add_item(gn, adm, "Beer")  # even the host's extras are theirs
     items = {i.name: i.claimed_by for i in FoodItem.query.filter_by(game_night_id=gn.id)}
     assert items == {"Cornbread": ann.id, "Beer": adm.id}
     # no split costs on a provided night
-    ok, msg = food_services.add_expense(gn, ann, MultiDict({"description": "x", "amount": "5"}))
-    assert not ok
+    with pytest.raises(FoodError):
+        food_services.add_expense(gn, ann, MultiDict({"description": "x", "amount": "5"}))
 
     login(client, ann)
     page = " ".join(client.get(f"/game_night/{gn.id}").get_data(as_text=True).split())

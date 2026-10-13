@@ -1,0 +1,4 @@
+/* Source for app/static/css/tailwind.css. Rebuild with scripts/build_css.sh */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;

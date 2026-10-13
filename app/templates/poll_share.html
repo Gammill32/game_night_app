@@ -31,7 +31,7 @@
                  class="person-checkbox rounded border-stone-300 text-red-600 focus:ring-red-500" />
           <div>
             <span class="text-sm font-medium text-stone-800">{{ person.first_name }} {{ person.last_name }}</span>
-            <span class="text-xs text-stone-400 ml-2">{{ person.email }}</span>
+            <span class="text-xs text-stone-500 ml-2">{{ person.email }}</span>
           </div>
         </label>
         {% endfor %}
@@ -40,7 +40,7 @@
       <p class="text-sm text-stone-500">No users with email addresses found.</p>
       {% endif %}
       {% if unclaimed %}
-      <p class="text-xs text-amber-700">{{ unclaimed }} {{ 'person hasn\'t' if unclaimed == 1 else 'people haven\'t' }} signed up yet, so they can't be emailed or answer polls. They can claim their account on the sign-up page with the name an admin added.</p>
+      <p class="text-xs text-amber-700">{{ unclaimed }} {{ 'person hasn\'t' if unclaimed == 1 else 'people haven\'t' }} signed up yet, so they can't be emailed or answer polls. Send them their <a href="{{ url_for('admin.invites') }}" class="underline">invite link</a> so they can sign up.</p>
       {% endif %}
 
       <button type="submit"

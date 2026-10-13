@@ -5,6 +5,7 @@ import pytest
 
 from app.extensions import db as _db
 from app.models import Person, Poll, PollResponse
+from app.services.errors import ServiceError
 from app.services.poll_services import (
     can_view,
     create_availability_poll,
@@ -179,12 +180,11 @@ def test_rsvps_come_from_availability_poll(app, db, poll_author, voters):
     _db.session.add_all([Player(game_night_id=gn.id, people_id=v.id) for v in voters])
     _db.session.commit()
 
-    ok, _ = create_availability_poll(gn.id, poll_author.id)
-    assert ok
+    create_availability_poll(gn.id, poll_author.id)
     poll = gn.availability_poll
     assert poll.availability and poll.game_night_id == gn.id
-    ok, msg = create_availability_poll(gn.id, poll_author.id)
-    assert not ok and "already" in msg
+    with pytest.raises(ServiceError, match="already"):
+        create_availability_poll(gn.id, poll_author.id)
 
     submit_response(poll, [poll.options[0].id], voters[0].id)
     submit_response(poll, [poll.options[2].id], voters[1].id)

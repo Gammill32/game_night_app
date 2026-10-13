@@ -40,7 +40,11 @@ services:
       - SESSION_TYPE
       - MAX_UPLOAD_MB
       - APP_BASE_URL
+      - APP_TIMEZONE
       - MEDIA_DIR=/app/media
+      # The reminder job runs in game_night_scheduler below, not in the web
+      # server (gunicorn threads/workers would otherwise each run a copy).
+      - ENABLE_SCHEDULER=false
     volumes:
       # Night photos and food receipts. Create the dataset before the first
       # deploy, or Docker makes a root-owned plain directory here instead:
@@ -70,6 +74,37 @@ services:
 
       # Service config
       - "traefik.http.services.game_night.loadbalancer.server.port=8000"
+
+  # The daily reminder emails (8:45 APP_TIMEZONE). Same image as the app,
+  # started with "scheduler" (see scripts/entrypoint.sh): no web server, no
+  # migrations (the app container runs those), no port, no media.
+  game_night_scheduler:
+    build: .
+    container_name: game_night_scheduler
+    command: ["scheduler"]
+    environment:
+      - FLASK_DEBUG
+      - SECRET_KEY
+      - DATABASE_URL
+      - MAIL_SERVER
+      - MAIL_PORT
+      - MAIL_USE_TLS
+      - MAIL_USE_SSL
+      - MAIL_USERNAME
+      - MAIL_PASSWORD
+      - MAIL_DEFAULT_SENDER
+      - APP_BASE_URL
+      - APP_TIMEZONE
+    restart: always
+    networks:
+      # game_night_internal for the database; web_network only for a way out
+      # to the SMTP server (game_night_internal is --internal: no egress).
+      - web_network
+      - game_night_internal
+    labels:
+      - "com.centurylinklabs.watchtower.enable=false"
+      # On web_network, but nothing for Traefik to route to.
+      - "traefik.enable=false"
 
 networks:
   web_network:

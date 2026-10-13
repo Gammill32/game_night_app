@@ -1,41 +1,37 @@
-{# Partial: single tracker cell. Rendered by POST /tracker/<session_id>/value #}
-{# Variables: tv, field, session, entity_type, entity_id #}
-<div id="cell-{{ field.id }}-{{ entity_type }}-{{ entity_id or 'global' }}"
-     class="flex items-center justify-center">
+{# Partial: single tracker cell. Also the response of POST /tracker/<session_id>/value.
+   Variables: tv, field, session, entity_type, entity_id.
+   Requests use hx-swap="none": juice.js updates the number at once and writes back the
+   server's value when the last request in flight answers, so the cell is never replaced. #}
+{% set cell_id = 'cell-' ~ field.id ~ '-' ~ entity_type ~ '-' ~ (entity_id or 'global') %}
+{% set vals = {"field_id": field.id|string, "entity_type": entity_type, "entity_id": (entity_id or '')|string} %}
+<div id="{{ cell_id }}" data-cell class="relative flex items-center justify-end">
   {% if field.type in ('counter', 'global_counter') %}
-    <button
-      hx-post="{{ url_for('tracker.update_value', session_id=session.id) }}"
-      hx-target="#cell-{{ field.id }}-{{ entity_type }}-{{ entity_id or 'global' }}"
-      hx-swap="outerHTML"
-      hx-vals='{"field_id": "{{ field.id }}", "entity_type": "{{ entity_type }}", "entity_id": "{{ entity_id or '' }}", "delta": "-1"}'
-      class="bg-stone-700 text-stone-200 border border-stone-600 rounded w-9 h-9 text-base hover:bg-stone-600" aria-label="Minus one">−</button>
+    <button type="button" data-step="-1"
+      hx-post="{{ url_for('tracker.update_value', session_id=session.id) }}" hx-swap="none"
+      hx-vals='{{ dict(vals, delta="-1") | tojson }}'
+      class="flex h-11 w-11 items-center justify-center rounded-lg border border-stone-300 bg-white text-xl font-medium text-stone-700 hover:bg-stone-50 active:bg-stone-100" aria-label="{{ field.label }} minus one">−</button>
     <input type="number" inputmode="numeric" name="value" value="{{ tv.value }}" aria-label="{{ field.label }}"
-           class="mx-1 w-14 rounded border border-transparent bg-transparent text-center text-lg font-bold text-stone-100 focus:border-stone-500 focus:bg-stone-800 focus:outline-none"
-           hx-post="{{ url_for('tracker.update_value', session_id=session.id) }}"
-           hx-trigger="change"
-           hx-target="#cell-{{ field.id }}-{{ entity_type }}-{{ entity_id or 'global' }}"
-           hx-swap="outerHTML"
-           hx-vals='{"field_id": "{{ field.id }}", "entity_type": "{{ entity_type }}", "entity_id": "{{ entity_id or '' }}"}'>
-    <button
-      hx-post="{{ url_for('tracker.update_value', session_id=session.id) }}"
-      hx-target="#cell-{{ field.id }}-{{ entity_type }}-{{ entity_id or 'global' }}"
-      hx-swap="outerHTML"
-      hx-vals='{"field_id": "{{ field.id }}", "entity_type": "{{ entity_type }}", "entity_id": "{{ entity_id or '' }}", "delta": "1"}'
-      class="bg-stone-700 text-stone-200 border border-stone-600 rounded w-9 h-9 text-base hover:bg-stone-600" aria-label="Plus one">+</button>
+           {% if field.is_score_field %}data-score{% endif %}
+           class="mx-1 w-14 rounded-lg border border-transparent bg-transparent text-center text-xl font-bold tabular-nums text-stone-900 focus:border-stone-300 focus:bg-stone-50 focus:outline-none"
+           hx-post="{{ url_for('tracker.update_value', session_id=session.id) }}" hx-trigger="change" hx-swap="none"
+           hx-vals='{{ vals | tojson }}'>
+    <button type="button" data-step="1"
+      hx-post="{{ url_for('tracker.update_value', session_id=session.id) }}" hx-swap="none"
+      hx-vals='{{ dict(vals, delta="1") | tojson }}'
+      class="flex h-11 w-11 items-center justify-center rounded-lg border border-red-600 bg-red-600 text-xl font-medium text-white hover:bg-red-700 active:bg-red-800" aria-label="{{ field.label }} plus one">+</button>
   {% elif field.type == 'checkbox' %}
     {# An unticked box sends no value; the server reads that as "false". #}
-    <input type="checkbox" name="value" value="true" {% if tv.value == 'true' %}checked{% endif %} aria-label="{{ field.label }}"
-           class="w-5 h-5 accent-blue-500 cursor-pointer"
-           hx-post="{{ url_for('tracker.update_value', session_id=session.id) }}"
-           hx-swap="none"
-           hx-vals='{"field_id": "{{ field.id }}", "entity_type": "{{ entity_type }}", "entity_id": "{{ entity_id or '' }}", "kind": "checkbox"}'>
+    <label class="flex h-11 w-11 cursor-pointer items-center justify-center">
+      <input type="checkbox" name="value" value="true" {% if tv.value == 'true' %}checked{% endif %} aria-label="{{ field.label }}"
+             class="h-6 w-6 cursor-pointer accent-red-600"
+             hx-post="{{ url_for('tracker.update_value', session_id=session.id) }}" hx-swap="none"
+             hx-vals='{{ dict(vals, kind="checkbox") | tojson }}'>
+    </label>
   {% else %}
     {# player_notes or global_notes #}
     <input type="text" name="value" value="{{ tv.value }}" aria-label="{{ field.label }}"
-           class="bg-stone-800 border border-stone-600 rounded px-2 py-1 text-sm text-stone-300 w-full"
-           hx-post="{{ url_for('tracker.update_value', session_id=session.id) }}"
-           hx-swap="none"
-           hx-trigger="change"
-           hx-vals='{"field_id": "{{ field.id }}", "entity_type": "{{ entity_type }}", "entity_id": "{{ entity_id or '' }}"}'>
+           class="w-full min-w-0 rounded-lg border border-stone-300 px-3 py-2 text-sm text-stone-800"
+           hx-post="{{ url_for('tracker.update_value', session_id=session.id) }}" hx-swap="none" hx-trigger="change"
+           hx-vals='{{ vals | tojson }}'>
   {% endif %}
 </div>

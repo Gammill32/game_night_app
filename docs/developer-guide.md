@@ -14,7 +14,7 @@ This is a fork of [game_night_app](https://github.com/Gammill32/game_night_app).
 - **Flask-Migrate (Alembic)** added for database schema management — all schema changes now go through versioned migrations in `migrations/versions/`
 - **GitHub Actions CI** runs on every push/PR: lint → type check → security scan → pytest → Docker build → image publish to GHCR
 - **Dockerfile** upgraded from Python 3.10 → 3.11; entrypoint runs `flask db upgrade` automatically before starting gunicorn
-- **Tailwind CSS** (CDN) replaces custom CSS; **HTMX** (CDN) added for async page fragments
+- **Tailwind CSS** replaces custom CSS (built with the pinned standalone CLI, `scripts/build_css.sh`; started on the CDN); **HTMX** (CDN) added for async page fragments
 - **pytest** infrastructure with PostgreSQL-backed integration tests (see [Testing](#testing))
 
 ### Features Added
@@ -135,7 +135,7 @@ cp .env.example .env
 | `APP_BASE_URL` | No | `https://gamenight.sgammill.com` | Public URL used for links in emails sent by the scheduler (no request to take it from) |
 | `MEDIA_DIR` | No | `/app/media` | Where night photos are stored; bind-mount a persistent volume here, writable by uid 1000 |
 | `MAX_UPLOAD_MB` | No | `20` | Largest photo upload accepted |
-| `ENABLE_SCHEDULER` | No | `true` | Set `false` to skip the reminder scheduler (dev tooling and tests do) |
+| `ENABLE_SCHEDULER` | No | `true` | Set `false` to skip the reminder scheduler in this process. `docker-compose.yml` sets it `false` on the web container (the `game_night_scheduler` container runs the job); dev tooling and tests set it too |
 
 ---
 
@@ -146,6 +146,8 @@ CI runs the tests on every push.
 Tests live in `tests/` and are split by layer:
 - `tests/blueprints/` — route-level integration tests
 - `tests/services/` — service-layer unit/integration tests
+
+Migrations run once per session. Each test then runs inside one transaction that's rolled back when it ends (the `_rollback_after_test` fixture in `tests/conftest.py`): `db.session.commit()` and `rollback()` become savepoint operations, so code under test behaves as usual but nothing a test writes reaches the next test, even if it fails before cleaning up. Server-side `now()` stays fixed for the whole test, and ids aren't reused (sequences don't roll back). A test that needs another connection or process to see its rows is marked `@pytest.mark.real_commits`; it commits for real and must clean up after itself (`tests/services/test_unique_races.py` does).
 
 CI runs them with:
 
@@ -251,6 +253,13 @@ Always review the auto-generated migration before applying it — Alembic someti
                                                                                        └─ q4r5s6t7u8v9  remove_votes_for_unnominated_games
                                                                                             └─ r5s6t7u8v9w0  night_hosts
                                                                                                  └─ s6t7u8v9w0x1  night_address
+                                                                                                      └─ t7u8v9w0x1y2  badge_rules_match_checks
+                                                                                                           └─ u8c1a2s3c4d5  tracker_player_fk_cascade
+                                                                                                                └─ u8c2u3n4i5q6  one_row_per_thing
+                                                                                                                     └─ u8c3v4i5e6w7  drop_unused_night_list_views
+                                                                                                                          └─ u8c4r5a6n7k8  rankings_count_every_place
+                                                                                                                               └─ u8v9w0auth01  session_tokens_and_auth_throttle
+                                                                                                                                    └─ v9w0x1y2z3a4  drop_blank_results
 ```
 
 ### Existing Production Database (Brownfield Setup)
@@ -265,23 +274,32 @@ Then future migrations will apply normally with `flask db upgrade`.
 
 ### Database Views
 
-The app uses 9 PostgreSQL views for performance (e.g., `GameNightRankings`, `GamesIndex`). These are tracked in migration `a1b2c3d4e5f6_create_views.py`. If you're starting from sgammill's original database, run `flask db upgrade` from the beginning to create them, or manually verify the views exist.
+The app uses 5 PostgreSQL views for performance (e.g., `GameNightRankings`, `GamesIndex`). These are tracked in migration `a1b2c3d4e5f6_create_views.py`. If you're starting from sgammill's original database, run `flask db upgrade` from the beginning to create them, or manually verify the views exist.
 
 ---
 
 ## User Management
 
-The app uses **invite-only signup**. A new user cannot register themselves — an admin must create their account first.
+People are added by name first (so they can be put on nights before they have an account), then claim that person with a personal **invite link**. Sign-up is invite-only: `/signup` without a link only explains how to get one, and typing a name never attaches to someone already on the site.
 
 ### Adding a New User
 
 1. Log in as an admin
-2. Go to **Admin → Add Person**
-3. Enter the person's first and last name
-4. The system creates a `Person` record with a temporary password
-5. Send the person the app URL — they sign up using their name to claim the account
+2. Go to **Admin → Add Person** and enter their first and last name
+3. On the Admin page, their row says *Not signed up yet* with **Copy invite link**
+4. Send them the link; it opens sign-up prefilled as that person and they add an email and password
 
-Hosts can also add someone by name from the start/edit night form (**Not on the site? Add them**, `POST /people/quick_add`); that person claims the account the same way.
+Invite links are signed with `SECRET_KEY` (`itsdangerous`, salt `person-invite`), last 14 days, and stop working once the person has signed up or has been deactivated (the link includes a digest of `people.session_token`, which deactivation changes). A link also names who made it and stops working if they could no longer make it: they lost admin or hosting, or an admin has since given the person rights. Whatever rights an admin gave the person (admin, Can host) carry over when they claim it.
+
+Hosts can also add someone by name from the start/edit night form (**Not on the site? Add them**, `POST /people/quick_add`). Hosts get invite links from **Profile → Invite people** (`/invites`) for their own guests: unclaimed people who have only ever played on nights that host ran, and whom no admin has given rights to.
+
+### Sign-in security
+
+- One password rule everywhere (`auth_services.password_problem`): 8+ characters, at most 72 bytes (bcrypt's limit).
+- `Person.get_id()` returns `"<id>:<session_token>"` (Flask-Login's alternative token). Changing or resetting a password, or deactivating someone, sets a new token, which logs out their other sessions; the session that changed the password is logged back in.
+- Failed sign-ins (per email *from* an address, and per address) and reset requests are counted in `auth_throttle`, so the limits hold across workers and threads. Keying the email limit by address too means guessing at an account from one place can't lock its owner out elsewhere. Tests turn this off with `AUTH_THROTTLE = False`.
+- The client address comes from `ProxyFix` (one trusted proxy: Traefik). If the domain is ever put behind Cloudflare or another proxy, every visitor would share that proxy's address and the per-address limit; trust its client-IP header only from its published ranges.
+- Accounts still flagged `temp_pass` (from the original app's mailed temporary passwords) can't sign in with that password; they use Forgot password.
 
 **Removing** someone who has played deactivates them (`people.active = false`) so their results and stats stay; people with no history are deleted.
 
@@ -314,54 +332,38 @@ A night can have an optional `address`. Only people who can open the night see i
 
 26 badges are automatically evaluated when a game night is **finalized** (marked as complete). The evaluation runs in `app/services/badge_services.py`.
 
-| Badge | Trigger |
-|-------|---------|
-| First Blood | Win your first game |
-| Hat Trick | Win 3 games in one night |
-| Bench Warmer | Attend 3+ nights without a win |
-| Jack of All Trades | Play 5+ different games |
-| The Diplomat | Play in every game of a night |
-| Opening Night | Host the first game night |
-| Redemption Arc | Win after 2+ losses to the same person |
-| The Rematch | Play the same game again after losing |
-| Dark Horse | Win with the longest losing streak |
-| Veteran | Attend 10 game nights |
-| Century Club | Attend 100 game nights |
-| Variety Pack | Play 25 unique games total |
-| Night Owl | Attend 5+ game nights that go past midnight |
-| Gracious Host | Host 5+ game nights |
-| Collector | Own 10+ games |
-| Early Bird | Be the first to RSVP to 3 game nights |
-| Founding Member | Attend one of the first 3 game nights |
-| Winning Streak | Win 3 games in a row (across nights) |
-| The Closer | Win the last game of a night |
-| Nemesis | Lose to the same person 3+ times |
-| Kingslayer | Beat the person with the most wins |
-| Upset Special | Win despite lowest win rate |
-| Grudge Match | Beat your nemesis |
-| Most Wins | Most wins in a single game night |
-| Social Butterfly | Play with 5+ different people in one night |
-| The Oracle | Correctly predict the game night winner |
+After changing a badge rule, run `flask badges recheck --dry-run` to see which awards would be added or removed when every finalized night is re-judged in date order, then `flask badges recheck` to save those changes in one transaction. Awards that still qualify are left as they are. Collector and Social Butterfly are skipped: they're judged on today's data (games owned now, who's active now), not on the night's history, so re-judging old nights would date or remove them wrongly; finalizing a night still awards them.
+
+| Badge | Rule |
+|-------|------|
+| First Blood | First time winning any game at a game night |
+| Hat Trick | Win 3 games in a single game night session |
+| Veteran | Attend 25 game nights total |
+| Kingslayer | Beat the person with the most all-time wins in a head-to-head game |
+| Collector | Own 10+ games in the group library |
+| Variety Pack | Play 10 different unique games across any number of nights |
+| Nemesis | One specific person has beaten you 5+ times in the same game |
+| Redemption Arc | Win a game you have previously lost 3+ times |
+| Night Owl | Attend 5 game nights in a single calendar month |
+| Gracious Host | Attend every game night in a calendar year (awarded once the year is over) |
+| Jack of All Trades | Finish in the top half in every game played at a single game night |
+| Upset Special | Beat a player whose win rate against you was 80% or more (min 5 games) |
+| Bench Warmer | Attend a game night but finish last in every game you played |
+| Grudge Match | Play the same game against the same opponent 10+ times |
+| The Closer | Win the last game at 5 consecutive game nights you attended |
+| Opening Night | Play in the very first game night ever recorded |
+| Winning Streak | Win at least one game at 3 consecutive game nights you attended |
+| The Diplomat | Play a game night where every game ends in a tie or shared first place |
+| Host with the Most | Host 10 game nights |
+| The Rematch | Play the same game at back-to-back consecutive game nights you attended |
+| Century Club | Play in 100 total game night games across all nights |
+| Dark Horse | Within one game night: finish last in your first 3 games then win the last |
+| Social Butterfly | Play at least one game with everyone else who has played |
+| The Oracle | Nominate a game, have it played, and win it — 5 times |
+| Founding Member | Be one of the first 5 people to ever play a game night |
+| Most Wins | Once hold the record for most all-time wins across the group |
 
 Badges are displayed on the **user stats page** (`/user_stats`) and on each game night's **recap page** (`/game_night/<id>/recap`).
-
-To retroactively evaluate badges on an existing database (e.g., after first deployment):
-
-```bash
-sudo docker compose -f docker-compose.dev.yml exec app flask shell
-```
-
-```python
-from app.models import GameNight
-from app.services.badge_services import evaluate_badges_for_night
-from app import db
-
-nights = GameNight.query.filter_by(final=True).all()
-for night in nights:
-    evaluate_badges_for_night(night.id)
-db.session.commit()
-print(f"Evaluated {len(nights)} nights")
-```
 
 ### Game Night Recap
 
@@ -395,6 +397,67 @@ sudo docker compose up -d
 
 The entrypoint automatically runs `flask db upgrade` before starting gunicorn, so migrations apply on deploy without manual intervention.
 
+### Before the first deploy of the October 2026 changes
+
+Run these against production first (read-only):
+
+```sql
+-- the main things migration u8c2 merges or deletes (its docstring lists every step and which row it keeps):
+-- people on a night twice
+SELECT game_night_id, people_id, count(*) FROM players GROUP BY 1, 2 HAVING count(*) > 1;
+-- more than one result for a player in one game
+SELECT game_night_game_id, player_id, count(*) FROM results GROUP BY 1, 2 HAVING count(*) > 1;
+-- the same vote twice
+SELECT player_id, game_id, count(*) FROM game_votes GROUP BY 1, 2 HAVING count(*) > 1;
+-- a game nominated twice on a night (the later nominations are dropped, which can change The Oracle)
+SELECT game_night_id, game_id, count(*) FROM game_nominations GROUP BY 1, 2 HAVING count(*) > 1;
+-- votes for a game that isn't nominated that night (deleted outright)
+SELECT gv.id FROM game_votes gv
+ WHERE NOT EXISTS (SELECT 1 FROM game_nominations n
+                    WHERE n.game_night_id = gv.game_night_id AND n.game_id = gv.game_id);
+-- the same wishlist entry twice
+SELECT person_id, game_id, count(*) FROM wishlist GROUP BY 1, 2 HAVING count(*) > 1;
+
+-- result rows with neither score nor place: migration v9w0 deletes them
+SELECT count(*) FROM results WHERE score IS NULL AND position IS NULL;
+
+-- anything built on the four views migration u8c3 drops (it fails rather than cascade)
+SELECT DISTINCT dependent.relname FROM pg_depend d
+  JOIN pg_rewrite r ON r.oid = d.objid
+  JOIN pg_class dependent ON dependent.oid = r.ev_class
+  JOIN pg_class source ON source.oid = d.refobjid
+ WHERE source.relname IN ('user_recent_future_game_nights', 'admin_recent_future_game_nights',
+                          'user_game_nights_list', 'admin_game_nights_list')
+   AND dependent.relname NOT IN ('user_recent_future_game_nights', 'admin_recent_future_game_nights',
+                                 'user_game_nights_list', 'admin_game_nights_list');
+
+-- old temporary passwords still set (they can no longer sign in; those people use Forgot password?)
+SELECT count(*) FROM people WHERE temp_pass;
+```
+
+Take a backup first (`pg_dump`): the duplicate and blank-row deletions can't be undone by a downgrade.
+
+and `\d players`, `\d wishlist`, `\d ownedby`, `\d game_nominations` in psql: if the brownfield database has its own unique indexes on those tables under other names, drop them in a migration so double-submits are recognised by the constraint names in `app/services/db_utils.py`. After deploying all four parts (not before: the blank-row cleanup only arrives in the last one, and a recheck before it would count blank rows as games played), run `flask badges recheck --dry-run`, read the list, then `flask badges recheck`.
+
+### Containers: web and scheduler
+
+`docker-compose.yml` runs two containers from the same image:
+
+| Container | Command | Does |
+|-----------|---------|------|
+| `game_night_app` | (default) | Waits for the database, runs `flask db upgrade`, then gunicorn: **1 worker process, 4 threads** (`-k gthread --threads 4`). `ENABLE_SCHEDULER=false`. |
+| `game_night_scheduler` | `scheduler` | Waits for the database, then `python -m app.scheduler` (`app/scheduler.py`): the daily reminder job at 8:45 `APP_TIMEZONE`, nothing else. No migrations, no port, no media volume. |
+
+`sudo docker compose up -d --build` builds and starts both; there's nothing else to do. The scheduler needs the same `DATABASE_URL`, `SECRET_KEY`, `MAIL_*`, `APP_BASE_URL` (and `APP_TIMEZONE` if you set it) as the app, from the same place. It sits on `web_network` as well as `game_night_internal` only because `game_night_internal` has no route out to the SMTP server; its `traefik.enable=false` label keeps Traefik from routing to it. Its logs: `sudo docker logs game_night_scheduler` (one "Scheduler running: daily_game_night_reminder, next run ..." line at start).
+
+Why: the web used to be one *sync* gunicorn worker, so one slow request (a photo upload, a batch of emails) held up every other visitor, and it couldn't have more because the scheduler ran inside it and would have been duplicated. Now the web has threads and the scheduler has its own process.
+
+Things to know before changing this:
+
+- **Keep `ENABLE_SCHEDULER=false` on the web if you raise `-w` above 1**, or every worker sends its own copy of each reminder. (With `-w 1`, even `true` only runs it once, so an older compose file without the scheduler service still works.)
+- In-process state is fine with threads: the BGG search cache is a `TTLCache` behind a lock, Flask-SQLAlchemy sessions are per request, and there are no other module-level caches. With more than one *worker process*, the BGG cache would be per process (harmless) and filesystem sessions still work because they're files in the container. With more than one *container* behind Traefik, sessions would need a shared store (`SESSION_TYPE=redis`).
+- Reminder jobs live in memory: if the scheduler container is down (or restarting during a deploy) at 8:45, that day's reminders don't go out. A wake-up up to an hour late still runs them (`misfire_grace_time`).
+
 ### Generating a Production SECRET_KEY
 
 ```bash
@@ -424,7 +487,12 @@ A failed lint or test blocks the merge. The 60% coverage gate is a minimum floor
 
 - Python 3.11, line length 100, ruff rules E/F/I/UP
 - Snake_case for functions and variables; PascalCase for classes and models
-- Blueprints handle HTTP only; all logic goes in services
-- Templates use Tailwind CSS (CDN) and HTMX for async fragments
+- Blueprints handle HTTP only (request parsing, auth decorators, flash/render/redirect); queries and writes go in services
+- **Service errors:** a service that refuses an operation raises `ServiceError(message, status=400)` (`app/services/errors.py`); `FoodError`, `MediaError` and `NightRuleError` subclass it. On success it returns the message to show (or the object it made). Routes don't catch it: the handler in `app/utils/errors.py` rolls back, then flashes the message and redirects back (form posts) or returns `{"error": message}` (JSON) / the bare message (HTMX fragment) with the status. A blueprint whose pages should land somewhere specific registers its own `@bp.errorhandler(ServiceError)` that calls `service_error_response(e, redirect_to=...)` (food → `#food`, photos → `#photos`, voting and night routes → the night page). Routes that re-render a form on error (start/edit night) catch `ServiceError` themselves; so do routes that should land somewhere other than their blueprint's default (tracker launch → setup, end game → live tracker, save results → confirm page, delete night → home, RSVP poll → `#polls`), and they hand it to `service_error_response(e, redirect_to=...)` so the rollback and the JSON/HTMX answers stay in one place.
+  - Converted: `food_services`, `photo_services`, `tracker_services`, `voting_services`, `game_night_services`, `poll_services.create_availability_poll`.
+  - Still `(ok, message[, obj])` tuples: `admin_services`, `auth_services` (login/signup/reset carry status like "too many attempts"), `games_services`, `payment_services`, `poll_services.submit_response` and `date_poll_services.submit_answers` (they re-render the poll widget with the message either way), `date_poll_services.pick_date`, and `game_night_services.finalize`/`unfinalize` (an "already finalized" outcome, flashed as info, not an error). Convert these the same way when touching them.
+- **One commit per operation:** an operation that writes several things commits once at the end; helpers it calls only `flush()` (e.g. `poll_services.add_poll` / `add_availability_poll` vs `create_poll` / `create_availability_poll`). Deliberate exceptions: `finalize` commits before awarding badges (a badge failure mustn't undo finalizing), `get_or_create_game` commits the library row before ownership/wishlist is added (the game belongs in the library either way), and the sign-in throttle (`auth_services._record`) commits its attempt rows itself (a refused sign-in must still count).
+- **Unique constraints and double-submits:** don't look a row up and then insert it. Use `app/services/db_utils.py`: `upsert()` (`INSERT ... ON CONFLICT DO UPDATE`, results and votes) or `add_unless_duplicate()` (savepoint; a duplicate means "already done": players, wishlist, ownership, nominations).
+- Templates use Tailwind CSS (built: run `scripts/build_css.sh` after using a new class and commit `app/static/css/tailwind.css`; CI fails on a stale file) and HTMX for async fragments
 - No docstrings required; add comments only where logic is non-obvious
 - Commits: no AI co-author lines

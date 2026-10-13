@@ -49,6 +49,12 @@ jobs:
           ruff check .
           ruff format --check .
 
+      - name: Built CSS is up to date
+        run: |
+          scripts/build_css.sh
+          git diff --exit-code -- app/static/css/tailwind.css || {
+            echo "::error::app/static/css/tailwind.css is stale: run scripts/build_css.sh and commit it"; exit 1; }
+
       - name: Type check (mypy)
         run: mypy app/ tests/
 

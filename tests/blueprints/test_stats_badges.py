@@ -60,7 +60,25 @@ def test_badges_link_back_to_the_night(client, make_person, make_night):
     night = client.get(f"/game_night/{gn.id}").get_data(as_text=True)
     assert "Badges earned this night" in night and first_blood.description in night
 
+    # The "New badge!" dialog's feed: newest first, with a link to the night
+    import json
+    import re
+
     from app.models import PersonBadge
+
+    home = client.get("/").get_data(as_text=True)
+    feed = json.loads(
+        re.search(r'id="gn-new-badges" data-uid="\d+">(.*?)</script>', home, re.S).group(1)
+    )
+    mine = PersonBadge.query.filter_by(person_id=ann.id).order_by(PersonBadge.id.desc()).all()
+    assert [b["id"] for b in feed] == [pb.id for pb in mine][:10]
+    assert any(
+        b["name"] == first_blood.name and b["night_url"].endswith(f"/game_night/{gn.id}#badges")
+        for b in feed
+    )
+    # You-are-here in the nav
+    assert re.search(r'href="/badges"', catalog)
+    assert re.search(r'href="/user_stats"\s+title="Stats" aria-current="page"', catalog)
 
     PersonBadge.query.filter_by(game_night_id=gn.id).delete()
     _db.session.delete(gn)

@@ -19,7 +19,7 @@
         <label class="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-2 text-sm hover:bg-stone-50">
           <input type="checkbox" name="{{ name }}" value="{{ p.id }}" data-label="{{ 'You' if p.id == current_user.id else p.name }}" class="h-4 w-4 accent-red-600">
           <span class="flex-1">{{ 'You' if p.id == current_user.id else p.name }}</span>
-          <span class="text-xs text-stone-400">{{ p.count }} {{ count_noun }}</span>
+          <span class="text-xs text-stone-500">{{ p.count }} {{ count_noun }}</span>
         </label>
       </li>
       {% endfor %}

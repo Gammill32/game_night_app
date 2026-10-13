@@ -12,7 +12,7 @@
         {% for value, label in [('yes', 'Yes'), ('maybe', 'If needed'), ('no', 'No')] %}
         <label class="cursor-pointer">
           <input type="radio" name="answer_{{ option.id }}" value="{{ value }}" {% if mine == value %}checked{% endif %} class="peer sr-only">
-          <span class="inline-block rounded-full border border-stone-300 px-2.5 py-1 text-xs font-medium text-stone-600 peer-checked:text-white peer-focus-visible:ring-2 peer-focus-visible:ring-red-400 {{ answer_styles[value] }}">{{ label }}</span>
+          <span class="inline-flex min-h-[2.5rem] items-center rounded-full border border-stone-300 px-3 text-sm font-medium text-stone-600 peer-checked:text-white peer-focus-visible:ring-2 peer-focus-visible:ring-red-400 {{ answer_styles[value] }}">{{ label }}</span>
         </label>
         {% endfor %}
       </span>
@@ -23,7 +23,7 @@
     <button type="submit" class="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 transition-colors">
       {{ 'Update my dates' if date_answers else 'Submit' }}
     </button>
-    {% if poll.closes_at %}<span class="text-xs text-stone-400">Closes {{ (poll.closes_at|local_dt).strftime('%b %-d at %-I:%M %p') }}</span>{% endif %}
+    {% if poll.closes_at %}<span class="text-xs text-stone-500">Closes {{ (poll.closes_at|local_dt).strftime('%b %-d at %-I:%M %p') }}</span>{% endif %}
   </div>
 </form>
 {% else %}

@@ -1,0 +1,28 @@
+{# Badges earned this night, grouped by person, as tappable chips that open the badge dialog.
+   Used by the night page and the public recap. Expects: badge_awards, a list of
+   {who, me, icon, name, rule}; optional show_all_link. #}
+{% if badge_awards %}
+<!-- Badges earned this night -->
+<section id="badges" class="rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
+  <div class="mb-3 flex items-baseline justify-between gap-2">
+    <h2 class="text-lg font-semibold text-stone-800">🏅 Badges earned</h2>
+    {% if show_all_link %}<a href="{{ url_for('games.badges') }}" class="text-sm text-stone-500 underline hover:text-red-600">All badges</a>{% endif %}
+  </div>
+  <ul class="space-y-2">
+    {% for who, awards in badge_awards | groupby('who') %}
+    {% set me = awards[0].me %}
+    <li class="flex flex-wrap items-center gap-2 rounded-lg px-3 py-2 {{ 'bg-green-50 ring-1 ring-green-200' if me else 'bg-stone-50' }}">
+      <span class="w-full text-sm font-semibold text-stone-800 sm:w-28 sm:shrink-0">{{ 'You' if me else who }}</span>
+      {% for b in awards %}
+      <button type="button" data-badge-icon="{{ b.icon }}" data-badge-name="{{ b.name }}" data-badge-rule="{{ b.rule }}"
+              data-badge-when="{{ ('You' if me else who) ~ ' earned it at this game night.' }}"
+              class="inline-flex min-h-[2.5rem] items-center gap-1.5 rounded-full border border-stone-200 bg-white px-3 text-sm font-medium text-stone-700 hover:border-red-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-400">
+        <span aria-hidden="true">{{ b.icon }}</span>{{ b.name }}
+      </button>
+      {% endfor %}
+    </li>
+    {% endfor %}
+  </ul>
+  <p class="mt-2 text-xs text-stone-500">Tap a badge to see what it's for.</p>
+</section>
+{% endif %}

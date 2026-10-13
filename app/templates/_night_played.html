@@ -13,10 +13,11 @@
     {% if not game_night_games %}<p class="text-sm text-stone-500">No games added yet. Add one when you sit down to play.</p>{% endif %}
     <ul class="space-y-6">
       {% for gng in game_night_games %}
-      <li class="border-b border-stone-100 last:border-0 pb-6 last:pb-0">
+      <li data-gng="{{ gng.game_night_game_id }}" class="border-b border-stone-100 last:border-0 pb-6 last:pb-0">
         <div class="flex gap-4">
           <a href="{{ url_for('games.view_game', game_id=gng.game_id) }}" class="flex-shrink-0">
-            <img src="{{ gng.game_image_url }}" alt="{{ gng.game_name }}" class="h-16 w-16 rounded-lg object-cover border border-stone-200">
+            {% if gng.game_image_url %}<img src="{{ gng.game_image_url }}" alt="{{ gng.game_name }}" class="h-16 w-16 rounded-lg object-cover border border-stone-200">
+            {% else %}<span class="flex h-16 w-16 items-center justify-center rounded-lg bg-stone-100 text-2xl" aria-hidden="true">🎲</span>{% endif %}
           </a>
           <div class="flex-1 min-w-0">
             <div class="flex items-start justify-between gap-2 mb-1">
@@ -26,12 +27,23 @@
             <p class="text-xs text-stone-500 mb-3 flex flex-wrap items-center gap-x-3 gap-y-1">
               <span>Your rating: {{ user_ratings_by_game_id.get(gng.game_id, 'not rated') }}</span>
               {% if gng.game_id not in owned_game_ids %}
-              <form action="{{ url_for('games.toggle_wishlist', game_id=gng.game_id) }}" method="POST" class="inline">
-                <button type="submit" class="underline hover:text-red-600">{% if gng.game_id in wishlist_game_ids %}♥ On your wishlist{% else %}♡ Add to wishlist{% endif %}</button>
+              {% set on_list = gng.game_id in wishlist_game_ids %}
+              <form action="{{ url_for('games.toggle_wishlist', game_id=gng.game_id) }}" method="POST" class="inline" data-juice="heart">
+                <button type="submit" aria-pressed="{{ 'true' if on_list else 'false' }}"
+                        class="group inline-flex min-h-[2.5rem] items-center gap-1 hover:text-red-600"><span data-heart class="text-base text-red-600" aria-hidden="true">{{ '♥' if on_list else '♡' }}</span><span data-label class="underline">{{ 'On your wishlist' if on_list else 'Add to wishlist' }}</span></button>
               </form>
               {% endif %}
             </p>
 
+            {% if not game_night.final and not can_manage and current_player_id %}
+            {% set tracker_session = tracker_sessions.get(gng.game_night_game_id) %}
+            {% if tracker_session and tracker_session.status == 'active' %}
+            <a href="{{ url_for('tracker.live_tracker', session_id=tracker_session.id) }}"
+               class="mb-3 inline-flex min-h-[2.75rem] items-center rounded-lg border border-blue-300 px-3 text-sm font-medium text-blue-600 hover:bg-blue-50 transition-colors">
+              &#9654; Join live tracker
+            </a>
+            {% endif %}
+            {% endif %}
             {% if not game_night.final and can_manage %}
             <div class="flex flex-wrap gap-2 mb-3">
               <form action="{{ url_for('game_night.log_results', game_night_id=game_night.id, game_night_game_id=gng.game_night_game_id) }}" method="GET">
@@ -78,10 +90,10 @@
                 </thead>
                 <tbody>
                   {% for result in gng.results %}
-                  <tr class="border-b border-stone-100 last:border-0 {{ 'bg-amber-50/60' if result.position == 1 else '' }}">
+                  <tr class="border-b border-stone-100 last:border-0 {{ 'bg-amber-50/60' if result.position == 1 else '' }}" {% if result.position == 1 %}data-winner-row{% endif %}>
                     <td class="py-1.5 pr-4 text-sm text-stone-700">{% if result.position == 1 %}🏆 {% endif %}{{ result.first_name }} {{ result.last_name }}</td>
                     <td class="py-1.5 pr-4 text-sm text-stone-700">{% if result.position is not none %}{{ result.position }}{% else %}-{% endif %}</td>
-                    <td class="py-1.5 text-sm text-stone-700">{% if result.score is not none %}{{ result.score }}{% else %}-{% endif %}</td>
+                    <td class="py-1.5 text-sm tabular-nums text-stone-700" {% if result.score is not none %}data-score-cell{% endif %}>{% if result.score is not none %}{{ result.score }}{% else %}-{% endif %}</td>
                   </tr>
                   {% else %}
                   <tr>
@@ -96,5 +108,13 @@
       </li>
       {% endfor %}
     </ul>
+    {% if can_manage and ready_to_finalize %}
+    <form action="{{ url_for('game_night.finalize_game_night', game_night_id=game_night.id) }}" method="POST"
+          data-confirm="Finalize this night? This awards badges and closes the night’s polls."
+          class="mt-5 flex flex-wrap items-center justify-end gap-3 border-t border-stone-100 pt-4">
+      <span class="text-xs text-stone-500">All games logged?</span>
+      <button class="rounded-lg bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700">Finalize night · awards badges</button>
+    </form>
+    {% endif %}
   </div>
   {% endif %}

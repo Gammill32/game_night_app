@@ -105,7 +105,7 @@
             {% else %}
             <li class="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
               <span>{{ 'You' if s.mine else s.share.person.first_name ~ ' ' ~ s.share.person.last_name }} · {{ s.share.amount_cents|money }}
-                {% if s.is_buyer %}<span class="text-xs text-stone-400">(bought it)</span>
+                {% if s.is_buyer %}<span class="text-xs text-stone-500">(bought it)</span>
                 {% elif s.share.paid %}<span class="rounded-full bg-green-100 px-1.5 text-xs text-green-800">paid ✓</span>
                 {% else %}<span class="rounded-full bg-amber-100 px-1.5 text-xs text-amber-800">owes {{ buyer }}</span>{% endif %}
               </span>

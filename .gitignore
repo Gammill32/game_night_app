@@ -48,3 +48,6 @@ postgres_data/
 
 # Uploaded media in local runs
 media/
+
+# Tailwind standalone binary (scripts/build_css.sh)
+.cache/

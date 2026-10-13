@@ -7,15 +7,28 @@ from flask_login import current_user, login_required
 from app.extensions import db
 from app.models import FoodExpense, FoodExpenseShare, FoodItem, GameNight
 from app.services import food_services, media_services
+from app.services.errors import ServiceError
 from app.utils import game_night_access_required
+from app.utils.errors import service_error_response
 
 food_bp = Blueprint("food", __name__, url_prefix="/game_night/<int:game_night_id>/food")
 
 
-def _done(result, game_night_id):
-    success, message = result
-    flash(message, "success" if success else "error")
-    return redirect(url_for("game_night.view_game_night", game_night_id=game_night_id) + "#food")
+def _night_food_url(game_night_id):
+    return url_for("game_night.view_game_night", game_night_id=game_night_id) + "#food"
+
+
+@food_bp.errorhandler(ServiceError)
+def _refused(error):
+    """Food services raise FoodError/MediaError: back to the night's food section."""
+    return service_error_response(
+        error, redirect_to=_night_food_url(request.view_args["game_night_id"])
+    )
+
+
+def _done(message, game_night_id):
+    flash(message, "success")
+    return redirect(_night_food_url(game_night_id))
 
 
 def _get(model, obj_id, game_night_id):

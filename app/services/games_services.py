@@ -18,6 +18,7 @@ from app.models import (
     db,
 )
 from app.services.bgg_service import BGGService
+from app.services.db_utils import add_unless_duplicate, upsert
 
 
 def get_or_create_game(game_name, bgg_id=None):
@@ -127,7 +128,7 @@ def get_filtered_games(
     min_rating_filter=None,
     scope="all",
 ):
-    user = Person.query.get(user_id)
+    user = db.session.get(Person, user_id)
 
     # Base query
     query = GamesIndex.query
@@ -214,9 +215,13 @@ def add_game_to_wishlist(user_id, game_name, bgg_id=None, game_id=None):
         return False, error, None
     if OwnedBy.query.filter_by(game_id=game.id, person_id=user_id).first():
         return False, f'You already own "{game.name}".', game
+    already = f'"{game.name}" is already on your wishlist.'
     if Wishlist.query.filter_by(game_id=game.id, person_id=user_id).first():
-        return False, f'"{game.name}" is already on your wishlist.', game
-    db.session.add(Wishlist(game_id=game.id, person_id=user_id))
+        return False, already, game
+    if not add_unless_duplicate(
+        Wishlist(game_id=game.id, person_id=user_id), "uq_wishlist_person_game"
+    ):
+        return False, already, game  # a double-submit added it first
     db.session.commit()
     return True, f'Added "{game.name}" to your wishlist.', game
 
@@ -280,9 +285,10 @@ def modify_wishlist(user_id, game_id, add=False, remove=False):
     wishlist_entry = Wishlist.query.filter_by(game_id=game_id, person_id=user_id).first()
 
     if add:
-        if wishlist_entry:
+        if wishlist_entry or not add_unless_duplicate(
+            Wishlist(game_id=game_id, person_id=user_id), "uq_wishlist_person_game"
+        ):
             return False, "Game is already in your wishlist."
-        db.session.add(Wishlist(game_id=game_id, person_id=user_id))
         db.session.commit()
         return True, "Game added to your wishlist."
 
@@ -294,20 +300,40 @@ def modify_wishlist(user_id, game_id, add=False, remove=False):
     return False, "Game not found in your wishlist."
 
 
+def toggle_wishlist(user_id, game_id):
+    """Wishlist a game, or take it off; owned games can't be wishlisted.
+    Returns (flash category, message)."""
+    if OwnedBy.query.filter_by(game_id=game_id, person_id=user_id).first():
+        return "info", "You already own this game — no need to wishlist it."
+    on_it = Wishlist.query.filter_by(game_id=game_id, person_id=user_id).first() is not None
+    success, message = modify_wishlist(user_id, game_id, add=not on_it, remove=on_it)
+    return ("success" if success else "error"), message
+
+
+def assignable_owners(game):
+    """Active people who don't own this game yet, for the admin's owner picker."""
+    owned_ids = {ob.person_id for ob in game.owners}
+    people = Person.query.filter_by(active=True).order_by(Person.first_name, Person.last_name)
+    return [p for p in people if p.id not in owned_ids]
+
+
 def modify_ownership(person_id, game_id, add=True, *, actor_is_self=True):
     """Modify ownership of a game for the given person.
 
     `actor_is_self=False` indicates an admin acting on someone else's behalf,
     which only changes message wording.
     """
-    game = Game.query.get_or_404(game_id)
+    game = db.get_or_404(Game, game_id)
     ownership = OwnedBy.query.filter_by(game_id=game.id, person_id=person_id).first()
     subject = "You" if actor_is_self else "Owner"
 
     if add:
-        if not ownership:
-            db.session.add(OwnedBy(game_id=game.id, person_id=person_id))
-            modify_wishlist(person_id, game.id, remove=True)
+        # A double-submitted claim may have added it since the lookup.
+        if not ownership and add_unless_duplicate(
+            OwnedBy(game_id=game.id, person_id=person_id), "uq_ownedby_game_person"
+        ):
+            # Owning it takes it off their wishlist, in the same commit.
+            Wishlist.query.filter_by(game_id=game.id, person_id=person_id).delete()
             db.session.commit()
             return True, f'{subject} now own "{game.name}".'
         return False, f'{subject} already own "{game.name}".'
@@ -323,7 +349,7 @@ def modify_ownership(person_id, game_id, add=True, *, actor_is_self=True):
 def get_game_details(game_id, user_id):
     """A game with its top winners (by person), the nights it was played (with
     who won), the viewer's rating and the group's average."""
-    game = Game.query.get_or_404(game_id)
+    game = db.get_or_404(Game, game_id)
 
     wins = func.count(Result.id)
     leaderboard = (
@@ -485,7 +511,9 @@ def toggle_wishlist_vote(user_id, game_id):
         db.session.commit()
         return True, "Vote removed."
 
-    db.session.add(WishlistVote(person_id=user_id, game_id=game_id))
+    add_unless_duplicate(  # a double-click may have added it already
+        WishlistVote(person_id=user_id, game_id=game_id), "wishlist_votes_person_id_game_id_key"
+    )
     db.session.commit()
     return True, "Vote added."
 
@@ -495,14 +523,12 @@ def update_game_rating(game_id, user_id, ranking):
     if ranking is None or not (0 <= ranking <= 10):
         return False, "Invalid rating. Must be between 0 and 10."
 
-    rating = GameRatings.query.filter_by(game_id=game_id, person_id=user_id).first()
-
-    if rating:
-        rating.ranking = ranking  # Update existing
-    else:
-        rating = GameRatings(game_id=game_id, person_id=user_id, ranking=ranking)
-        db.session.add(rating)
-
+    upsert(
+        GameRatings,
+        {"game_id": game_id, "person_id": user_id, "ranking": ranking},
+        "uq_game_ratings_game_person",
+        ["ranking"],
+    )
     db.session.commit()
 
     return True, "Rating saved successfully."
@@ -522,7 +548,7 @@ def youtube_id(url):
 
 def update_tutorial_url(game_id, tutorial_url):
     """Save a YouTube tutorial link (or clear it). Returns (success, message)."""
-    game = Game.query.get_or_404(game_id)
+    game = db.get_or_404(Game, game_id)
     tutorial_url = (tutorial_url or "").strip()
     if tutorial_url and not youtube_id(tutorial_url):
         return False, "That doesn't look like a YouTube video link."
@@ -681,19 +707,3 @@ def summarize_user_stats(rows):
         "average_position": round(positions / played, 2) if played else None,
         "distinct_games": len(rows),
     }
-
-
-def get_selected_games(game_ids):
-    if not game_ids:
-        return []
-    return db.session.query(Game.id, Game.name).filter(Game.id.in_(game_ids)).all()
-
-
-def get_selected_opponents(opponent_ids):
-    if not opponent_ids:
-        return []
-    return (
-        db.session.query(Person.id, Person.first_name, Person.last_name)
-        .filter(Person.id.in_(opponent_ids))
-        .all()
-    )

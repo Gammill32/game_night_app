@@ -7,6 +7,7 @@ import pytest
 
 from app.extensions import db as _db
 from app.models import Game, GameNight, GameNominations, GameVotes, OwnedBy, Person, Player
+from app.services.errors import ServiceError
 
 
 @pytest.fixture()
@@ -70,10 +71,7 @@ def test_nominate_game_success(app, voting_night):
     from app.services.voting_services import nominate_game
 
     with app.app_context():
-        success, msg = nominate_game(
-            voting_night["gn_id"], voting_night["p1_id"], voting_night["g1_id"]
-        )
-    assert success is True
+        nominate_game(voting_night["gn_id"], voting_night["p1_id"], voting_night["g1_id"])
     nom = GameNominations.query.filter_by(
         game_night_id=voting_night["gn_id"], player_id=voting_night["pl1_id"]
     ).first()
@@ -91,10 +89,8 @@ def test_nominate_game_not_a_player(app, voting_night):
     _db.session.add(outsider)
     _db.session.commit()
     try:
-        with app.app_context():
-            success, msg = nominate_game(voting_night["gn_id"], outsider.id, voting_night["g1_id"])
-        assert success is False
-        assert "not a player" in msg.lower()
+        with app.app_context(), pytest.raises(ServiceError, match="not a player"):
+            nominate_game(voting_night["gn_id"], outsider.id, voting_night["g1_id"])
     finally:
         _db.session.delete(outsider)
         _db.session.commit()
@@ -106,11 +102,8 @@ def test_nominate_game_already_nominated_by_other(app, voting_night):
 
     with app.app_context():
         nominate_game(voting_night["gn_id"], voting_night["p1_id"], voting_night["g1_id"])
-        success, msg = nominate_game(
-            voting_night["gn_id"], voting_night["p2_id"], voting_night["g1_id"]
-        )
-    assert success is False
-    assert "already been nominated" in msg.lower()
+        with pytest.raises(ServiceError, match="already been nominated"):
+            nominate_game(voting_night["gn_id"], voting_night["p2_id"], voting_night["g1_id"])
 
 
 def test_nominate_game_updates_own_nomination(app, voting_night):
@@ -119,10 +112,7 @@ def test_nominate_game_updates_own_nomination(app, voting_night):
 
     with app.app_context():
         nominate_game(voting_night["gn_id"], voting_night["p1_id"], voting_night["g1_id"])
-        success, msg = nominate_game(
-            voting_night["gn_id"], voting_night["p1_id"], voting_night["g2_id"]
-        )
-    assert success is True
+        nominate_game(voting_night["gn_id"], voting_night["p1_id"], voting_night["g2_id"])
     nom = GameNominations.query.filter_by(
         game_night_id=voting_night["gn_id"], player_id=voting_night["pl1_id"]
     ).first()
@@ -152,10 +142,7 @@ def test_vote_game_success(app, voting_night):
 
     with app.app_context():
         nominate_game(voting_night["gn_id"], voting_night["p1_id"], voting_night["g1_id"])
-        success, msg = vote_game(
-            voting_night["gn_id"], voting_night["p1_id"], {voting_night["g1_id"]: 1}
-        )
-    assert success is True
+        vote_game(voting_night["gn_id"], voting_night["p1_id"], {voting_night["g1_id"]: 1})
     vote = GameVotes.query.filter_by(
         game_night_id=voting_night["gn_id"], player_id=voting_night["pl1_id"]
     ).first()
@@ -170,13 +157,12 @@ def test_vote_game_duplicate_rank_rejected(app, voting_night):
     with app.app_context():
         nominate_game(voting_night["gn_id"], voting_night["p1_id"], voting_night["g1_id"])
         nominate_game(voting_night["gn_id"], voting_night["p2_id"], voting_night["g2_id"])
-        success, msg = vote_game(
-            voting_night["gn_id"],
-            voting_night["p1_id"],
-            {voting_night["g1_id"]: 1, voting_night["g2_id"]: 1},
-        )
-    assert success is False
-    assert "already used" in msg.lower() or "rank" in msg.lower()
+        with pytest.raises(ServiceError, match="already used"):
+            vote_game(
+                voting_night["gn_id"],
+                voting_night["p1_id"],
+                {voting_night["g1_id"]: 1, voting_night["g2_id"]: 1},
+            )
 
 
 def test_vote_game_not_a_player(app, voting_night):
@@ -187,10 +173,8 @@ def test_vote_game_not_a_player(app, voting_night):
     _db.session.add(outsider)
     _db.session.commit()
     try:
-        with app.app_context():
-            success, msg = vote_game(voting_night["gn_id"], outsider.id, {voting_night["g1_id"]: 1})
-        assert success is False
-        assert "not a player" in msg.lower()
+        with app.app_context(), pytest.raises(ServiceError, match="not a player"):
+            vote_game(voting_night["gn_id"], outsider.id, {voting_night["g1_id"]: 1})
     finally:
         _db.session.delete(outsider)
         _db.session.commit()

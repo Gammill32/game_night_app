@@ -23,7 +23,7 @@
       <a href="https://www.google.com/maps/search/?api=1&query={{ game_night.address | urlencode }}" target="_blank" rel="noopener"
          class="rounded-lg bg-red-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-red-700">Open in Maps</a>
       <button type="button" data-copy="{{ game_night.address }}" class="text-xs text-stone-600 underline">Copy</button>
-      <span class="w-full text-[11px] text-stone-400">Only players can see this; it's deleted when the night is finalized.</span>
+      <span class="w-full text-xs text-stone-500">Only players can see this; it's deleted when the night is finalized.</span>
     </div>
     {% endif %}
     <div class="mt-3 flex flex-wrap gap-2">
@@ -36,11 +36,12 @@
       <form action="{{ url_for('game_night.toggle_game_night_field', game_night_id=game_night.id, field='closed') }}" method="POST">
         <button class="rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm font-medium text-stone-700 hover:bg-stone-50">{{ 'Reopen voting' if game_night.closed else 'Close voting' }}</button>
       </form>
-      {% endif %}
-      <form action="{{ url_for('game_night.toggle_game_night_field', game_night_id=game_night.id, field='final') }}" method="POST"
-            data-confirm="{{ 'Reopen results? Badges from this night are removed until you finalize again.' if game_night.final else 'Finalize results? This awards badges and closes the night’s polls.' }}">
-        <button class="rounded-lg px-3 py-1.5 text-sm font-medium {{ 'border border-stone-300 bg-white text-stone-700 hover:bg-stone-50' if game_night.final else 'bg-red-600 text-white hover:bg-red-700' }}">{{ 'Reopen results' if game_night.final else 'Finalize results' }}</button>
+      {% else %}
+      <form action="{{ url_for('game_night.unfinalize_game_night', game_night_id=game_night.id) }}" method="POST"
+            data-confirm="Reopen results? Badges from this night are removed until you finalize again.">
+        <button class="rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm font-medium text-stone-700 hover:bg-stone-50">Reopen results</button>
       </form>
+      {% endif %}
       {% endif %}
     </div>
   </div>
@@ -48,48 +49,17 @@
 {% if game_night.final %}
   <!-- Top places -->
   {% if game_night.final and top_places %}
-  <div class="grid grid-cols-3 gap-3">
-    {% for place, player_ids in top_places %}
-    <div class="rounded-xl border p-4 text-center shadow-sm {{ 'border-amber-300 bg-amber-50' if place == 1 else 'border-stone-200 bg-white' }}">
-      <div class="text-2xl" aria-hidden="true">{{ ['🥇', '🥈', '🥉'][place - 1] if place <= 3 else '' }}</div>
-      <p class="text-xs font-semibold uppercase tracking-wide text-stone-500">{{ place }}{{ 'st' if place == 1 else 'nd' if place == 2 else 'rd' if place == 3 else 'th' }}</p>
-      {% for player_id in player_ids %}
-      {% set player = players | selectattr("id", "equalto", player_id) | first %}
-      <p class="text-sm font-semibold text-stone-800">{{ player.person.first_name ~ ' ' ~ player.person.last_name if player and player.person else 'Unknown' }}</p>
-      {% endfor %}
-    </div>
-    {% endfor %}
-  </div>
+  {% include "_podium.html" %}
   {% endif %}
 
   {% include "_night_played.html" %}
 
-  <!-- Badges earned this night -->
-  {% if night_badges %}
-  <div id="badges" class="bg-white rounded-xl border border-stone-200 shadow-sm p-5">
-    <div class="flex items-baseline justify-between gap-2 mb-3">
-      <h2 class="text-lg font-semibold text-stone-800">🏅 Badges earned</h2>
-      <a href="{{ url_for('games.badges') }}" class="text-xs text-stone-500 underline hover:text-red-600">All badges</a>
-    </div>
-    <ul class="space-y-2">
-      {% for person_id, awards in night_badges | groupby('person_id') %}
-      {% set person = awards[0].person %}
-      <li class="flex flex-wrap items-center gap-2 rounded-lg px-3 py-2 {{ 'bg-green-50 ring-1 ring-green-200' if person_id == current_user.id else 'bg-stone-50' }}">
-        <span class="w-24 shrink-0 text-sm font-semibold text-stone-800">{{ 'You' if person_id == current_user.id else person.first_name }}</span>
-        {% for pb in awards %}
-        <button type="button" data-badge-icon="{{ pb.badge.icon }}" data-badge-name="{{ pb.badge.name }}" data-badge-rule="{{ pb.badge.description }}"
-                data-badge-when="{{ ('You' if person_id == current_user.id else person.first_name) ~ ' earned it at this game night.' }}"
-                class="inline-flex items-center gap-1 rounded-full border border-stone-200 bg-white px-2.5 py-1 text-xs font-medium text-stone-700 hover:border-red-300">
-          <span aria-hidden="true">{{ pb.badge.icon }}</span>{{ pb.badge.name }}
-        </button>
-        {% endfor %}
-      </li>
-      {% endfor %}
-    </ul>
-    <p class="mt-2 text-xs text-stone-500">Tap a badge to see what it's for.</p>
-  </div>
-  {% include "_badge_dialog.html" %}
-  {% endif %}
+  {% set badge_awards = [] %}
+  {% for pb in night_badges %}
+  {% set _ = badge_awards.append({'who': pb.person.first_name ~ ' ' ~ pb.person.last_name[:1] ~ '.', 'me': pb.person_id == current_user.id,
+                                  'icon': pb.badge.icon, 'name': pb.badge.name, 'rule': pb.badge.description}) %}
+  {% endfor %}
+  {% with show_all_link = True %}{% include "_night_badges.html" %}{% endwith %}
 
   {% include "_night_photos.html" %}
 
@@ -105,7 +75,6 @@
   {% include "_night_polls.html" %}
 
   <!-- Choosing games: nominate + rank -->
-  {% set voting_open = not game_night.closed %}
   {% if voting_open or nominations %}
   {% set ranked = user_votes | length %}
   <div id="games" class="bg-white rounded-xl border border-stone-200 shadow-sm p-5">
@@ -115,7 +84,9 @@
     <!-- Where you are in the two steps -->
     <ol class="mt-3 grid gap-2 sm:grid-cols-2">
       <li class="flex items-start gap-3 rounded-lg p-3 {{ 'bg-green-50' if user_nomination else 'bg-amber-50 ring-1 ring-amber-200' }}">
-        <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold {{ 'bg-green-600 text-white' if user_nomination else 'bg-amber-500 text-white' }}">{{ '✓' if user_nomination else '1' }}</span>
+        <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold {{ 'bg-green-600 text-white' if user_nomination else 'bg-amber-500 text-white' }}">
+          {%- if user_nomination %}<svg class="gn-check h-3.5 w-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-label="Done"><path d="M3 8.5l3.2 3L13 4.5"/></svg>{% else %}1{% endif -%}
+        </span>
         <span class="text-sm">
           <strong class="block text-stone-800">Nominate one game</strong>
           {% if user_nomination %}
@@ -128,8 +99,11 @@
           {% endif %}
         </span>
       </li>
-      <li class="flex items-start gap-3 rounded-lg p-3 {{ 'bg-green-50' if ranked else ('bg-amber-50 ring-1 ring-amber-200' if nominations else 'bg-stone-50') }}">
-        <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold {{ 'bg-green-600 text-white' if ranked else ('bg-amber-500 text-white' if nominations else 'bg-stone-300 text-white') }}">{{ '✓' if ranked else '2' }}</span>
+      <li class="flex items-start gap-3 rounded-lg p-3 {{ 'bg-green-50' if ranked else ('bg-amber-50 ring-1 ring-amber-200' if nominations else 'bg-stone-50') }}"
+          {% if user_nomination and nominations and not ranked %}data-pulse-once="rank-{{ game_night.id }}"{% endif %}>
+        <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold {{ 'bg-green-600 text-white' if ranked else ('bg-amber-500 text-white' if nominations else 'bg-stone-400 text-white') }}">
+          {%- if ranked %}<svg class="gn-check h-3.5 w-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-label="Done"><path d="M3 8.5l3.2 3L13 4.5"/></svg>{% else %}2{% endif -%}
+        </span>
         <span class="text-sm">
           <strong class="block text-stone-800">Rank your top 3</strong>
           <span class="text-stone-600">
@@ -163,9 +137,9 @@
           </a>
           <div class="min-w-0 flex-1">
             <p class="text-sm font-semibold text-stone-800">{% if loop.first and n.vote_score %}🥇 {% endif %}{{ n.game_name }}
-              {% if is_mine %}<span class="ml-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-800">Your pick</span>{% endif %}</p>
+              {% if is_mine %}<span class="ml-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">Your pick</span>{% endif %}</p>
             <p class="text-xs text-stone-500">{% if n.nominated_by and not is_mine %}{{ n.nominated_by }}'s pick · {% endif %}<strong class="text-stone-700">{{ n.vote_score or 0 }} pts</strong>{% if n.avg_rating %} · ★ {{ n.avg_rating }}{% endif %}</p>
-            <div class="mt-1 h-1.5 rounded-full bg-stone-100"><div class="h-full rounded-full bg-red-500" style="width: {{ n.vote_pct }}%"></div></div>
+            <div class="mt-1 h-1.5 rounded-full bg-stone-100"><div class="gn-bar h-full rounded-full bg-red-500" style="width: {{ n.vote_pct }}%"></div></div>
           </div>
           {% if can_rank %}
           <div class="flex w-full justify-end gap-1 sm:w-auto" role="radiogroup" aria-label="Your rank for {{ n.game_name }}">
@@ -173,7 +147,9 @@
             <label class="cursor-pointer" title="{{ title }}">
               <input type="radio" name="votes[{{ n.game_id }}]" value="{{ value }}" data-rank="{{ value }}" aria-label="{{ title }}"
                      {% if (mine|string if mine else '') == value %}checked{% endif %} class="peer sr-only">
-              <span class="inline-flex h-9 min-w-[2.5rem] items-center justify-center rounded-lg border border-stone-300 px-2 text-xs font-medium text-stone-600 peer-checked:border-red-600 peer-checked:bg-red-600 peer-checked:text-white peer-focus-visible:ring-2 peer-focus-visible:ring-red-400 {{ 'peer-checked:!border-stone-400 peer-checked:!bg-stone-200 peer-checked:!text-stone-600' if not value else '' }}">{{ label }}</span>
+              <span class="inline-flex h-11 min-w-[3rem] items-center justify-center rounded-lg border border-stone-300 px-2 text-sm font-medium text-stone-600 transition-colors peer-checked:border-red-600 peer-checked:bg-red-600 peer-checked:text-white peer-focus-visible:ring-2 peer-focus-visible:ring-red-400 {{ 'peer-checked:!border-stone-400 peer-checked:!bg-stone-200 peer-checked:!text-stone-600' if not value else '' }}">
+                {%- if value %}<span class="inline-block" data-chip-label>{{ label }}</span>{% else %}{{ label }}{% endif -%}
+              </span>
             </label>
             {% endfor %}
           </div>
@@ -184,9 +160,9 @@
         {% endfor %}
       </ul>
       {% if can_rank %}
-      <div class="mt-3 flex flex-wrap items-center gap-3">
-        <button type="submit" class="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700">Save my ranking</button>
-        <span data-unsaved class="hidden text-sm font-medium text-amber-700">You have unsaved changes</span>
+      <div data-save-bar class="sticky bottom-14 z-20 -mx-5 mt-3 flex bg-white flex-wrap items-center gap-3 px-5 py-2.5 md:bottom-0">
+        <button type="submit" class="min-h-[2.75rem] rounded-lg bg-red-600 px-4 text-sm font-medium text-white hover:bg-red-700">Save my ranking</button>
+        <span data-unsaved class="hidden text-sm font-medium text-amber-800">Unsaved changes</span>
       </div>
       {% endif %}
     </form>
@@ -208,16 +184,38 @@
 {% if game_night.photos %}<script src="{{ url_for('static', filename='js/gallery.js') }}"></script>{% endif %}
 <script>
   // Each rank (1st/2nd/3rd) can go to only one game: picking it elsewhere clears it here.
+  const MEDALS = { '1': '🥇', '2': '🥈', '3': '🥉' };
+  function showMedals(form) {
+    // A picked chip reads 🥇/🥈/🥉 instead of 1st/2nd/3rd.
+    form.querySelectorAll('input[data-rank]').forEach(function (input) {
+      const label = input.parentNode.querySelector('[data-chip-label]');
+      if (label) label.textContent = input.checked ? MEDALS[input.dataset.rank] : label.dataset.text;
+    });
+  }
   document.querySelectorAll('[data-rank-form]').forEach(function (form) {
+    form.querySelectorAll('[data-chip-label]').forEach(function (l) { l.dataset.text = l.textContent; });
+    showMedals(form);
     form.addEventListener('change', function (e) {
       const hint = form.querySelector('[data-unsaved]');
       if (hint) hint.classList.remove('hidden');
+      const bar = form.querySelector('[data-save-bar]');
+      if (bar) { bar.classList.remove('bg-white'); bar.classList.add('bg-amber-50', 'border-t', 'border-amber-200', 'shadow-lg'); }
       const rank = e.target.dataset.rank;
-      if (!rank) return;
-      form.querySelectorAll('input[data-rank="' + rank + '"]:checked').forEach(function (other) {
-        if (other !== e.target) form.querySelector('input[name="' + other.name + '"][data-rank=""]').checked = true;
-      });
+      if (rank) {
+        form.querySelectorAll('input[data-rank="' + rank + '"]:checked').forEach(function (other) {
+          if (other !== e.target) form.querySelector('input[name="' + other.name + '"][data-rank=""]').checked = true;
+        });
+      }
+      showMedals(form);
+      const label = e.target.parentNode.querySelector('[data-chip-label]');
+      if (label && window.GN && !GN.calm) GN.play(label, 'gn-pop', 500);
     });
+  });
+  // Step 2 pulses once (per night) right after you've nominated.
+  document.querySelectorAll('[data-pulse-once]').forEach(function (el) {
+    const key = 'gn_pulsed_' + el.dataset.pulseOnce;
+    try { if (localStorage.getItem(key)) return; localStorage.setItem(key, '1'); } catch (e) { return; }
+    el.classList.add('gn-pulse-once');
   });
 </script>
 {% endblock %}

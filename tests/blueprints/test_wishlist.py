@@ -182,3 +182,31 @@ def test_wishlist_and_library_have_person_filters(client, make_person):
     OwnedBy.query.filter_by(game_id=g.id).delete()
     _db.session.delete(g)
     _db.session.commit()
+
+
+def test_toggle_wishlist_route_adds_removes_and_refuses_owned(client, make_person):
+    from app.models import OwnedBy
+    from tests.conftest import login
+
+    ann = make_person("Ann")
+    wanted = Game(name=f"Toggle {uuid.uuid4().hex[:6]}")
+    owned = Game(name=f"Owned {uuid.uuid4().hex[:6]}")
+    _db.session.add_all([wanted, owned])
+    _db.session.flush()
+    _db.session.add(OwnedBy(person_id=ann.id, game_id=owned.id))
+    _db.session.commit()
+    login(client, ann)
+    try:
+        client.post(f"/wishlist/toggle/{wanted.id}")
+        assert Wishlist.query.filter_by(person_id=ann.id, game_id=wanted.id).count() == 1
+        client.post(f"/wishlist/toggle/{wanted.id}")
+        assert Wishlist.query.filter_by(person_id=ann.id, game_id=wanted.id).count() == 0
+        page = client.post(f"/wishlist/toggle/{owned.id}", follow_redirects=True)
+        assert "already own this game" in page.get_data(as_text=True)
+        assert Wishlist.query.filter_by(person_id=ann.id).count() == 0
+    finally:
+        OwnedBy.query.filter_by(person_id=ann.id).delete()
+        Wishlist.query.filter_by(person_id=ann.id).delete()
+        _db.session.delete(wanted)
+        _db.session.delete(owned)
+        _db.session.commit()

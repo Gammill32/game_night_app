@@ -37,11 +37,11 @@
           <div class="flex items-center gap-2">
             <input type="text" name="option_label_{{ option.id }}" value="{{ option.label }}"
                    class="flex-1 rounded-lg border border-stone-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent" />
-            <span class="text-xs text-stone-400 shrink-0">{{ poll.responses | selectattr('option_id', 'equalto', option.id) | list | length }} response{{ 's' if (poll.responses | selectattr('option_id', 'equalto', option.id) | list | length) != 1 }}</span>
+            <span class="text-xs text-stone-500 shrink-0">{{ poll.responses | selectattr('option_id', 'equalto', option.id) | list | length }} response{{ 's' if (poll.responses | selectattr('option_id', 'equalto', option.id) | list | length) != 1 }}</span>
           </div>
           {% endfor %}
         </div>
-        <p class="text-xs text-stone-400 mt-2">Option labels can be edited. Adding or removing options requires deleting and recreating the poll.</p>
+        <p class="text-xs text-stone-500 mt-2">Option labels can be edited. Adding or removing options requires deleting and recreating the poll.</p>
       </div>
       {% endif %}
 
@@ -58,7 +58,7 @@
           <option value="{{ gn.id }}" {% if poll.game_night_id == gn.id %}selected{% endif %}>{{ gn.date.strftime('%B %-d, %Y') }}</option>
           {% endfor %}
         </select>
-        <p class="text-xs text-stone-400 mt-1">A linked poll shows on that night's page and only its players can see it.</p>
+        <p class="text-xs text-stone-500 mt-1">A linked poll shows on that night's page and only its players can see it.</p>
       </div>
 
       {% endif %}
@@ -86,7 +86,7 @@
                  {% if poll.private %}checked{% endif %}
                  class="rounded border-stone-300 text-red-600 focus:ring-red-500" />
           <label for="private-toggle" class="text-sm font-medium text-stone-700">Private poll</label>
-          <span class="text-xs text-stone-400">Only invited people can see or answer it</span>
+          <span class="text-xs text-stone-500">Only invited people can see or answer it</span>
         </div>
 
         <div id="invitee-section" class="{% if not poll.private %}hidden{% endif %} space-y-2">

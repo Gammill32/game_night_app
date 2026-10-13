@@ -25,7 +25,7 @@
         {% if poll.description %}
         <p class="text-sm text-stone-500 mt-0.5">{{ poll.description }}</p>
         {% endif %}
-        <div class="flex gap-3 mt-2 text-xs text-stone-400">
+        <div class="flex gap-3 mt-2 text-xs text-stone-500">
           <span>{% if poll.date_poll %}Find a date · {{ poll.options | length }} dates{% else %}{{ poll.options | length }} options{% endif %}</span>
           {% if poll.picked_game_night %}<a href="{{ url_for('game_night.view_game_night', game_night_id=poll.picked_game_night_id) }}" class="text-green-700 underline">Picked {{ poll.picked_game_night.date.strftime('%b %-d') }}</a>{% endif %}
           {% if poll.closes_at %}<span>Closes {{ (poll.closes_at|local_dt).strftime('%b %-d, %-I:%M %p') }}</span>{% endif %}

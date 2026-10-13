@@ -1,0 +1,22 @@
+{# Top three places as a podium (2nd · 1st · 3rd). Used by the night page and the public recap.
+   Expects: top_places [(place, [player ids])], players. First name + last initial only, so it
+   fits three across on a phone and is fine on the public recap.
+   juice.js raises the cards in turn when the page opens with ?finalized=1. #}
+{% if top_places %}
+<ol class="grid grid-cols-3 items-end gap-2 sm:gap-3" data-podium aria-label="Top places">
+  {% for place, player_ids in top_places if player_ids and place <= 3 %}
+  <li data-place="{{ place }}"
+      class="gn-podium-card rounded-xl border text-center shadow-sm
+             {{ 'order-2 border-amber-300 bg-amber-50 px-2 pb-4 pt-5' if place == 1 else ('order-1' if place == 2 else 'order-3') ~ ' border-stone-200 bg-white px-2 py-3' }}">
+    <div class="{{ 'text-4xl' if place == 1 else 'text-2xl' }} leading-none" aria-hidden="true">{{ ['🥇', '🥈', '🥉'][place - 1] }}</div>
+    <p class="mt-1 text-xs font-semibold uppercase tracking-wide {{ 'text-amber-700' if place == 1 else 'text-stone-500' }}">{{ place }}{{ 'st' if place == 1 else 'nd' if place == 2 else 'rd' }}</p>
+    {% for player_id in player_ids %}
+    {% set player = players | selectattr("id", "equalto", player_id) | first %}
+    <p class="truncate {{ 'text-base font-bold' if place == 1 else 'text-sm font-semibold' }} text-stone-800"
+       {% if player and player.person %}title="{{ player.person.first_name }} {{ player.person.last_name }}"{% endif %}>
+      {{ player.person.first_name ~ ' ' ~ player.person.last_name[:1] ~ '.' if player and player.person else 'Unknown' }}</p>
+    {% endfor %}
+  </li>
+  {% endfor %}
+</ol>
+{% endif %}

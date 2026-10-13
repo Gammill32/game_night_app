@@ -7,6 +7,7 @@ from sqlalchemy.orm import joinedload
 
 from app.extensions import db
 from app.models import Poll, PollInvitee, PollOption, PollResponse
+from app.services.errors import ServiceError
 
 
 def poll_is_active(poll: Poll) -> bool:
@@ -51,6 +52,34 @@ def create_poll(
     game_night_id: int | None = None,
 ) -> Poll:
     """Create a new poll with options. Returns the saved Poll."""
+    poll = add_poll(
+        title,
+        description,
+        option_labels,
+        created_by_id,
+        multi_select,
+        closes_at=closes_at,
+        private=private,
+        invitee_ids=invitee_ids,
+        game_night_id=game_night_id,
+    )
+    db.session.commit()
+    return poll
+
+
+def add_poll(
+    title: str,
+    description: str | None,
+    option_labels: list[str],
+    created_by_id: int | None,
+    multi_select: bool,
+    closes_at: datetime | None = None,
+    private: bool = False,
+    invitee_ids: list[int] | None = None,
+    game_night_id: int | None = None,
+) -> Poll:
+    """create_poll without the commit: the poll and its options are flushed,
+    for operations that save it together with other changes."""
     for _attempt in range(3):
         token = Poll.generate_token()
         if not Poll.query.filter_by(token=token).first():
@@ -78,7 +107,7 @@ def create_poll(
         for person_id in invitee_ids:
             db.session.add(PollInvitee(poll_id=poll.id, person_id=person_id))
 
-    db.session.commit()
+    db.session.flush()
     return poll
 
 
@@ -118,24 +147,31 @@ def update_poll(
     db.session.commit()
 
 
-def create_availability_poll(game_night_id: int, user_id: int) -> tuple[bool, str]:
-    """Create the night's Can/Maybe/Can't poll. Its answers are the RSVPs."""
+def create_availability_poll(game_night_id: int, user_id: int) -> str:
+    """Create the night's Can/Maybe/Can't poll. Its answers are the RSVPs.
+    Returns the message to show; raises ServiceError if it already has one."""
     from app.models import GameNight
 
-    gn = GameNight.query.get_or_404(game_night_id)
-    if gn.availability_poll is not None:
-        return False, "This game night already has an availability poll."
-    poll = create_poll(
-        title=availability_title(gn.date),
+    add_availability_poll(db.get_or_404(GameNight, game_night_id), user_id)
+    db.session.commit()
+    return "Availability poll created. Players can answer it on this page."
+
+
+def add_availability_poll(game_night, user_id: int) -> Poll:
+    """The night's availability poll, flushed but not committed."""
+    if game_night.availability_poll is not None:
+        raise ServiceError("This game night already has an availability poll.")
+    poll = add_poll(
+        title=availability_title(game_night.date),
         description=None,
         option_labels=AVAILABILITY_OPTIONS,
         created_by_id=user_id,
         multi_select=False,
-        game_night_id=game_night_id,
+        game_night_id=game_night.id,
     )
     poll.availability = True
-    db.session.commit()
-    return True, "Availability poll created. Players can answer it on this page."
+    db.session.flush()
+    return poll
 
 
 AVAILABILITY_OPTIONS = ["Can Make It", "Maybe", "Can't Make It"]
@@ -143,6 +179,50 @@ AVAILABILITY_OPTIONS = ["Can Make It", "Maybe", "Can't Make It"]
 
 def availability_title(date) -> str:
     return f"Availability — Game Night {date.strftime('%B %-d, %Y')}"
+
+
+def polls_managed_by(user) -> list[Poll]:
+    """Every poll this user can manage, newest first (the poll list)."""
+    return [p for p in Poll.query.order_by(Poll.created_at.desc()).all() if can_manage(p, user)]
+
+
+def linkable_nights(user) -> list:
+    """Nights a poll can be linked to: not finalized, and ones this user runs."""
+    from app.models import GameNight
+
+    nights = GameNight.query.filter_by(final=False).order_by(GameNight.date.desc()).all()
+    return [n for n in nights if n.managed_by(user)]
+
+
+def invitable_people() -> list:
+    """Active people by first name, for a private poll's invitee picker."""
+    from app.models import Person
+
+    return Person.query.filter_by(active=True).order_by(Person.first_name).all()
+
+
+def share_recipients() -> tuple[list, int]:
+    """(active people with an email, by first name; how many active people
+    have no email yet and so can't be sent a poll)."""
+    from app.models import Person
+
+    people = (
+        Person.query.filter(Person.email.isnot(None), Person.active.is_(True))
+        .order_by(Person.first_name)
+        .all()
+    )
+    unclaimed = Person.query.filter(Person.email.is_(None), Person.active.is_(True)).count()
+    return people, unclaimed
+
+
+def close_poll(poll: Poll) -> None:
+    poll.closed = True
+    db.session.commit()
+
+
+def delete_poll(poll: Poll) -> None:
+    db.session.delete(poll)
+    db.session.commit()
 
 
 def get_poll_by_token(token: str) -> Poll | None:
@@ -179,17 +259,48 @@ def can_view(poll: Poll, user) -> bool:
     return True
 
 
+def _open_polls_query(user):
+    """Open polls this user can see: can_view() and poll_is_active() as one
+    query, so the nav badge doesn't cost a query per poll."""
+    from sqlalchemy import and_, exists, or_
+
+    from app.models import GameNight, Player
+
+    query = Poll.query.filter(
+        Poll.closed.is_(False),
+        or_(Poll.closes_at.is_(None), Poll.closes_at > datetime.utcnow()),
+    )
+    if user.admin or user.owner:
+        return query
+    hosts_night = exists().where(GameNight.id == Poll.game_night_id, GameNight.host_id == user.id)
+    invited = exists().where(PollInvitee.poll_id == Poll.id, PollInvitee.person_id == user.id)
+    plays_night = exists().where(
+        Player.game_night_id == Poll.game_night_id, Player.people_id == user.id
+    )
+    return query.filter(
+        or_(
+            Poll.created_by == user.id,
+            hosts_night,
+            and_(Poll.private.is_(True), invited),
+            and_(
+                Poll.private.is_(False),
+                or_(Poll.game_night_id.is_(None), plays_night),
+            ),
+        )
+    )
+
+
 def open_polls_for(user) -> list[Poll]:
     """Open polls this user can see, newest first."""
-    from sqlalchemy.orm import selectinload
+    if not getattr(user, "is_authenticated", False):
+        return []
+    return _open_polls_query(user).order_by(Poll.created_at.desc()).all()
 
-    polls = (
-        Poll.query.filter_by(closed=False)
-        .options(selectinload(Poll.invitees), selectinload(Poll.game_night))  # type: ignore[arg-type]
-        .order_by(Poll.created_at.desc())
-        .all()
-    )
-    return [p for p in polls if poll_is_active(p) and can_view(p, user)]
+
+def count_open_polls_for(user) -> int:
+    if not getattr(user, "is_authenticated", False):
+        return 0
+    return _open_polls_query(user).count()
 
 
 def has_responded(poll: Poll, person_id: int) -> bool:

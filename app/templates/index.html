@@ -13,7 +13,7 @@
     <img src="{{ url_for('static', filename='images/logo.png') }}" alt="" class="h-12 w-auto" />
     <div>
       <h1 class="text-2xl font-bold text-stone-800">Welcome back, {{ current_user.first_name }}!</h1>
-      {% if polls_to_answer %}<p class="text-sm text-red-700 font-medium">{{ polls_to_answer|length }} poll{{ 's' if polls_to_answer|length != 1 }} waiting on your answer</p>{% endif %}
+      {% if polls_to_answer %}<p class="text-sm text-red-700 font-medium" data-polls-waiting="{{ polls_to_answer|length }}" aria-live="polite">{{ polls_to_answer|length }} poll{{ 's' if polls_to_answer|length != 1 }} waiting on your answer</p>{% endif %}
     </div>
   </div>
 
@@ -36,8 +36,14 @@
          class="block bg-white rounded-xl border shadow-sm p-5 hover:shadow transition-all {{ 'border-red-300 sm:col-span-2' if loop.first else 'border-stone-200 hover:border-red-300' }}">
         <div class="flex items-start justify-between gap-3">
           <div>
-            <p class="text-xs font-semibold uppercase tracking-wide {{ 'text-red-600' if card.days_away <= 1 else 'text-stone-400' }}">
-              {% if card.days_away == 0 %}Tonight{% elif card.days_away == 1 %}Tomorrow{% else %}In {{ card.days_away }} days{% endif %}
+            <p class="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide {{ 'text-red-600' if card.days_away <= 1 else 'text-stone-500' }}">
+              {% if card.days_away == 0 %}
+              <span class="relative flex h-2.5 w-2.5" aria-hidden="true">
+                <span class="absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75 motion-safe:animate-ping"></span>
+                <span class="relative inline-flex h-2.5 w-2.5 rounded-full bg-red-600"></span>
+              </span>
+              Tonight <span class="gn-wiggle text-base leading-none" aria-hidden="true">🎲</span>
+              {% elif card.days_away == 1 %}Tomorrow{% else %}In {{ card.days_away }} days{% endif %}
             </p>
             <p class="{{ 'text-xl' if loop.first else 'text-lg' }} font-bold text-stone-800">{{ gn.date.strftime('%A, %B %-d') }}</p>
             {% if gn.notes %}<p class="text-sm text-stone-500 mt-0.5 line-clamp-2">{{ gn.notes }}</p>{% endif %}
@@ -75,9 +81,9 @@
     <h2 class="text-lg font-semibold text-stone-800 mb-3">Polls</h2>
     <div class="space-y-3">
       {% for ctx in polls_to_answer %}
-      <div class="bg-white rounded-xl border border-red-200 shadow-sm p-5">
+      <div class="bg-white rounded-xl border border-red-200 shadow-sm p-5" data-needs-answer>
         <div class="mb-3">
-          <p class="text-xs font-semibold uppercase tracking-wide text-red-600">Needs your answer</p>
+          <p class="text-xs font-semibold uppercase tracking-wide text-red-600" data-needs-label>Needs your answer</p>
           <h3 class="text-base font-semibold text-stone-800">{{ ctx.poll.title }}</h3>
           {% if ctx.poll.game_night and not ctx.poll.availability %}<p class="text-xs text-stone-500">For the {{ ctx.poll.game_night.date.strftime('%B %-d') }} game night</p>{% endif %}
           {% if ctx.poll.availability %}<p class="text-xs text-stone-500">Your answer is your RSVP.</p>{% endif %}
@@ -152,7 +158,7 @@
     <!-- Day-of-week headers -->
     <div class="grid grid-cols-7 mb-1">
       {% for day in ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] %}
-      <div class="text-center text-xs font-semibold text-stone-400 uppercase tracking-wide py-1">{{ day }}</div>
+      <div class="text-center text-xs font-semibold text-stone-500 uppercase tracking-wide py-1">{{ day }}</div>
       {% endfor %}
     </div>
 

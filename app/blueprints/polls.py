@@ -1,8 +1,10 @@
 from flask import (
     Blueprint,
     abort,
+    current_app,
     flash,
     has_request_context,
+    make_response,
     redirect,
     render_template,
     request,
@@ -10,7 +12,8 @@ from flask import (
 )
 from flask_login import current_user, login_required
 
-from app.services import date_poll_services
+from app.extensions import db
+from app.services import date_poll_services, notifications, poll_services
 from app.services.poll_services import (
     can_manage,
     can_view,
@@ -23,6 +26,7 @@ from app.services.poll_services import (
     view_context,
 )
 from app.utils import host_required
+from app.utils.errors import is_htmx_fragment
 
 polls_bp = Blueprint("polls", __name__)
 
@@ -30,30 +34,32 @@ polls_bp = Blueprint("polls", __name__)
 @polls_bp.app_context_processor
 def inject_active_polls():
     """The number of open polls the current user can see (for the nav badge)."""
-    from app.services.poll_services import open_polls_for
+    from app.services import poll_services
 
-    # Emails rendered by the scheduler have no request (and so no user).
-    if not has_request_context() or not current_user.is_authenticated:
+    # Emails rendered by the scheduler have no request (and so no user), and
+    # HTMX fragments (a tracker tap, a poll answer) have no nav to show it in,
+    # and the nav only shows it to people who can run polls.
+    if (
+        not has_request_context()
+        or is_htmx_fragment()
+        or not current_user.is_authenticated
+        or not current_user.can_start_nights
+    ):
         return {"active_polls_count": 0}
     try:
-        return {"active_polls_count": len(open_polls_for(current_user))}
+        return {"active_polls_count": poll_services.count_open_polls_for(current_user)}
     except Exception:
+        # A nav badge isn't worth a broken page, but it is worth a log line.
+        current_app.logger.exception("Couldn't count open polls for the nav")
+        db.session.rollback()
         return {"active_polls_count": 0}
-
-
-def _linkable_nights():
-    """Nights a poll can be linked to: not finalized, and ones you run."""
-    from app.models import GameNight
-
-    nights = GameNight.query.filter_by(final=False).order_by(GameNight.date.desc()).all()
-    return [n for n in nights if n.managed_by(current_user)]
 
 
 def _managed_poll(poll_id: int):
     """The poll, if the current user may manage it (else 404)."""
     from app.models import Poll
 
-    poll = Poll.query.get_or_404(poll_id)
+    poll = db.get_or_404(Poll, poll_id)
     if not can_manage(poll, current_user):
         abort(404)
     return poll
@@ -76,6 +82,14 @@ def _form_night_id() -> int | None:
     return int(raw) if raw.isdigit() else None
 
 
+NIGHT_NOT_LINKABLE = "Pick one of the game nights in the list (or none)."
+
+
+def _night_ok(night_id: int | None, nights) -> bool:
+    """A poll can only be linked to a night in the form's list: one you run."""
+    return night_id is None or any(n.id == night_id for n in nights)
+
+
 # ── Admin routes ─────────────────────────────────────────────────────────── #
 
 
@@ -83,12 +97,7 @@ def _form_night_id() -> int | None:
 @login_required
 @host_required
 def poll_list():
-    from app.models import Poll
-
-    polls = [
-        p for p in Poll.query.order_by(Poll.created_at.desc()).all() if can_manage(p, current_user)
-    ]
-    return render_template("poll_list.html", polls=polls)
+    return render_template("poll_list.html", polls=poll_services.polls_managed_by(current_user))
 
 
 @polls_bp.route("/polls/<int:poll_id>/results")
@@ -111,10 +120,8 @@ def poll_results(poll_id: int):
 @login_required
 @host_required
 def poll_create():
-    from app.models import Person
-
-    people = Person.query.filter_by(active=True).order_by(Person.first_name).all()
-    nights = _linkable_nights()
+    people = poll_services.invitable_people()
+    nights = poll_services.linkable_nights(current_user)
     form = request.form
 
     def page(error=None):
@@ -152,6 +159,8 @@ def poll_create():
             ]
             if len(option_labels) < 2:
                 return page("A poll needs at least two options.")
+            if not _night_ok(_form_night_id(), nights):
+                return page(NIGHT_NOT_LINKABLE), 400
             create_poll(
                 title,
                 description,
@@ -171,13 +180,16 @@ def poll_create():
 @polls_bp.route("/polls/<int:poll_id>/edit", methods=["GET", "POST"])
 @login_required
 def poll_edit(poll_id: int):
-    from app.models import Person
-
     poll = _managed_poll(poll_id)
-    people = Person.query.filter_by(active=True).order_by(Person.first_name).all()
-    nights = _linkable_nights()
+    people = poll_services.invitable_people()
+    nights = poll_services.linkable_nights(current_user)
     if poll.game_night and poll.game_night not in nights:
         nights.insert(0, poll.game_night)
+
+    def page(error=None):
+        return render_template(
+            "poll_edit.html", poll=poll, people=people, nights=nights, error=error
+        )
 
     if request.method == "POST":
         title = request.form.get("title", "").strip()
@@ -189,13 +201,7 @@ def poll_edit(poll_id: int):
         try:
             closes_at = parse_closes_at(request.form.get("closes_at", ""))
         except ValueError:
-            return render_template(
-                "poll_edit.html",
-                poll=poll,
-                people=people,
-                nights=nights,
-                error="Invalid close date format. Please use the date picker.",
-            )
+            return page("Invalid close date format. Please use the date picker.")
 
         option_updates: dict[int, str] = {}
         for key, val in request.form.items():
@@ -207,13 +213,9 @@ def poll_edit(poll_id: int):
                     pass
 
         if not title:
-            return render_template(
-                "poll_edit.html",
-                poll=poll,
-                people=people,
-                nights=nights,
-                error="Title is required.",
-            )
+            return page("Title is required.")
+        if not _night_ok(_form_night_id(), nights):
+            return page(NIGHT_NOT_LINKABLE), 400
 
         update_poll(
             poll,
@@ -229,7 +231,7 @@ def poll_edit(poll_id: int):
         flash("Poll updated.", "success")
         return redirect(url_for("polls.poll_list"))
 
-    return render_template("poll_edit.html", poll=poll, people=people, nights=nights)
+    return page()
 
 
 @polls_bp.route("/polls/<int:poll_id>/pick/<int:option_id>", methods=["POST"])
@@ -248,22 +250,14 @@ def poll_pick_date(poll_id: int, option_id: int):
 @polls_bp.route("/polls/<int:poll_id>/close", methods=["POST"])
 @login_required
 def poll_close(poll_id: int):
-    from app.extensions import db
-
-    poll = _managed_poll(poll_id)
-    poll.closed = True
-    db.session.commit()
+    poll_services.close_poll(_managed_poll(poll_id))
     return redirect(url_for("polls.poll_list"))
 
 
 @polls_bp.route("/polls/<int:poll_id>/delete", methods=["POST"])
 @login_required
 def poll_delete(poll_id: int):
-    from app.extensions import db
-
-    poll = _managed_poll(poll_id)
-    db.session.delete(poll)
-    db.session.commit()
+    poll_services.delete_poll(_managed_poll(poll_id))
     flash("Poll deleted.", "success")
     return redirect(url_for("polls.poll_list"))
 
@@ -271,18 +265,8 @@ def poll_delete(poll_id: int):
 @polls_bp.route("/polls/<int:poll_id>/share", methods=["GET", "POST"])
 @login_required
 def poll_share(poll_id: int):
-    from flask_mail import Message
-
-    from app.extensions import mail
-    from app.models import Person
-
     poll = _managed_poll(poll_id)
-    people = (
-        Person.query.filter(Person.email.isnot(None), Person.active.is_(True))
-        .order_by(Person.first_name)
-        .all()
-    )
-    unclaimed = Person.query.filter(Person.email.is_(None), Person.active.is_(True)).count()
+    people, unclaimed = poll_services.share_recipients()
     poll_url = request.host_url.rstrip("/") + url_for("polls.poll_respond", token=poll.token)
 
     if request.method == "POST":
@@ -294,41 +278,15 @@ def poll_share(poll_id: int):
             )
 
         recipients = [p for p in people if str(p.id) in selected_ids]
-        sent = 0
-        errors = 0
-        for person in recipients:
-            try:
-                msg = Message(
-                    subject=f"Game Night Poll: {poll.title}",
-                    recipients=[person.email],
-                    body=(
-                        f"Hi {person.first_name},\n\n"
-                        + (
-                            f"Help pick a date for the next game night: {poll.title}\n"
-                            if poll.date_poll
-                            else f"There's a Game Night poll for you: {poll.title}\n"
-                        )
-                        + (f"{poll.description}\n" if poll.description else "")
-                        + (
-                            "\nSay which dates work for you here:\n"
-                            if poll.date_poll
-                            else "\nAnswer it here:\n"
-                        )
-                        + f"{poll_url}\n\n"
-                        "You'll be asked to sign in first. Forgot your password? "
-                        "The sign-in page has a reset link.\n\n"
-                        "— Game Night"
-                    ),
-                )
-                mail.send(msg)
-                sent += 1
-            except Exception:
-                errors += 1
-
-        if sent:
-            flash(f"Sent to {sent} person{'s' if sent != 1 else ''}.", "success")
-        if errors:
-            flash(f"{errors} email{'s' if errors != 1 else ''} failed to send.", "danger")
+        # The flash names whoever didn't get it so a retry can select just them.
+        sent_ids = notifications.send_poll_invites(poll, recipients, poll_url)
+        failed = [p for p in recipients if p.id not in sent_ids]
+        if sent_ids:
+            n = len(sent_ids)
+            flash(f"Sent to {n} {'person' if n == 1 else 'people'}.", "success")
+        if failed:
+            names = ", ".join(f"{p.first_name} {p.last_name}" for p in failed)
+            flash(f"Couldn't email {names}. Try again for just them.", "error")
         return redirect(url_for("polls.poll_list"))
 
     return render_template(
@@ -379,4 +337,9 @@ def poll_submit(token: str):
             success, message = submit_response(poll, option_ids, current_user.id)
 
     context = view_context(poll, current_user.id)
-    return render_template("_poll_widget.html", success=success, message=message, **context)
+    response = make_response(
+        render_template("_poll_widget.html", success=success, message=message, **context)
+    )
+    if success:
+        response.headers["HX-Trigger"] = "pollAnswered"  # the home page counts down its "N waiting"
+    return response

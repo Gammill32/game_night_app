@@ -23,6 +23,7 @@ from decimal import Decimal, InvalidOperation
 from app.extensions import db
 from app.models import FOOD_MODES, FoodExpense, FoodExpenseShare, FoodItem, Person, Player
 from app.services import media_services, payment_services, poll_services
+from app.services.errors import ServiceError
 
 FOOD_MODE_LABELS = {
     "none": "No food plans",
@@ -33,7 +34,7 @@ FOOD_MODE_LABELS = {
 }
 
 
-class FoodError(ValueError):
+class FoodError(ServiceError, ValueError):
     pass
 
 
@@ -106,12 +107,12 @@ def apply_food_settings(game_night, mode, provider_id, note):
 
 def add_item(game_night, user, name, claim=False):
     if not game_night.food_list:
-        return False, "This night doesn't have a food list."
+        raise FoodError("This night doesn't have a food list.")
     if not food_open(game_night):
-        return False, "This game night is finalized."
+        raise FoodError("This game night is finalized.")
     name = (name or "").strip()[:80]
     if not name:
-        return False, "Say what the item is, e.g. chips or a 12-pack."
+        raise FoodError("Say what the item is, e.g. chips or a 12-pack.")
     item = FoodItem(game_night_id=game_night.id, name=name, added_by=user.id)
     # Players adding something are bringing it; admins adding items build a
     # list for others to claim unless they tick "I'm bringing it". When the
@@ -121,38 +122,38 @@ def add_item(game_night, user, name, claim=False):
     db.session.add(item)
     db.session.commit()
     if item.claimed_by == user.id:
-        return True, f"Added: you're bringing {name}."
-    return True, f"Added {name} to the list."
+        return f"Added: you're bringing {name}."
+    return f"Added {name} to the list."
 
 
 def claim_item(game_night, item, user, claim=True):
     if not food_open(game_night):
-        return False, "This game night is finalized."
+        raise FoodError("This game night is finalized.")
     if not is_player(game_night, user):
-        return False, "Only players at this game night can sign up."
+        raise FoodError("Only players at this game night can sign up.")
     db.session.query(FoodItem).filter_by(id=item.id).with_for_update().one()
     db.session.refresh(item)
     if claim:
         if item.claimed_by and item.claimed_by != user.id:
-            return False, f"{item.claimer.first_name} is already bringing that."
+            raise FoodError(f"{item.claimer.first_name} is already bringing that.")
         item.claimed_by = user.id
         db.session.commit()
-        return True, f"You're bringing {item.name}."
+        return f"You're bringing {item.name}."
     if item.claimed_by != user.id:
-        return False, "You haven't signed up for that."
+        raise FoodError("You haven't signed up for that.")
     item.claimed_by = None
     db.session.commit()
-    return True, f"You're no longer bringing {item.name}."
+    return f"You're no longer bringing {item.name}."
 
 
 def delete_item(game_night, item, user):
     if not food_open(game_night):
-        return False, "This game night is finalized."
+        raise FoodError("This game night is finalized.")
     if not (game_night.managed_by(user) or item.added_by == user.id):
-        return False, "Only the host, an admin or whoever added it can remove it."
+        raise FoodError("Only the host, an admin or whoever added it can remove it.")
     db.session.delete(item)
     db.session.commit()
-    return True, f"Removed {item.name}."
+    return f"Removed {item.name}."
 
 
 # ---------------------------------------------------------------------------
@@ -215,82 +216,76 @@ def can_edit_expense(expense, user):
 
 def add_expense(game_night, user, form, receipt=None):
     if not game_night.food_split:
-        return False, "This night doesn't split food costs."
+        raise FoodError("This night doesn't split food costs.")
     if not food_open(game_night):
-        return False, "This game night is finalized."
-    try:
-        description = (form.get("description") or "").strip()[:120]
-        if not description:
-            raise FoodError("Say what it was, e.g. pizza or drinks.")
-        amount = parse_money(form.get("amount"))
-        raw_payer = form.get("paid_by") or str(user.id)
-        if not raw_payer.isdigit() or int(raw_payer) not in player_ids(game_night):
-            raise FoodError("Pick who paid from the list of players.")
-        covered = (
-            _parse_covered(game_night, form)
-            if form.get("covered_set")
-            else default_covered(game_night)
-        )
-        if not covered:
-            raise FoodError("This night has no players to split it between.")
-        receipt_path = None
-        if receipt is not None and receipt.filename:
-            receipt_path, _ = media_services.save_image(receipt, f"receipts/{game_night.id}", 2000)
-    except (FoodError, media_services.MediaError) as e:
-        return False, str(e)
-    expense = FoodExpense(
-        game_night_id=game_night.id,
-        description=description,
-        amount_cents=amount,
-        paid_by=int(raw_payer),
-        receipt_path=receipt_path,
-        created_by=user.id,
+        raise FoodError("This game night is finalized.")
+    description = (form.get("description") or "").strip()[:120]
+    if not description:
+        raise FoodError("Say what it was, e.g. pizza or drinks.")
+    amount = parse_money(form.get("amount"))
+    raw_payer = form.get("paid_by") or str(user.id)
+    if not raw_payer.isdigit() or int(raw_payer) not in player_ids(game_night):
+        raise FoodError("Pick who paid from the list of players.")
+    covered = (
+        _parse_covered(game_night, form) if form.get("covered_set") else default_covered(game_night)
     )
-    db.session.add(expense)
-    _set_shares(expense, covered)
-    db.session.commit()
-    return True, f"Logged {money(amount)} for {description}, split {len(covered)} ways."
+    if not covered:
+        raise FoodError("This night has no players to split it between.")
+    receipt_path = None
+    if receipt is not None and receipt.filename:
+        receipt_path, _ = media_services.save_image(receipt, f"receipts/{game_night.id}", 2000)
+    with media_services.removed_if_not_committed(receipt_path):
+        expense = FoodExpense(
+            game_night_id=game_night.id,
+            description=description,
+            amount_cents=amount,
+            paid_by=int(raw_payer),
+            receipt_path=receipt_path,
+            created_by=user.id,
+        )
+        db.session.add(expense)
+        _set_shares(expense, covered)
+        db.session.commit()
+    return f"Logged {money(amount)} for {description}, split {len(covered)} ways."
 
 
 def set_covered(game_night, expense, user, form):
     if not food_open(game_night):
-        return False, "This game night is finalized."
+        raise FoodError("This game night is finalized.")
     if not can_edit_expense(expense, user):
-        return False, "Only whoever logged it or an admin can change who it covers."
-    try:
-        covered = _parse_covered(game_night, form)
-    except FoodError as e:
-        return False, str(e)
+        raise FoodError("Only whoever logged it or an admin can change who it covers.")
+    covered = _parse_covered(game_night, form)
     _set_shares(expense, covered)
     db.session.commit()
-    return True, f"{expense.description} is now split {len(covered)} ways."
+    return f"{expense.description} is now split {len(covered)} ways."
 
 
 def delete_expense(game_night, expense, user):
     if not food_open(game_night):
-        return False, "This game night is finalized."
+        raise FoodError("This game night is finalized.")
     if not can_edit_expense(expense, user):
-        return False, "Only whoever logged it or an admin can remove it."
-    media_services.delete(expense.receipt_path)
+        raise FoodError("Only whoever logged it or an admin can remove it.")
+    receipt, description = expense.receipt_path, expense.description
     db.session.delete(expense)
     db.session.commit()
-    return True, f"Removed {expense.description}."
+    media_services.delete(receipt)  # only once the row is gone
+    return f"Removed {description}."
 
 
 def set_paid(share, user, paid=True):
     """The person who owes, the buyer, or an admin can tick a share paid."""
     expense = share.expense
     if share.person_id == expense.paid_by:
-        return False, "That's the buyer's own share."
+        raise FoodError("That's the buyer's own share.")
     if not (expense.game_night.managed_by(user) or user.id in (share.person_id, expense.paid_by)):
-        return False, "Only the person who owes it, the buyer or an admin can change that."
+        raise FoodError("Only the person who owes it, the buyer or an admin can change that.")
     share.paid = paid
     share.paid_at = datetime.utcnow() if paid else None
     db.session.commit()
     if not paid:
-        return True, f"{share.person.first_name}'s share of {expense.description} is unpaid again."
+        return f"{share.person.first_name}'s share of {expense.description} is unpaid again."
     who = "You" if share.person_id == user.id else share.person.first_name
-    return True, f"{who} paid {expense.payer.first_name} {money(share.amount_cents)}."
+    return f"{who} paid {expense.payer.first_name} {money(share.amount_cents)}."
 
 
 def files_for_night(game_night):

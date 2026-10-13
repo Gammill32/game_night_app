@@ -81,14 +81,12 @@ def test_changing_nomination_keeps_other_rankings(client, make_person, make_nigh
     ann, bo = make_person("Ann"), make_person("Bo")
     gn = make_night(ann, bo, date=dt.date(2031, 8, 15))
     a, b, c = _games(ann, "KeepA", "KeepB", "KeepC")
-    ok, msg = voting_services.nominate_game(gn.id, ann.id, a.id)
-    assert ok and "Next: rank" in msg
+    assert "Next: rank" in voting_services.nominate_game(gn.id, ann.id, a.id)
     voting_services.nominate_game(gn.id, bo.id, b.id)
     voting_services.vote_game(gn.id, ann.id, {a.id: 2, b.id: 1})
     voting_services.vote_game(gn.id, bo.id, {a.id: 1})
 
-    ok, msg = voting_services.nominate_game(gn.id, ann.id, c.id)
-    assert ok and "KeepC" in msg
+    assert "KeepC" in voting_services.nominate_game(gn.id, ann.id, c.id)
     left = {(v.player.people_id, v.game_id) for v in GameVotes.query.filter_by(game_night_id=gn.id)}
     assert left == {(ann.id, b.id)}  # Ann's other ranking kept; everyone's votes for KeepA gone
 
@@ -120,8 +118,7 @@ def test_votes_never_outlive_a_nomination(admin_client, client, make_person, mak
     assert {v.game_id for v in GameVotes.query.filter_by(game_night_id=gn.id)} == {b.id}
 
     # 2. Bo is taken off the night: his nomination and everyone's votes for it go.
-    ok, _ = game_night_services.edit_game_night(gn.id, str(gn.date), "", [str(ann.id), str(cy.id)])
-    assert ok
+    game_night_services.edit_game_night(gn.id, str(gn.date), "", [str(ann.id), str(cy.id)])
     assert GameVotes.query.filter_by(game_night_id=gn.id).count() == 0
 
     # 3. Even a stray vote left in the table isn't shown as a nomination.

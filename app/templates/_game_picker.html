@@ -37,7 +37,7 @@
           <span class="min-w-0 flex-1">
             <span class="block font-semibold text-stone-800">{{ g.name }}</span>
             <span class="block text-xs text-stone-500">{{ [g|player_range, (g.playtime ~ ' min') if g.playtime else ''] | select | join(' · ') }}{% if item.avg_rating is not none %} · ★ {{ item.avg_rating }}{% endif %}</span>
-            <span class="block text-xs text-stone-400 truncate">Owned by {{ item.owners|join(', ') }}</span>
+            <span class="block text-xs text-stone-500 truncate">Owned by {{ item.owners|join(', ') }}</span>
             {% if item.nominated_by or item.in_wishlist %}
             <span class="mt-1 flex flex-wrap gap-1">
               {% if item.nominated_by %}<span class="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-800">Nominated by {{ item.nominated_by }}{% if item.vote_score %} · {{ item.vote_score }} pts{% endif %}</span>{% endif %}
@@ -96,7 +96,12 @@
       search.value = ''; if (fits) fits.checked = false;
       root.querySelector('[data-picker-time=""]').checked = true; filter();
     });
-    root.addEventListener('change', e => { if (e.target.name === 'game_id') sync(); });
+    root.addEventListener('change', e => {
+      if (e.target.name !== 'game_id') return;
+      sync();
+      const tick = e.target.parentNode.querySelector('svg');  // the ✓ pops in: locked in
+      if (tick && window.GN) GN.play(tick, 'gn-pop', 500);
+    });
     filter(); sync();
   })();
 </script>

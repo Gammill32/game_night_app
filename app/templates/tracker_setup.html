@@ -159,9 +159,11 @@
       </button>
     </div>
   </form>
+  {% if can_manage %}
   <form action="{{ url_for('tracker.discard_tracker', session_id=session.id) }}" method="POST" class="inline">
     <button type="submit" class="text-stone-500 hover:text-stone-700 px-4 py-2 text-sm">Discard</button>
   </form>
+  {% endif %}
 </div>
 
 <script>

@@ -1,4 +1,5 @@
 # models.py
+import secrets
 
 from flask_login import UserMixin
 from sqlalchemy import ForeignKey, func
@@ -96,6 +97,8 @@ class Person(db.Model, UserMixin):
     email = db.Column(db.String, unique=True, nullable=True)
     password = db.Column(db.String, nullable=True)
     created_at = db.Column(db.DateTime, server_default=func.now())
+    # Unused: left over from a temporary-password flow that was never wired up.
+    # A later migration can drop both columns.
     temp_pass = db.Column(db.Boolean, default=False)
     temp_pass_expires_at = db.Column(db.DateTime, nullable=True)
     admin = db.Column(db.Boolean, default=False, nullable=False)
@@ -105,6 +108,9 @@ class Person(db.Model, UserMixin):
     active = db.Column(db.Boolean, default=True, nullable=False, server_default="true")
     # Trusted to start and host their own game nights without being an admin.
     can_host = db.Column(db.Boolean, default=False, nullable=False, server_default="false")
+    # Part of the login session id (see get_id); a new one logs out every
+    # other session. NULL until first set, then sessions hold "<id>:<token>".
+    session_token = db.Column(db.String(64), nullable=True)
 
     players = relationship("Player", back_populates="person", cascade="all, delete-orphan")
     owned_games = relationship("OwnedBy", back_populates="person", cascade="all, delete-orphan")
@@ -125,6 +131,14 @@ class Person(db.Model, UserMixin):
         order_by="(PaymentHandle.preferred.desc(), PaymentHandle.id)",
     )
 
+    def get_id(self):
+        """Flask-Login's "alternative token": what the session stores."""
+        return f"{self.id}:{self.session_token}" if self.session_token else str(self.id)
+
+    def rotate_session_token(self):
+        """Log out every session (callers log the current one back in)."""
+        self.session_token = secrets.token_urlsafe(32)
+
     @property
     def is_admin_or_owner(self):
         return self.admin or self.owner
@@ -136,6 +150,20 @@ class Person(db.Model, UserMixin):
     @property
     def full_name(self):
         return f"{self.first_name} {self.last_name}"
+
+
+class AuthThrottle(db.Model):
+    """A failed sign-in or a reset request, for slowing down guessing and
+    reset-email floods. Rows older than a day are cleared as new ones arrive."""
+
+    __tablename__ = "auth_throttle"
+    __table_args__ = (
+        db.Index("ix_auth_throttle_key_created_at", "key", "created_at"),
+        db.Index("ix_auth_throttle_created_at", "created_at"),
+    )
+    id = db.Column(db.Integer, primary_key=True)
+    key = db.Column(db.String(100), nullable=False)
+    created_at = db.Column(db.DateTime, server_default=func.now(), nullable=False)
 
 
 class Game(db.Model):
@@ -169,9 +197,10 @@ class Game(db.Model):
 
 class OwnedBy(db.Model):
     __tablename__ = "ownedby"
+    __table_args__ = (db.UniqueConstraint("game_id", "person_id", name="uq_ownedby_game_person"),)
     id = db.Column(db.Integer, primary_key=True)
-    game_id = db.Column(db.Integer, ForeignKey("games.id"), nullable=False)
-    person_id = db.Column(db.Integer, ForeignKey("people.id"), nullable=False)
+    game_id = db.Column(db.Integer, ForeignKey("games.id"), nullable=False, index=True)
+    person_id = db.Column(db.Integer, ForeignKey("people.id"), nullable=False, index=True)
 
     game = relationship("Game", back_populates="owners")
     person = relationship("Person", back_populates="owned_games")
@@ -179,9 +208,12 @@ class OwnedBy(db.Model):
 
 class GameRatings(db.Model):
     __tablename__ = "game_ratings"
+    __table_args__ = (
+        db.UniqueConstraint("game_id", "person_id", name="uq_game_ratings_game_person"),
+    )
     id = db.Column(db.Integer, primary_key=True)
-    game_id = db.Column(db.Integer, ForeignKey("games.id"), nullable=False)
-    person_id = db.Column(db.Integer, ForeignKey("people.id"), nullable=False)
+    game_id = db.Column(db.Integer, ForeignKey("games.id"), nullable=False, index=True)
+    person_id = db.Column(db.Integer, ForeignKey("people.id"), nullable=False, index=True)
     ranking = db.Column(db.Integer)
 
     game = relationship("Game", back_populates="ratings")
@@ -190,9 +222,12 @@ class GameRatings(db.Model):
 
 class Player(db.Model):
     __tablename__ = "players"
+    __table_args__ = (
+        db.UniqueConstraint("game_night_id", "people_id", name="uq_players_night_person"),
+    )
     id = db.Column(db.Integer, primary_key=True)
-    game_night_id = db.Column(db.Integer, ForeignKey("gamenights.id"))
-    people_id = db.Column(db.Integer, ForeignKey("people.id"))
+    game_night_id = db.Column(db.Integer, ForeignKey("gamenights.id"), index=True)
+    people_id = db.Column(db.Integer, ForeignKey("people.id"), index=True)
     created_at = db.Column(db.DateTime, server_default=func.now())
 
     game_night = relationship("GameNight", back_populates="players")
@@ -207,8 +242,8 @@ class Player(db.Model):
 class GameNightGame(db.Model):
     __tablename__ = "gamenightgames"
     id = db.Column(db.Integer, primary_key=True)
-    game_night_id = db.Column(db.Integer, ForeignKey("gamenights.id"), nullable=True)
-    game_id = db.Column(db.Integer, ForeignKey("games.id"), nullable=True)
+    game_night_id = db.Column(db.Integer, ForeignKey("gamenights.id"), nullable=True, index=True)
+    game_id = db.Column(db.Integer, ForeignKey("games.id"), nullable=True, index=True)
     round = db.Column(db.Integer)
     created_at = db.Column(db.DateTime, server_default=func.now())
 
@@ -225,9 +260,14 @@ class GameNightGame(db.Model):
 
 class Result(db.Model):
     __tablename__ = "results"
+    __table_args__ = (
+        db.UniqueConstraint("game_night_game_id", "player_id", name="uq_results_game_player"),
+    )
     id = db.Column(db.Integer, primary_key=True)
-    game_night_game_id = db.Column(db.Integer, ForeignKey("gamenightgames.id"), nullable=True)
-    player_id = db.Column(db.Integer, ForeignKey("players.id"), nullable=True)
+    game_night_game_id = db.Column(
+        db.Integer, ForeignKey("gamenightgames.id"), nullable=True, index=True
+    )
+    player_id = db.Column(db.Integer, ForeignKey("players.id"), nullable=True, index=True)
     score = db.Column(db.Integer)
     position = db.Column(db.Integer)
     created_at = db.Column(db.DateTime, server_default=func.now())
@@ -238,11 +278,18 @@ class Result(db.Model):
 
 class GameNominations(db.Model):
     __tablename__ = "game_nominations"
+    __table_args__ = (
+        # One nomination per player per night, and each game nominated once.
+        db.UniqueConstraint("game_night_id", "player_id", name="uq_game_nominations_night_player"),
+        db.UniqueConstraint("game_night_id", "game_id", name="uq_game_nominations_night_game"),
+    )
 
     id = db.Column(db.Integer, primary_key=True)
-    game_night_id = db.Column(db.Integer, db.ForeignKey("gamenights.id"), nullable=False)
-    player_id = db.Column(db.Integer, db.ForeignKey("players.id"), nullable=False)
-    game_id = db.Column(db.Integer, db.ForeignKey("games.id"), nullable=False)
+    game_night_id = db.Column(
+        db.Integer, db.ForeignKey("gamenights.id"), nullable=False, index=True
+    )
+    player_id = db.Column(db.Integer, db.ForeignKey("players.id"), nullable=False, index=True)
+    game_id = db.Column(db.Integer, db.ForeignKey("games.id"), nullable=False, index=True)
 
     game_night = db.relationship("GameNight", back_populates="nominations")
     player = db.relationship("Player", back_populates="nominations")
@@ -251,11 +298,16 @@ class GameNominations(db.Model):
 
 class GameVotes(db.Model):
     __tablename__ = "game_votes"
+    __table_args__ = (
+        db.UniqueConstraint("player_id", "game_id", name="uq_game_votes_player_game"),
+    )
 
     id = db.Column(db.Integer, primary_key=True)
-    game_night_id = db.Column(db.Integer, db.ForeignKey("gamenights.id"), nullable=False)
-    player_id = db.Column(db.Integer, db.ForeignKey("players.id"), nullable=False)
-    game_id = db.Column(db.Integer, db.ForeignKey("games.id"), nullable=False)
+    game_night_id = db.Column(
+        db.Integer, db.ForeignKey("gamenights.id"), nullable=False, index=True
+    )
+    player_id = db.Column(db.Integer, db.ForeignKey("players.id"), nullable=False, index=True)
+    game_id = db.Column(db.Integer, db.ForeignKey("games.id"), nullable=False, index=True)
     rank = db.Column(db.Integer, nullable=False)
 
     game_night = db.relationship("GameNight", back_populates="votes")
@@ -265,6 +317,7 @@ class GameVotes(db.Model):
 
 class Wishlist(db.Model):
     __tablename__ = "wishlist"
+    __table_args__ = (db.UniqueConstraint("person_id", "game_id", name="uq_wishlist_person_game"),)
     id = db.Column(db.Integer, primary_key=True)
     person_id = db.Column(db.Integer, db.ForeignKey("people.id"), nullable=False)
     game_id = db.Column(db.Integer, db.ForeignKey("games.id"), nullable=False)
@@ -275,9 +328,15 @@ class Wishlist(db.Model):
 
 class WishlistVote(db.Model):
     __tablename__ = "wishlist_votes"
+    __table_args__ = (
+        db.UniqueConstraint("person_id", "game_id", name="wishlist_votes_person_id_game_id_key"),
+    )
     id = db.Column(db.Integer, primary_key=True)
-    person_id = db.Column(db.Integer, db.ForeignKey("people.id"), nullable=False)
-    game_id = db.Column(db.Integer, db.ForeignKey("games.id"), nullable=False)
+    person_id = db.Column(
+        db.Integer, db.ForeignKey("people.id", ondelete="CASCADE"), nullable=False
+    )
+    game_id = db.Column(db.Integer, db.ForeignKey("games.id", ondelete="CASCADE"), nullable=False)
+    created_at = db.Column(db.DateTime, server_default=func.now())
 
     person = db.relationship("Person", back_populates="wishlist_votes")
     game = db.relationship("Game", back_populates="wishlist_vote_entries")
@@ -298,56 +357,17 @@ class GamesIndex(db.Model):  # SQL View
     player_owner = db.Column(db.Boolean, nullable=True)
 
 
-class UserRecentFutureGameNight(db.Model):  # SQL View
-    __tablename__ = "user_recent_future_game_nights"
-    id = db.Column(db.Integer, primary_key=True)  # Artificial primary key from row_number()
-    game_night_id = db.Column(db.Integer, nullable=False)
-    date = db.Column(db.Date, nullable=False)
-    notes = db.Column(db.Text, nullable=True)
-    final = db.Column(db.Boolean, nullable=False)
-    closed = db.Column(db.Boolean, nullable=False)
-    user_id = db.Column(db.Integer, nullable=False)
-
-
-class UserGameNightList(db.Model):  # SQL View
-    __tablename__ = "user_game_nights_list"
-    id = db.Column(db.Integer, primary_key=True)  # Artificial primary key from row_number()
-    game_night_id = db.Column(db.Integer, nullable=False)
-    date = db.Column(db.Date, nullable=False)
-    notes = db.Column(db.Text, nullable=True)
-    final = db.Column(db.Boolean, nullable=False)
-    closed = db.Column(db.Boolean, nullable=False)
-    user_id = db.Column(db.Integer, nullable=False)
-
-
-class AdminRecentFutureGameNight(db.Model):  # SQL View
-    __tablename__ = "admin_recent_future_game_nights"
-    game_night_id = db.Column(
-        db.Integer, primary_key=True
-    )  # Use game_night_id as PK since row_number() isn't used
-    date = db.Column(db.Date, nullable=False)
-    notes = db.Column(db.Text, nullable=True)
-    final = db.Column(db.Boolean, nullable=False)
-    closed = db.Column(db.Boolean, nullable=False)
-
-
-class AdminGameNightList(db.Model):  # SQL View
-    __tablename__ = "admin_game_nights_list"
-    id = db.Column(db.Integer, primary_key=True)  # Artificial primary key from row_number()
-    game_night_id = db.Column(db.Integer, nullable=False)
-    date = db.Column(db.Date, nullable=False)
-    notes = db.Column(db.Text, nullable=True)
-    final = db.Column(db.Boolean, nullable=False)
-    closed = db.Column(db.Boolean, nullable=False)
-
-
 class GameNightRankings(db.Model):  # SQL View
     __tablename__ = "game_night_rankings_view"
 
-    id = db.Column(db.Integer, primary_key=True)  # Artificial primary key from row_number()
+    # row_number() OVER (): not stable between queries, so only ever select
+    # columns from this view; never load or identify rows by id.
+    id = db.Column(db.Integer, primary_key=True)
     game_night_id = db.Column(db.Integer, nullable=False)
     player_id = db.Column(db.Integer, nullable=False)
-    position_counts = db.Column(db.ARRAY(db.Integer), nullable=False)  # Array of position counts
+    position_counts = db.Column(
+        db.ARRAY(db.Integer), nullable=False
+    )  # [number of 1sts, 2nds, ...], at least 4 long
     overall_score = db.Column(db.Integer, nullable=False)
     rank = db.Column(db.Integer, nullable=False)
 
@@ -393,7 +413,11 @@ class Poll(db.Model):
     token = db.Column(db.Text, unique=True, nullable=False)
     multi_select = db.Column(db.Boolean, default=False, nullable=False)
     private = db.Column(db.Boolean, default=False, nullable=False)
-    game_night_id = db.Column(db.Integer, db.ForeignKey("gamenights.id"), nullable=True)
+    game_night_id = db.Column(
+        db.Integer,
+        db.ForeignKey("gamenights.id", name="fk_polls_game_night_id", ondelete="SET NULL"),
+        nullable=True,
+    )
     # The night's RSVP poll (created from the night page), as opposed to any
     # other poll that's merely linked to the night.
     availability = db.Column(db.Boolean, default=False, nullable=False, server_default="false")
@@ -425,7 +449,7 @@ class PollOption(db.Model):
     __tablename__ = "poll_options"
 
     id = db.Column(db.Integer, primary_key=True)
-    poll_id = db.Column(db.Integer, db.ForeignKey("polls.id"), nullable=False)
+    poll_id = db.Column(db.Integer, db.ForeignKey("polls.id"), nullable=False, index=True)
     label = db.Column(db.Text, nullable=False)
     display_order = db.Column(db.Integer, default=0, nullable=False)
     option_date = db.Column(db.Date, nullable=True)  # date polls only
@@ -440,9 +464,9 @@ class PollResponse(db.Model):
     __tablename__ = "poll_responses"
 
     id = db.Column(db.Integer, primary_key=True)
-    poll_id = db.Column(db.Integer, db.ForeignKey("polls.id"), nullable=False)
-    option_id = db.Column(db.Integer, db.ForeignKey("poll_options.id"), nullable=False)
-    person_id = db.Column(db.Integer, db.ForeignKey("people.id"), nullable=True)
+    poll_id = db.Column(db.Integer, db.ForeignKey("polls.id"), nullable=False, index=True)
+    option_id = db.Column(db.Integer, db.ForeignKey("poll_options.id"), nullable=False, index=True)
+    person_id = db.Column(db.Integer, db.ForeignKey("people.id"), nullable=True, index=True)
     respondent_name = db.Column(db.Text, nullable=True)
     answer = db.Column(db.String, nullable=True)  # date polls: yes / maybe / no
     created_at = db.Column(db.DateTime, default=func.current_timestamp())
@@ -457,7 +481,9 @@ class PollInvitee(db.Model):
     __table_args__ = (db.UniqueConstraint("poll_id", "person_id", name="uq_poll_invitees"),)
 
     id = db.Column(db.Integer, primary_key=True)
-    poll_id = db.Column(db.Integer, db.ForeignKey("polls.id", ondelete="CASCADE"), nullable=False)
+    poll_id = db.Column(
+        db.Integer, db.ForeignKey("polls.id", ondelete="CASCADE"), nullable=False, index=True
+    )
     person_id = db.Column(
         db.Integer, db.ForeignKey("people.id", ondelete="CASCADE"), nullable=False
     )
@@ -483,10 +509,10 @@ class PersonBadge(db.Model):
     __table_args__ = (db.UniqueConstraint("person_id", "badge_id", name="uq_person_badge"),)
 
     id = db.Column(db.Integer, primary_key=True)
-    person_id = db.Column(db.Integer, db.ForeignKey("people.id"), nullable=False)
+    person_id = db.Column(db.Integer, db.ForeignKey("people.id"), nullable=False, index=True)
     badge_id = db.Column(db.Integer, db.ForeignKey("badges.id"), nullable=False)
     earned_at = db.Column(db.DateTime, server_default=func.now(), nullable=False)
-    game_night_id = db.Column(db.Integer, db.ForeignKey("gamenights.id"), nullable=True)
+    game_night_id = db.Column(db.Integer, db.ForeignKey("gamenights.id"), nullable=True, index=True)
 
     person = relationship("Person", back_populates="person_badges")
     badge = relationship("Badge", back_populates="person_badges")
@@ -505,7 +531,12 @@ tracker_team_players = db.Table(
         db.ForeignKey("tracker_teams.id", ondelete="CASCADE"),
         primary_key=True,
     ),
-    db.Column("player_id", db.Integer, db.ForeignKey("players.id"), primary_key=True),
+    db.Column(
+        "player_id",
+        db.Integer,
+        db.ForeignKey("players.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
 )
 
 
@@ -536,6 +567,16 @@ class TrackerSession(db.Model):
 
 class TrackerField(db.Model):
     __tablename__ = "tracker_fields"
+    __table_args__ = (
+        db.Index("ix_tracker_fields_session_id", "tracker_session_id"),
+        # Exactly one score field per session.
+        db.Index(
+            "uq_one_score_field",
+            "tracker_session_id",
+            unique=True,
+            postgresql_where=db.text("is_score_field = true"),
+        ),
+    )
 
     id = db.Column(db.Integer, primary_key=True)
     tracker_session_id = db.Column(
@@ -553,6 +594,7 @@ class TrackerField(db.Model):
 
 class TrackerTeam(db.Model):
     __tablename__ = "tracker_teams"
+    __table_args__ = (db.Index("ix_tracker_teams_session_id", "tracker_session_id"),)
 
     id = db.Column(db.Integer, primary_key=True)
     tracker_session_id = db.Column(
@@ -567,6 +609,18 @@ class TrackerTeam(db.Model):
 
 class TrackerValue(db.Model):
     __tablename__ = "tracker_values"
+    __table_args__ = (
+        # NULLS NOT DISTINCT so global fields (player and team both NULL) are unique too.
+        db.UniqueConstraint(
+            "tracker_field_id",
+            "player_id",
+            "team_id",
+            name="uq_tracker_value",
+            postgresql_nulls_not_distinct=True,
+        ),
+        db.Index("ix_tracker_values_field_id", "tracker_field_id"),
+        db.Index("ix_tracker_values_player_id", "player_id"),
+    )
 
     id = db.Column(db.Integer, primary_key=True)
     tracker_session_id = db.Column(
@@ -575,7 +629,9 @@ class TrackerValue(db.Model):
     tracker_field_id = db.Column(
         db.Integer, db.ForeignKey("tracker_fields.id", ondelete="CASCADE"), nullable=False
     )
-    player_id = db.Column(db.Integer, db.ForeignKey("players.id"), nullable=True)
+    player_id = db.Column(
+        db.Integer, db.ForeignKey("players.id", ondelete="CASCADE"), nullable=True
+    )
     team_id = db.Column(
         db.Integer, db.ForeignKey("tracker_teams.id", ondelete="CASCADE"), nullable=True
     )

@@ -36,13 +36,11 @@ def register_blueprints(app):
     app.register_blueprint(blueprints.game_night_bp)
     app.register_blueprint(blueprints.games_bp)
     app.register_blueprint(blueprints.voting_bp)
-    app.register_blueprint(blueprints.reminders_bp)
     app.register_blueprint(blueprints.main_bp)
     app.register_blueprint(blueprints.polls_bp)
     app.register_blueprint(blueprints.tracker_bp)
     app.register_blueprint(blueprints.photos_bp)
     app.register_blueprint(blueprints.food_bp)
-    # test_bp removed — was a debug artifact registered unconditionally
 
 
 def setup_logging(debug: bool = False):
@@ -57,18 +55,28 @@ def register_user_loader(app):
 
     @login_manager.user_loader
     def load_user(user_id):
-        person = db.session.get(Person, int(user_id))
-        return person if person is not None and person.active else None
+        # Person.get_id() is "<id>:<session_token>" (just "<id>" until a token
+        # is first set), so a new token ends every older session.
+        import hmac
+
+        pid, _, token = str(user_id).partition(":")
+        if not pid.isdigit():
+            return None
+        person = db.session.get(Person, int(pid))
+        if person is None or not person.active:
+            return None
+        if not hmac.compare_digest(token, person.session_token or ""):
+            return None
+        return person
 
 
 def start_schedulers(app):
-    """Start the background scheduler for reminders.
+    """Start the background scheduler for reminders, unless ENABLE_SCHEDULER=false.
 
-    In multi-worker Gunicorn deployments each worker calls create_app(), which
-    would start N copies of the scheduler and send N reminder emails per run.
-    Set ENABLE_SCHEDULER=false on web worker processes and run a dedicated
-    single-process scheduler worker (e.g. `gunicorn --workers 1`) or a
-    standalone cron process instead.
+    In production the web container sets ENABLE_SCHEDULER=false and the
+    game_night_scheduler service runs `python -m app.scheduler` (app/scheduler.py),
+    so the job runs once however many gunicorn workers or threads there are.
+    Anything that starts create_app() in more than one process must keep it off.
     """
     import os
 
@@ -99,6 +107,12 @@ def create_app(config_class=None):
     init_extensions(app)
     register_user_loader(app)
     register_blueprints(app)
+    from app.utils.errors import register_error_handlers
+
+    register_error_handlers(app)
+    from app.cli import badges_cli
+
+    app.cli.add_command(badges_cli)
     start_schedulers(app)
 
     app.jinja_env.filters["strip_html"] = _strip_html
@@ -122,6 +136,10 @@ def create_app(config_class=None):
         return f"{n} player{'s' if n != 1 else ''}"
 
     app.jinja_env.filters["player_range"] = player_range
+
+    from app.utils import new_badges
+
+    new_badges.register(app)
 
     @app.errorhandler(413)
     def upload_too_large(_error):

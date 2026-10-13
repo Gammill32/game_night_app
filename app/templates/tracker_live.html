@@ -1,92 +1,93 @@
 {% extends "base.html" %}
 
-{% block title %}Live Tracker — {{ session.game_night_game.game.name }}{% endblock %}
+{% set game = session.game_night_game.game %}
+{% block title %}Live Tracker — {{ game.name }}{% endblock %}
 
 {% block content %}
-<div class="max-w-5xl mx-auto">
+{% set entities = teams if session.mode == 'teams' else players %}
+{% set score_label = player_fields | selectattr('is_score_field') | map(attribute='label') | first | default('') %}
+{# Every request in here queues on this element, in order (see juice.js). #}
+<div class="max-w-5xl mx-auto pb-24" data-tracker hx-sync="closest [data-tracker]:queue all">
 
-  {# Global fields bar — only shown if global fields exist #}
+  <header class="mb-4">
+    <a href="{{ url_for('game_night.view_game_night', game_night_id=gn.id) }}#played"
+       class="inline-flex min-h-[2.75rem] items-center text-sm text-stone-500 hover:text-red-600">&larr; {{ gn.date.strftime('%A, %B %-d') }}</a>
+    <h1 class="text-2xl font-bold text-stone-800">{{ game.name }}</h1>
+    <p class="mt-0.5 text-sm text-stone-500">
+      Live score · {{ entities | length }} {{ 'team' if session.mode == 'teams' else 'player' }}{{ 's' if entities | length != 1 }}
+      {% if score_label %}· most <strong class="font-medium text-stone-700">{{ score_label }}</strong> leads{% endif %}
+    </p>
+  </header>
+
+  {# Global fields: one card above the players #}
   {% if global_fields %}
-  <div class="bg-stone-900 border-b border-stone-700 px-4 py-3 flex flex-wrap gap-6 items-center">
-    <span class="text-stone-500 text-xs uppercase tracking-wide font-medium">Global</span>
+  <section class="mb-3 rounded-xl border border-stone-200 bg-white px-4 py-2 shadow-sm" aria-label="Whole table">
     {% for field in global_fields %}
       {% set tv = value_map.get((field.id, None, None)) %}
       {% if tv %}
-        <div class="flex items-center gap-2">
-          <span class="text-stone-300 text-sm">{{ field.label }}</span>
-          {% set entity_type = "global" %}
-          {% set entity_id = None %}
-          {% include "_tracker_cell.html" %}
-        </div>
+      <div class="flex items-center justify-between gap-3 py-1.5">
+        <span class="text-sm font-medium text-stone-600">{{ field.label }}</span>
+        {% set entity_type = "global" %}
+        {% set entity_id = None %}
+        <div class="{{ 'min-w-0 flex-1' if field.type == 'global_notes' else '' }}">{% include "_tracker_cell.html" %}</div>
+      </div>
       {% endif %}
     {% endfor %}
-  </div>
+  </section>
   {% endif %}
 
-  {# Player / Team grid #}
-  <div class="overflow-x-auto bg-stone-950">
-    <table class="w-full border-collapse">
-      <thead class="bg-stone-900">
-        <tr>
-          <th class="text-left px-4 py-3 text-stone-400 text-xs uppercase tracking-wide w-36">
-            {% if session.mode == 'teams' %}Team{% else %}Player{% endif %}
-          </th>
-          {% for field in player_fields %}
-          <th class="px-4 py-3 text-xs uppercase tracking-wide text-center
-                     {% if field.is_score_field %}text-yellow-400{% else %}text-stone-400{% endif %}">
-            {{ field.label }}{% if field.is_score_field %} ★{% endif %}
-          </th>
-          {% endfor %}
-        </tr>
-      </thead>
-      <tbody>
-        {% set entities = teams if session.mode == 'teams' else players %}
-        {% for entity in entities %}
-        <tr class="border-t border-stone-800 {% if loop.index is odd %}bg-stone-950{% else %}bg-stone-900{% endif %}">
-          <td class="px-4 py-3 font-semibold text-stone-100 text-sm">
-            {% if session.mode == 'teams' %}
-              {{ entity.name }}
-              <span class="block text-xs font-normal text-stone-400">{{ entity.players | map(attribute='person.first_name') | join(', ') }}</span>
-            {% else %}
-              {{ entity.person.first_name }} {{ entity.person.last_name }}
-            {% endif %}
-          </td>
-          {% for field in player_fields %}
-            {% if session.mode == 'teams' %}
-              {% set tv = value_map.get((field.id, None, entity.id)) %}
-              {% set entity_type = "team" %}
-              {% set entity_id = entity.id %}
-            {% else %}
-              {% set tv = value_map.get((field.id, entity.id, None)) %}
-              {% set entity_type = "player" %}
-              {% set entity_id = entity.id %}
-            {% endif %}
-            <td class="px-4 py-3 text-center">
-              {% if tv %}{% include "_tracker_cell.html" %}{% endif %}
-            </td>
-          {% endfor %}
-        </tr>
+  {# One card per player or team #}
+  <ul class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+    {% for entity in entities %}
+    <li data-entity class="rounded-xl border border-l-4 border-stone-200 bg-white px-4 py-3 shadow-sm transition-colors">
+      <h2 class="flex items-center gap-1.5 font-semibold text-stone-800">
+        <span data-crown hidden aria-label="Leading">👑</span>
+        {% if session.mode == 'teams' %}
+        <span class="min-w-0 truncate">{{ entity.name }}</span>
+        {% else %}
+        <span class="min-w-0 truncate">{{ entity.person.first_name }} {{ entity.person.last_name }}</span>
+        {% endif %}
+      </h2>
+      {% if session.mode == 'teams' %}
+      <p class="text-xs text-stone-500">{{ entity.players | map(attribute='person.first_name') | join(', ') }}</p>
+      {% endif %}
+      <div class="mt-1 divide-y divide-stone-100">
+        {% for field in player_fields %}
+          {% if session.mode == 'teams' %}
+            {% set tv = value_map.get((field.id, None, entity.id)) %}
+            {% set entity_type = "team" %}
+          {% else %}
+            {% set tv = value_map.get((field.id, entity.id, None)) %}
+            {% set entity_type = "player" %}
+          {% endif %}
+          {% set entity_id = entity.id %}
+          {% if tv %}
+          <div class="flex items-center justify-between gap-3 py-1.5">
+            <span class="min-w-0 text-sm {{ 'font-semibold text-amber-700' if field.is_score_field else 'text-stone-600' }}">{{ field.label }}{% if field.is_score_field %} ★{% endif %}</span>
+            <div class="{{ 'min-w-0 flex-1' if field.type == 'player_notes' else 'shrink-0' }}">{% include "_tracker_cell.html" %}</div>
+          </div>
+          {% endif %}
         {% endfor %}
-      </tbody>
-    </table>
-  </div>
+      </div>
+    </li>
+    {% endfor %}
+  </ul>
 
-  {# Footer #}
-  <div class="bg-stone-900 border-t border-stone-700 px-4 py-3 flex justify-between items-center">
-    <span class="text-stone-500 text-sm">
-      {{ entities | length }} {{ 'team' if session.mode == 'teams' else 'player' }}s &middot;
-      {{ session.mode | capitalize }} &middot;
-      Score: {{ player_fields | selectattr('is_score_field') | map(attribute='label') | first | default('—') }}
-    </span>
-    <div class="flex gap-3">
+  {# Actions stay in reach above the bottom nav #}
+  <div class="fixed inset-x-0 bottom-14 z-20 border-t border-stone-200 bg-white/95 px-4 py-2.5 backdrop-blur md:bottom-0 md:left-16">
+    <div class="mx-auto flex max-w-5xl items-center justify-between gap-3">
+    {% if can_manage %}
       <form action="{{ url_for('tracker.discard_tracker', session_id=session.id) }}" method="POST"
             data-confirm="Discard this tracker session? All tracked data will be permanently lost.">
-        <button class="text-stone-500 hover:text-stone-300 text-sm px-3 py-1.5">Discard</button>
+        <button class="min-h-[2.75rem] whitespace-nowrap rounded-lg px-3 text-sm font-medium text-stone-600 hover:bg-stone-100 hover:text-stone-800">Discard</button>
       </form>
       <a href="{{ url_for('tracker.end_game', session_id=session.id) }}"
-         class="bg-red-600 text-white font-semibold px-5 py-1.5 rounded-lg hover:bg-red-700 text-sm">
-        End Game &rarr;
+         class="inline-flex min-h-[2.75rem] items-center whitespace-nowrap rounded-lg bg-red-600 px-5 text-sm font-semibold text-white hover:bg-red-700">
+        End game &rarr;
       </a>
+    {% else %}
+      <span class="text-sm text-stone-500">The host saves the results.</span>
+    {% endif %}
     </div>
   </div>
 
