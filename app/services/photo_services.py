@@ -38,25 +38,27 @@ def upload(game_night, user, file_storage, caption=""):
         )
     except media_services.MediaError as e:
         return False, str(e)
-    db.session.add(
-        GameNightPhoto(
-            game_night_id=game_night.id,
-            uploader_id=user.id,
-            path=rel,
-            thumb_path=thumb,
-            caption=(caption or "").strip()[:200] or None,
+    with media_services.removed_if_not_committed(rel, thumb):
+        db.session.add(
+            GameNightPhoto(
+                game_night_id=game_night.id,
+                uploader_id=user.id,
+                path=rel,
+                thumb_path=thumb,
+                caption=(caption or "").strip()[:200] or None,
+            )
         )
-    )
-    db.session.commit()
+        db.session.commit()
     return True, "Photo added."
 
 
 def delete(photo, user):
     if not can_delete(photo, user):
         return False, "Only whoever uploaded it, the host or an admin can delete a photo."
-    media_services.delete(photo.path, photo.thumb_path)
+    files = (photo.path, photo.thumb_path)
     db.session.delete(photo)
     db.session.commit()
+    media_services.delete(*files)  # only once the row is gone
     return True, "Photo deleted."
 
 

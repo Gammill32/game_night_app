@@ -8,6 +8,5 @@ from .games import games_bp as games_bp
 from .main import main_bp as main_bp
 from .photos import photos_bp as photos_bp
 from .polls import polls_bp as polls_bp
-from .reminders import reminders_bp as reminders_bp
 from .tracker import tracker_bp as tracker_bp
 from .voting import voting_bp as voting_bp

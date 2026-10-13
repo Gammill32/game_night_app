@@ -54,10 +54,6 @@ def get_metadata():
 # View DDL is managed separately via op.execute() in dedicated migrations.
 VIEW_TABLES = {
     "games_index",
-    "user_recent_future_game_nights",
-    "user_game_nights_list",
-    "admin_recent_future_game_nights",
-    "admin_game_nights_list",
     "game_night_rankings_view",
     "game_night_game_results",
     "game_night_nominations_votes",

@@ -209,11 +209,6 @@ def log_results(game_night_id, game_night_game_id, scores_positions):
     return True, "Results logged successfully."
 
 
-def get_all_games():
-    """Retrieve all available games."""
-    return Game.query.order_by(Game.name).all()
-
-
 def get_log_results_data(game_night_game_id):
     """Retrieve data for logging game results."""
     game_night_game = GameNightGame.query.get_or_404(game_night_game_id)

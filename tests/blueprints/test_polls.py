@@ -252,16 +252,75 @@ def test_failed_submit_does_not_render_results(auth_client, open_poll):
     assert b"at least one option" in resp.data.lower()
 
 
-def test_share_email_says_to_sign_in(admin_client, make_person, monkeypatch):
+def test_share_email_says_to_sign_in(admin_client, make_person):
     from app.extensions import mail
 
     ann = make_person("Ann")
     poll = create_poll("Share me", None, ["A", "B"], ann.id, False)
-    sent = []
-    monkeypatch.setattr(mail, "send", lambda msg: sent.append(msg))
     page = admin_client.get(f"/polls/{poll.id}/share").get_data(as_text=True)
     assert "people need to sign in" in page
-    admin_client.post(f"/polls/{poll.id}/share", data={"person_ids": [str(ann.id)]})
+    with mail.record_messages() as sent:
+        admin_client.post(f"/polls/{poll.id}/share", data={"person_ids": [str(ann.id)]})
     assert sent and "sign in first" in sent[0].body and f"/poll/{poll.token}" in sent[0].body
+    _db.session.delete(poll)
+    _db.session.commit()
+
+
+def _couldnt_email(page, name):
+    return f"Couldn&#39;t email {name}" in page or f"Couldn't email {name}" in page
+
+
+def test_share_uses_one_smtp_connection_and_names_failures(admin_client, make_person, monkeypatch):
+    """One SMTP session for the batch (not one per person), and a failed
+    address doesn't stop the rest; the flash says who to retry."""
+    from flask_mail import Connection
+
+    from app.extensions import mail
+
+    ann, bo, cy = make_person("Ann"), make_person("Bo"), make_person("Cy")
+    poll = create_poll("Share me", None, ["A", "B"], ann.id, False)
+    opened = []
+    real_enter, real_send = Connection.__enter__, Connection.send
+
+    def enter(self):
+        opened.append(self)
+        return real_enter(self)
+
+    def send(self, message, *args, **kwargs):
+        if bo.email in message.recipients:
+            raise OSError("mailbox unavailable")
+        return real_send(self, message, *args, **kwargs)
+
+    monkeypatch.setattr(Connection, "__enter__", enter)
+    monkeypatch.setattr(Connection, "send", send)
+    with mail.record_messages() as sent:
+        resp = admin_client.post(
+            f"/polls/{poll.id}/share",
+            data={"person_ids": [str(p.id) for p in (ann, bo, cy)]},
+            follow_redirects=True,
+        )
+    assert len(opened) == 1
+    assert sorted(m.recipients[0] for m in sent) == sorted([ann.email, cy.email])
+    page = resp.get_data(as_text=True)
+    assert "Sent to 2 people." in page
+    assert _couldnt_email(page, "Bo Test") and not _couldnt_email(page, "Ann")
+    _db.session.delete(poll)
+    _db.session.commit()
+
+
+def test_share_when_smtp_is_down(admin_client, make_person, monkeypatch):
+    from flask_mail import Connection
+
+    ann = make_person("Ann")
+    poll = create_poll("Share me", None, ["A", "B"], ann.id, False)
+
+    def refuse(self):
+        raise ConnectionRefusedError("no smtp")
+
+    monkeypatch.setattr(Connection, "__enter__", refuse)
+    resp = admin_client.post(
+        f"/polls/{poll.id}/share", data={"person_ids": [str(ann.id)]}, follow_redirects=True
+    )
+    assert _couldnt_email(resp.get_data(as_text=True), "Ann Test")
     _db.session.delete(poll)
     _db.session.commit()

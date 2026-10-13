@@ -135,7 +135,7 @@ cp .env.example .env
 | `APP_BASE_URL` | No | `https://gamenight.sgammill.com` | Public URL used for links in emails sent by the scheduler (no request to take it from) |
 | `MEDIA_DIR` | No | `/app/media` | Where night photos are stored; bind-mount a persistent volume here, writable by uid 1000 |
 | `MAX_UPLOAD_MB` | No | `20` | Largest photo upload accepted |
-| `ENABLE_SCHEDULER` | No | `true` | Set `false` to skip the reminder scheduler (dev tooling and tests do) |
+| `ENABLE_SCHEDULER` | No | `true` | Set `false` to skip the reminder scheduler in this process. `docker-compose.yml` sets it `false` on the web container (the `game_night_scheduler` container runs the job); dev tooling and tests set it too |
 
 ---
 
@@ -265,7 +265,7 @@ Then future migrations will apply normally with `flask db upgrade`.
 
 ### Database Views
 
-The app uses 9 PostgreSQL views for performance (e.g., `GameNightRankings`, `GamesIndex`). These are tracked in migration `a1b2c3d4e5f6_create_views.py`. If you're starting from sgammill's original database, run `flask db upgrade` from the beginning to create them, or manually verify the views exist.
+The app uses 5 PostgreSQL views for performance (e.g., `GameNightRankings`, `GamesIndex`). These are tracked in migration `a1b2c3d4e5f6_create_views.py`. If you're starting from sgammill's original database, run `flask db upgrade` from the beginning to create them, or manually verify the views exist.
 
 ---
 
@@ -313,6 +313,8 @@ A night can have an optional `address`. Only people who can open the night see i
 ### Achievement Badges
 
 26 badges are automatically evaluated when a game night is **finalized** (marked as complete). The evaluation runs in `app/services/badge_services.py`.
+
+After changing a badge rule, run `flask badges recheck --dry-run` to see which awards would be added or removed when every finalized night is re-judged in date order, then `flask badges recheck` to save those changes in one transaction. Awards that still qualify are left as they are.
 
 | Badge | Trigger |
 |-------|---------|
@@ -394,6 +396,25 @@ sudo docker compose up -d
 ```
 
 The entrypoint automatically runs `flask db upgrade` before starting gunicorn, so migrations apply on deploy without manual intervention.
+
+### Containers: web and scheduler
+
+`docker-compose.yml` runs two containers from the same image:
+
+| Container | Command | Does |
+|-----------|---------|------|
+| `game_night_app` | (default) | Waits for the database, runs `flask db upgrade`, then gunicorn: **1 worker process, 4 threads** (`-k gthread --threads 4`). `ENABLE_SCHEDULER=false`. |
+| `game_night_scheduler` | `scheduler` | Waits for the database, then `python -m app.scheduler` (`app/scheduler.py`): the daily reminder job at 8:45 `APP_TIMEZONE`, nothing else. No migrations, no port, no media volume. |
+
+`sudo docker compose up -d --build` builds and starts both; there's nothing else to do. The scheduler needs the same `DATABASE_URL`, `SECRET_KEY`, `MAIL_*`, `APP_BASE_URL` (and `APP_TIMEZONE` if you set it) as the app, from the same place. It sits on `web_network` as well as `game_night_internal` only because `game_night_internal` has no route out to the SMTP server; its `traefik.enable=false` label keeps Traefik from routing to it. Its logs: `sudo docker logs game_night_scheduler` (one "Scheduler running: daily_game_night_reminder, next run ..." line at start).
+
+Why: the web used to be one *sync* gunicorn worker, so one slow request (a photo upload, a batch of emails) held up every other visitor, and it couldn't have more because the scheduler ran inside it and would have been duplicated. Now the web has threads and the scheduler has its own process.
+
+Things to know before changing this:
+
+- **Keep `ENABLE_SCHEDULER=false` on the web if you raise `-w` above 1**, or every worker sends its own copy of each reminder. (With `-w 1`, even `true` only runs it once, so an older compose file without the scheduler service still works.)
+- In-process state is fine with threads: the BGG search cache is a `TTLCache` behind a lock, Flask-SQLAlchemy sessions are per request, and there are no other module-level caches. With more than one *worker process*, the BGG cache would be per process (harmless) and filesystem sessions still work because they're files in the container. With more than one *container* behind Traefik, sessions would need a shared store (`SESSION_TYPE=redis`).
+- Reminder jobs live in memory: if the scheduler container is down (or restarting during a deploy) at 8:45, that day's reminders don't go out. A wake-up up to an hour late still runs them (`misfire_grace_time`).
 
 ### Generating a Production SECRET_KEY
 
