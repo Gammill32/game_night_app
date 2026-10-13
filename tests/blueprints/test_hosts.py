@@ -35,7 +35,7 @@ def test_host_starts_and_runs_their_night_but_not_others(client, make_person, ma
 
     # Hana isn't playing, but it's her night: she sees it and runs it
     page = client.get(f"/game_night/{gn.id}").get_data(as_text=True)
-    assert "Hosted by" in page and "Finalize results" in page and "+ Add a game" in page
+    assert "Hosted by" in page and "Close voting" in page and "+ Add a game" in page
     assert "You&#39;re hosting" in client.get("/").get_data(
         as_text=True
     ) or "You're hosting" in client.get("/").get_data(as_text=True)
@@ -47,7 +47,7 @@ def test_host_starts_and_runs_their_night_but_not_others(client, make_person, ma
     # Someone else's night: no admin controls, and the routes refuse
     other = make_night(hana, date=dt.date(2031, 11, 14))
     page = client.get(f"/game_night/{other.id}").get_data(as_text=True)
-    assert "Finalize results" not in page
+    assert "Close voting" not in page
     resp = client.post(f"/game_night/{other.id}/toggle/closed")
     _db.session.refresh(other)
     assert not other.closed and "/game_night/" in resp.headers["Location"]
@@ -75,7 +75,7 @@ def test_admin_can_make_anyone_host_of_a_night(admin_client, client, make_person
 
     g.pop("_login_user", None)
     login(client, bo)
-    assert "Finalize results" in client.get(f"/game_night/{gn.id}").get_data(as_text=True)
+    assert "Close voting" in client.get(f"/game_night/{gn.id}").get_data(as_text=True)
     assert client.get("/game_night/start").status_code == 302  # still can't start new ones
 
 

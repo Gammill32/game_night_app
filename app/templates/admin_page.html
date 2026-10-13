@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_invite_link.html" import invite_link as invite_field, invite_link_script %}
 
 {% block title %}Admin Panel{% endblock %}
 
@@ -13,7 +14,7 @@
   </div>
 
   <p class="text-sm text-stone-600 mb-6">
-    Add people by name, then they claim their account on the sign-up page using that exact name.
+    Add people by name, then send each one their own invite link (it works for two weeks, once); they sign up from it as that person, with any rights you've given them. Hosts can copy links for the guests on their own nights.
     Turn on <strong>Can host</strong> to let someone start and run their own game nights without being an admin{% if not current_user.owner %}; only the owner can make or remove admins{% endif %}.
     Removing someone who has played keeps their past results: they're deactivated (can't log in, hidden from lists) and can be restored.
   </p>
@@ -31,12 +32,15 @@
       </thead>
       <tbody class="divide-y divide-stone-100">
         {% for person in people %}
-        <tr>
+        <tr id="person-{{ person.id }}">
           <td class="py-3 px-2 font-medium text-stone-800">
             {{ person.first_name }} {{ person.last_name }}
           </td>
           <td class="py-3 px-2 text-stone-600">
-            {% if person.email %}{{ person.email }}{% else %}<span class="text-xs text-amber-700">Not signed up yet</span>{% endif %}
+            {% if person.email %}{{ person.email }}{% else %}
+            <span class="text-xs text-amber-700">Not signed up yet</span>
+            {% if not person.owner %}<div class="mt-1 min-w-[16rem]">{{ invite_field(person, invite_link(person)) }}</div>{% endif %}
+            {% endif %}
           </td>
           <td class="py-3 px-2">
             {% if person.owner %}
@@ -120,3 +124,5 @@
 
 </div>
 {% endblock %}
+
+{% block scripts %}{{ invite_link_script() }}{% endblock %}

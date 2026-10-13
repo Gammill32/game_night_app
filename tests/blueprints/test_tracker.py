@@ -158,17 +158,7 @@ def test_setup_get_completed_session_redirects(app, db, auth_tracker_client):
         entity_id=auth_tracker_client["player_id"],
         delta=3,
     )
-    save_results(
-        session.id,
-        [
-            {
-                "player_id": auth_tracker_client["player_id"],
-                "team_id": None,
-                "position": 1,
-                "score": 3,
-            }
-        ],
-    )
+    save_results(session.id)
     resp = c.get(f"/game_night/{gng_id}/tracker/new")
     assert resp.status_code == 302
     assert f"/game_night/{auth_tracker_client['gn_id']}" in resp.headers["Location"]
@@ -470,7 +460,7 @@ def test_end_game_get_returns_rankings(app, db, auth_tracker_client):
     resp = c.get(f"/tracker/{session.id}/end")
     assert resp.status_code == 200
     assert b"VP" in resp.data
-    session_obj = TrackerSession.query.get(session.id)
+    session_obj = _db.session.get(TrackerSession, session.id)
     assert session_obj.status == "active"  # GET does not mutate status
 
 
@@ -498,17 +488,7 @@ def test_end_game_completed_session_redirects(app, db, auth_tracker_client):
         entity_id=auth_tracker_client["player_id"],
         delta=3,
     )
-    save_results(
-        session.id,
-        [
-            {
-                "player_id": auth_tracker_client["player_id"],
-                "team_id": None,
-                "position": 1,
-                "score": 3,
-            }
-        ],
-    )
+    save_results(session.id)
     resp = c.get(f"/tracker/{session.id}/end")
     assert resp.status_code == 302
 
@@ -548,7 +528,7 @@ def test_save_results_marks_completed(app, db, auth_tracker_client):
         },
     )
     assert resp.status_code == 302
-    session_obj = TrackerSession.query.get(session.id)
+    session_obj = _db.session.get(TrackerSession, session.id)
     assert session_obj.status == "completed"
     result = Result.query.filter_by(game_night_game_id=gng_id, player_id=player_id).first()
     assert result is not None
@@ -595,7 +575,7 @@ def test_discard_deletes_session(app, db, auth_tracker_client):
     sid = session.id
     resp = c.post(f"/tracker/{sid}/discard")
     assert resp.status_code == 302
-    assert TrackerSession.query.get(sid) is None
+    assert _db.session.get(TrackerSession, sid) is None
 
 
 # ── view_game_night integration ───────────────────────────────────────────────
@@ -615,7 +595,7 @@ def test_track_button_not_visible_on_finalized_game_night(auth_tracker_client):
 
     c = auth_tracker_client["client"]
     gn_id = auth_tracker_client["gn_id"]
-    gn = GameNight.query.get(gn_id)
+    gn = _db.session.get(GameNight, gn_id)
     gn.final = True
     _db.session.commit()
     try:
@@ -623,7 +603,7 @@ def test_track_button_not_visible_on_finalized_game_night(auth_tracker_client):
         assert resp.status_code == 200
         assert b"/tracker/new" not in resp.data
     finally:
-        gn = GameNight.query.get(gn_id)
+        gn = _db.session.get(GameNight, gn_id)
         gn.final = False
         _db.session.commit()
 
@@ -785,7 +765,7 @@ def test_team_mode_save_results_writes_all_members(app, db, team_tracker_client)
     )
     assert resp.status_code == 302
 
-    session_obj = TrackerSession.query.get(session.id)
+    session_obj = _db.session.get(TrackerSession, session.id)
     assert session_obj.status == "completed"
     # Both players should have Result rows
     r1 = Result.query.filter_by(game_night_game_id=gng_id, player_id=p1_id).first()

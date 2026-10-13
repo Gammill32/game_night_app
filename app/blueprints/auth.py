@@ -1,4 +1,5 @@
 # blueprints/auth.py
+from urllib.parse import urlsplit
 
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required, login_user, logout_user
@@ -9,25 +10,31 @@ from app.utils import flash_if_no_action
 auth_bp = Blueprint("auth", __name__)
 
 
+def _safe_next(url):
+    """A same-site path to go to after login, or None. Browsers treat a
+    backslash like a slash, so "/\\evil.com" would leave the site."""
+    if not url or "\\" in url or any(ord(c) < 32 for c in url):
+        return None
+    parts = urlsplit(url)
+    if parts.scheme or parts.netloc or not url.startswith("/") or url.startswith("//"):
+        return None
+    return url
+
+
 @auth_bp.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
         email = request.form.get("email", "").strip().lower()
         password = request.form.get("password")
 
-        success, message, user = auth_services.login(email, password)
+        success, message, user = auth_services.login(email, password, request.remote_addr)
 
         if success:
             login_user(user)
-            if user.temp_pass:
-                flash("Please update your password.", "warning")
-                return redirect(url_for("auth.update_password"))
-            next_url = request.args.get("next") or ""
-            if next_url and (not next_url.startswith("/") or next_url.startswith("//")):
-                next_url = ""
-            return redirect(next_url or url_for("main.index"))
-        else:
-            flash(message, "error")
+            return redirect(_safe_next(request.args.get("next")) or url_for("main.index"))
+        flash(message, "error")
+        if message == auth_services.TOO_MANY_LOGINS:
+            return render_template("login.html"), 429
 
     context = {}
     return render_template("login.html", **context)
@@ -44,20 +51,26 @@ def logout():
 @auth_bp.route("/signup", methods=["GET", "POST"])
 @flash_if_no_action("Please provide all required fields to sign up.", "error")
 def signup():
-    if request.method == "POST":
-        first_name = request.form.get("first_name")
-        last_name = request.form.get("last_name")
-        email = request.form.get("email", "").strip().lower()
-        password = request.form.get("password")
+    """Sign up from an invite link (?invite=...), claiming the person it was
+    made for. Without one the page only explains how to get a link."""
+    invite = request.values.get("invite") or None
+    invitee = auth_services.person_for_invite(invite) if invite else None
+    if invite and invitee is None:
+        flash(auth_services.INVITE_USED, "error")
+        return redirect(url_for("auth.signup"))
 
-        success, message = auth_services.signup(first_name, last_name, email, password)
+    form = {}
+    if request.method == "POST":
+        form = request.form
+        success, message = auth_services.signup(
+            form.get("email"), form.get("password"), invite=invite
+        )
         flash(message, "success" if success else "error")
 
         if success:
             return redirect(url_for("auth.login"))
 
-    context = {}
-    return render_template("signup.html", **context)
+    return render_template("signup.html", invite=invite, invitee=invitee, form=form)
 
 
 @auth_bp.route("/forgot_password", methods=["GET", "POST"])
@@ -65,7 +78,7 @@ def signup():
 def forgot_password():
     if request.method == "POST":
         email = request.form.get("email", "").strip().lower()
-        success, message = auth_services.forgot_password(email)
+        success, message = auth_services.forgot_password(email, request.remote_addr)
         flash(message, "success" if success else "error")
 
         if success:
@@ -105,6 +118,7 @@ def update_password():
         flash(message, "success" if success else "error")
 
         if success:
+            login_user(current_user._get_current_object())  # new session token: stay signed in
             return redirect(url_for("main.index"))
 
     context = {}
@@ -125,6 +139,8 @@ def manage_user():
             request.form.get("new_password"),
             request.form.get("confirm_password"),
         )
+        if success:
+            login_user(user._get_current_object())  # keep this session if the token changed
         flash(message, "success" if success else "error")
         return redirect(url_for("auth.manage_user"))
 

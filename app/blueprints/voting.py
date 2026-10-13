@@ -1,6 +1,7 @@
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 
+from app.extensions import db
 from app.services import voting_services
 from app.utils import flash_if_no_action, game_night_access_required
 
@@ -28,7 +29,7 @@ def nominate_game_page(game_night_id):
     from app.models import GameNight, GameNominations, Player
     from app.services import game_picker_services
 
-    game_night = GameNight.query.get_or_404(game_night_id)
+    game_night = db.get_or_404(GameNight, game_night_id)
     items, player_count = game_picker_services.picker_items(game_night, current_user.id)
     me = Player.query.filter_by(game_night_id=game_night_id, people_id=current_user.id).first()
     mine = (
@@ -54,6 +55,9 @@ def vote_game(game_night_id):
     votes_dict = {}
     for key, value in request.form.items():
         if key.startswith("votes[") and key.endswith("]"):
+            if not key[6:-1].isdigit():
+                flash("That ranking couldn't be read. Please try again.", "error")
+                return redirect(url_for("game_night.view_game_night", game_night_id=game_night_id))
             game_id = int(key[6:-1])
             if value.strip():
                 try:

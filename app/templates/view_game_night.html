@@ -36,11 +36,12 @@
       <form action="{{ url_for('game_night.toggle_game_night_field', game_night_id=game_night.id, field='closed') }}" method="POST">
         <button class="rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm font-medium text-stone-700 hover:bg-stone-50">{{ 'Reopen voting' if game_night.closed else 'Close voting' }}</button>
       </form>
-      {% endif %}
-      <form action="{{ url_for('game_night.toggle_game_night_field', game_night_id=game_night.id, field='final') }}" method="POST"
-            data-confirm="{{ 'Reopen results? Badges from this night are removed until you finalize again.' if game_night.final else 'Finalize results? This awards badges and closes the night’s polls.' }}">
-        <button class="rounded-lg px-3 py-1.5 text-sm font-medium {{ 'border border-stone-300 bg-white text-stone-700 hover:bg-stone-50' if game_night.final else 'bg-red-600 text-white hover:bg-red-700' }}">{{ 'Reopen results' if game_night.final else 'Finalize results' }}</button>
+      {% else %}
+      <form action="{{ url_for('game_night.unfinalize_game_night', game_night_id=game_night.id) }}" method="POST"
+            data-confirm="Reopen results? Badges from this night are removed until you finalize again.">
+        <button class="rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm font-medium text-stone-700 hover:bg-stone-50">Reopen results</button>
       </form>
+      {% endif %}
       {% endif %}
     </div>
   </div>
@@ -105,7 +106,6 @@
   {% include "_night_polls.html" %}
 
   <!-- Choosing games: nominate + rank -->
-  {% set voting_open = not game_night.closed %}
   {% if voting_open or nominations %}
   {% set ranked = user_votes | length %}
   <div id="games" class="bg-white rounded-xl border border-stone-200 shadow-sm p-5">

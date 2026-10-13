@@ -10,6 +10,7 @@ from app.models import Game, OwnedBy
 from app.services import badge_services, games_services
 from app.services.bgg_service import BGGService
 from app.utils import admin_required
+from app.utils.dates import local_today
 
 games_bp = Blueprint("games", __name__)
 
@@ -28,7 +29,7 @@ def games_index():
         "owner_choices": games_services.owner_choices(games) if scope == "all" else [],
         "play_stats": games_services.get_play_stats(),
         "bridesmaid_games": games_services.get_bridesmaid_games(),
-        "today": date.today(),
+        "today": local_today(),
         "scope": scope,
     }
     return render_template("games_index.html", **context)
@@ -71,7 +72,7 @@ def view_game(game_id):
         ]
     context.update(
         game_stat=games_services.get_play_stats().get(game_id),
-        today=date.today(),
+        today=local_today(),
         assignable_owners=assignable_owners,
     )
     return render_template("view_game.html", **context)
@@ -230,7 +231,7 @@ def user_stats():
     all_games = games_services.get_user_stats(user_id, sort_by="games_played")
     all_opponents = games_services.get_head_to_head(user_id)
 
-    today = date.today()
+    today = local_today()
     presets = [
         ("All time", "", ""),
         ("This year", date(today.year, 1, 1).isoformat(), ""),

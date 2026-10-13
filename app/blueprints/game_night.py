@@ -1,6 +1,9 @@
 # blueprints/game_night.py
 
-from flask import Blueprint, flash, redirect, render_template, request, url_for
+from datetime import datetime
+
+import pytz
+from flask import Blueprint, current_app, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 
 from app.models import TrackerSession
@@ -9,12 +12,18 @@ from app.services import (
     food_services,
     game_night_services,
     game_picker_services,
+    night_policy,
     photo_services,
     poll_services,
 )
 from app.utils import game_night_access_required, host_required, night_manager_required
 
 game_night_bp = Blueprint("game_night", __name__)
+
+
+def _local_today():
+    """Today in the app's timezone (APP_TIMEZONE), like the home page."""
+    return datetime.now(pytz.timezone(current_app.config["APP_TIMEZONE"])).date()
 
 
 @game_night_bp.route("/game_night/start", methods=["GET", "POST"])
@@ -99,7 +108,9 @@ def view_game_night(game_night_id):
         if poll_services.can_view(poll, current_user)
     ]
     game_night = context["game_night"]
-    context["can_manage"] = game_night.managed_by(current_user)
+    context["can_manage"] = night_policy.can_manage(game_night, current_user)
+    context["voting_open"] = night_policy.voting_open(game_night)
+    context["ready_to_finalize"] = night_policy.ready_to_finalize(game_night, _local_today())
     context["can_upload_photos"] = photo_services.can_upload(game_night, current_user)
     if game_night.food_mode != "none":
         context["food_rows"] = food_services.expense_rows(game_night, current_user)
@@ -179,17 +190,19 @@ def manage_game_in_night(game_night_id):
 @night_manager_required
 def log_results(game_night_id, game_night_game_id):
     if request.method == "POST":
-        data = request.get_json()
+        data = request.get_json(silent=True)
         if not data:
             flash("No data received", "error")
             return redirect(url_for("game_night.view_game_night", game_night_id=game_night_id))
 
         success, message = game_night_services.log_results(game_night_id, game_night_game_id, data)
-        flash(message, "success" if success else "error")
+        if not success:
+            return message, 400
+        flash(message, "success")
         return redirect(url_for("game_night.view_game_night", game_night_id=game_night_id))
 
     game_night_game, players, existing_results = game_night_services.get_log_results_data(
-        game_night_game_id
+        game_night_id, game_night_game_id
     )
 
     context = {
@@ -207,6 +220,25 @@ def log_results(game_night_id, game_night_game_id):
 def toggle_game_night_field(game_night_id, field):
     success, message = game_night_services.toggle_game_night_field(game_night_id, field)
     flash(message, "success" if success else "error")
+    return redirect(url_for("game_night.view_game_night", game_night_id=game_night_id))
+
+
+@game_night_bp.route("/game_night/<int:game_night_id>/finalize", methods=["POST"])
+@login_required
+@night_manager_required
+def finalize_game_night(game_night_id):
+    changed, message = game_night_services.finalize(game_night_id)
+    flash(message, "success" if changed else "info")
+    params = {"finalized": 1} if changed else {}
+    return redirect(url_for("game_night.view_game_night", game_night_id=game_night_id, **params))
+
+
+@game_night_bp.route("/game_night/<int:game_night_id>/unfinalize", methods=["POST"])
+@login_required
+@night_manager_required
+def unfinalize_game_night(game_night_id):
+    changed, message = game_night_services.unfinalize(game_night_id)
+    flash(message, "success" if changed else "info")
     return redirect(url_for("game_night.view_game_night", game_night_id=game_night_id))
 
 

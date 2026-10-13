@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% from "_invite_link.html" import invite_link as invite_field, invite_link_script %}
+
+{% block title %}Invite People{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto">
+  <h1 class="text-2xl font-bold text-stone-800">Invite people</h1>
+  <p class="mt-1 mb-5 text-sm text-stone-500">
+    {% if current_user.admin or current_user.owner %}Everyone who hasn't signed up yet.{% else %}Guests on nights you host who haven't signed up yet.{% endif %}
+    Send each person their own link: it signs them up as that person, works once, and lasts two weeks.
+  </p>
+
+  <div class="bg-white rounded-xl border border-stone-200 shadow-sm p-5">
+    {% if people %}
+    <ul class="divide-y divide-stone-100">
+      {% for person in people %}
+      <li class="py-3">
+        <div class="mb-1 text-sm font-medium text-stone-800">{{ person.full_name }}</div>
+        {{ invite_field(person, invite_link(person)) }}
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="text-sm text-stone-500">Nobody's waiting on an invite. People you add to a night from <strong>Not on the site? Add them</strong> show up here.</p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}{{ invite_link_script() }}{% endblock %}

@@ -122,7 +122,7 @@ def create_availability_poll(game_night_id: int, user_id: int) -> tuple[bool, st
     """Create the night's Can/Maybe/Can't poll. Its answers are the RSVPs."""
     from app.models import GameNight
 
-    gn = GameNight.query.get_or_404(game_night_id)
+    gn = db.get_or_404(GameNight, game_night_id)
     if gn.availability_poll is not None:
         return False, "This game night already has an availability poll."
     poll = create_poll(
@@ -179,17 +179,48 @@ def can_view(poll: Poll, user) -> bool:
     return True
 
 
+def _open_polls_query(user):
+    """Open polls this user can see: can_view() and poll_is_active() as one
+    query, so the nav badge doesn't cost a query per poll."""
+    from sqlalchemy import and_, exists, or_
+
+    from app.models import GameNight, Player
+
+    query = Poll.query.filter(
+        Poll.closed.is_(False),
+        or_(Poll.closes_at.is_(None), Poll.closes_at > datetime.utcnow()),
+    )
+    if user.admin or user.owner:
+        return query
+    hosts_night = exists().where(GameNight.id == Poll.game_night_id, GameNight.host_id == user.id)
+    invited = exists().where(PollInvitee.poll_id == Poll.id, PollInvitee.person_id == user.id)
+    plays_night = exists().where(
+        Player.game_night_id == Poll.game_night_id, Player.people_id == user.id
+    )
+    return query.filter(
+        or_(
+            Poll.created_by == user.id,
+            hosts_night,
+            and_(Poll.private.is_(True), invited),
+            and_(
+                Poll.private.is_(False),
+                or_(Poll.game_night_id.is_(None), plays_night),
+            ),
+        )
+    )
+
+
 def open_polls_for(user) -> list[Poll]:
     """Open polls this user can see, newest first."""
-    from sqlalchemy.orm import selectinload
+    if not getattr(user, "is_authenticated", False):
+        return []
+    return _open_polls_query(user).order_by(Poll.created_at.desc()).all()
 
-    polls = (
-        Poll.query.filter_by(closed=False)
-        .options(selectinload(Poll.invitees), selectinload(Poll.game_night))  # type: ignore[arg-type]
-        .order_by(Poll.created_at.desc())
-        .all()
-    )
-    return [p for p in polls if poll_is_active(p) and can_view(p, user)]
+
+def count_open_polls_for(user) -> int:
+    if not getattr(user, "is_authenticated", False):
+        return 0
+    return _open_polls_query(user).count()
 
 
 def has_responded(poll: Poll, person_id: int) -> bool:

@@ -31,3 +31,10 @@ def test_home_shows_upcoming_and_open_polls(app, client, make_person, make_night
     for poll in (general, answered):
         _db.session.delete(poll)
     _db.session.commit()
+
+
+def test_home_rejects_bad_month_or_year(client, make_person):
+    login(client, make_person("Ann"))
+    for query in ("month=13", "month=0", "year=0", "year=99999", "month=12&year=9999"):
+        assert client.get(f"/?{query}").status_code == 400, query
+    assert client.get("/?month=2&year=2026").status_code == 200

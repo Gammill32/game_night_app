@@ -10,6 +10,7 @@ and are only served through routes that check the viewer can see the night.
 
 import os
 import secrets
+from contextlib import contextmanager
 
 from flask import current_app
 from PIL import Image, ImageOps, UnidentifiedImageError
@@ -53,24 +54,38 @@ def save_image(file_storage, folder, max_side=2400, thumb_side=None):
         raise MediaError("That file is empty.")
     from io import BytesIO
 
+    too_large = MediaError("That image is too large (too many pixels) to upload.")
     try:
-        img = Image.open(BytesIO(data))
-        fmt = img.format
-        img.load()
-    except (UnidentifiedImageError, OSError, Image.DecompressionBombError):
+        img = Image.open(BytesIO(data))  # reads the header only
+    except Image.DecompressionBombError:
+        raise too_large from None
+    except (UnidentifiedImageError, OSError):
         raise MediaError("That doesn't look like a JPEG, PNG or HEIC photo.") from None
+    fmt = img.format
     if fmt not in ALLOWED_FORMATS:
         raise MediaError("Only JPEG, PNG and HEIC photos can be uploaded.")
+    # Pillow only raises past 2x MAX_IMAGE_PIXELS; between 1x and 2x it just
+    # warns (DecompressionBombWarning) and decodes. Check before load().
+    width, height = img.size
+    if width * height > MAX_PIXELS:
+        raise too_large
+    try:
+        img.load()
+    except (OSError, Image.DecompressionBombError):
+        raise MediaError("That doesn't look like a JPEG, PNG or HEIC photo.") from None
 
     img = ImageOps.exif_transpose(img)  # honour the camera's rotation, then drop EXIF
     img = _to_rgb(img)
     name = secrets.token_hex(16)
     rel = os.path.join(folder, f"{name}.jpg")
-    _write(img, rel, max_side)
-    rel_thumb = None
-    if thumb_side:
-        rel_thumb = os.path.join(folder, f"{name}_t.jpg")
-        _write(img, rel_thumb, thumb_side)
+    rel_thumb = os.path.join(folder, f"{name}_t.jpg") if thumb_side else None
+    try:
+        _write(img, rel, max_side)
+        if rel_thumb:
+            _write(img, rel_thumb, thumb_side)
+    except BaseException:
+        delete(rel, rel_thumb)
+        raise
     return rel, rel_thumb
 
 
@@ -101,6 +116,9 @@ def path_for(rel_path):
 
 
 def delete(*rel_paths):
+    """Remove files. Call it after the commit that drops their rows: a file
+    left behind is only clutter, a row pointing at no file is a broken image.
+    So a file that can't be removed is logged, not raised."""
     for rel in rel_paths:
         if not rel:
             continue
@@ -108,3 +126,19 @@ def delete(*rel_paths):
             os.remove(_abs(rel))
         except FileNotFoundError:
             pass
+        except (OSError, MediaError):
+            current_app.logger.exception("Couldn't remove media file %s", rel)
+
+
+@contextmanager
+def removed_if_not_committed(*rel_paths):
+    """Wrap the commit that records freshly written files: if it fails, roll
+    back and remove the files instead of leaving orphans, then re-raise."""
+    from app.extensions import db
+
+    try:
+        yield
+    except BaseException:
+        db.session.rollback()
+        delete(*rel_paths)
+        raise

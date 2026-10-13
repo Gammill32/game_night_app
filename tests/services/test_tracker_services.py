@@ -161,7 +161,7 @@ def test_discard_session_removes_session(app, db, tracker_night):
     session = get_or_create_configuring_session(tracker_night["gng_id"])
     sid = session.id
     discard_session(sid)
-    assert TrackerSession.query.get(sid) is None
+    assert _db.session.get(TrackerSession, sid) is None
 
 
 def test_add_field_creates_tracker_field(app, db, tracker_night):
@@ -200,7 +200,7 @@ def test_launch_session_seeds_values_for_individual(app, db, tracker_night):
         player_ids=[tracker_night["pl1_id"], tracker_night["pl2_id"]],
     )
 
-    session = TrackerSession.query.get(session.id)
+    session = _db.session.get(TrackerSession, session.id)
     assert session.status == "active"
     assert session.mode == "individual"
 
@@ -252,42 +252,39 @@ def test_compute_rankings_ties_share_position(app, db, active_session):
 
 def test_save_results_creates_result_rows(app, db, active_session):
     from app.models import Result
-    from app.services.tracker_services import compute_rankings, save_results, update_value
+    from app.services.tracker_services import save_results, update_value
 
     sid = active_session["session_id"]
     field = TrackerField.query.filter_by(tracker_session_id=sid, label="VP").first()
     gng_id = active_session["gng_id"]
     update_value(sid, field.id, entity_type="player", entity_id=active_session["pl1_id"], delta=10)
     update_value(sid, field.id, entity_type="player", entity_id=active_session["pl2_id"], delta=7)
-    rankings = compute_rankings(sid)
-    save_results(sid, rankings)
+    save_results(sid)
     results = Result.query.filter_by(game_night_game_id=gng_id).all()
     assert len(results) == 2
     winner = next(r for r in results if r.player_id == active_session["pl1_id"])
     assert winner.position == 1
     assert winner.score == 10
-    session = TrackerSession.query.get(sid)
+    session = _db.session.get(TrackerSession, sid)
     assert session.status == "completed"
 
 
 def test_save_results_upserts_existing_rows(app, db, active_session):
     from app.extensions import db as _db
     from app.models import Result
-    from app.services.tracker_services import compute_rankings, save_results, update_value
+    from app.services.tracker_services import save_results, update_value
 
     sid = active_session["session_id"]
     field = TrackerField.query.filter_by(tracker_session_id=sid, label="VP").first()
     gng_id = active_session["gng_id"]
     update_value(sid, field.id, entity_type="player", entity_id=active_session["pl1_id"], delta=10)
-    rankings = compute_rankings(sid)
-    save_results(sid, rankings)
+    save_results(sid)
     # Save again with different score — reset status first
-    session = TrackerSession.query.get(sid)
+    session = _db.session.get(TrackerSession, sid)
     session.status = "active"
     _db.session.commit()
     update_value(sid, field.id, entity_type="player", entity_id=active_session["pl1_id"], delta=5)
-    rankings = compute_rankings(sid)
-    save_results(sid, rankings)
+    save_results(sid)
     results = Result.query.filter_by(game_night_game_id=gng_id).all()
     # No duplicate rows
     assert len(results) == 2

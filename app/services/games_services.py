@@ -127,7 +127,7 @@ def get_filtered_games(
     min_rating_filter=None,
     scope="all",
 ):
-    user = Person.query.get(user_id)
+    user = db.session.get(Person, user_id)
 
     # Base query
     query = GamesIndex.query
@@ -300,7 +300,7 @@ def modify_ownership(person_id, game_id, add=True, *, actor_is_self=True):
     `actor_is_self=False` indicates an admin acting on someone else's behalf,
     which only changes message wording.
     """
-    game = Game.query.get_or_404(game_id)
+    game = db.get_or_404(Game, game_id)
     ownership = OwnedBy.query.filter_by(game_id=game.id, person_id=person_id).first()
     subject = "You" if actor_is_self else "Owner"
 
@@ -323,7 +323,7 @@ def modify_ownership(person_id, game_id, add=True, *, actor_is_self=True):
 def get_game_details(game_id, user_id):
     """A game with its top winners (by person), the nights it was played (with
     who won), the viewer's rating and the group's average."""
-    game = Game.query.get_or_404(game_id)
+    game = db.get_or_404(Game, game_id)
 
     wins = func.count(Result.id)
     leaderboard = (
@@ -522,7 +522,7 @@ def youtube_id(url):
 
 def update_tutorial_url(game_id, tutorial_url):
     """Save a YouTube tutorial link (or clear it). Returns (success, message)."""
-    game = Game.query.get_or_404(game_id)
+    game = db.get_or_404(Game, game_id)
     tutorial_url = (tutorial_url or "").strip()
     if tutorial_url and not youtube_id(tutorial_url):
         return False, "That doesn't look like a YouTube video link."
@@ -681,19 +681,3 @@ def summarize_user_stats(rows):
         "average_position": round(positions / played, 2) if played else None,
         "distinct_games": len(rows),
     }
-
-
-def get_selected_games(game_ids):
-    if not game_ids:
-        return []
-    return db.session.query(Game.id, Game.name).filter(Game.id.in_(game_ids)).all()
-
-
-def get_selected_opponents(opponent_ids):
-    if not opponent_ids:
-        return []
-    return (
-        db.session.query(Person.id, Person.first_name, Person.last_name)
-        .filter(Person.id.in_(opponent_ids))
-        .all()
-    )

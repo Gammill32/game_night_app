@@ -238,17 +238,18 @@ def add_expense(game_night, user, form, receipt=None):
             receipt_path, _ = media_services.save_image(receipt, f"receipts/{game_night.id}", 2000)
     except (FoodError, media_services.MediaError) as e:
         return False, str(e)
-    expense = FoodExpense(
-        game_night_id=game_night.id,
-        description=description,
-        amount_cents=amount,
-        paid_by=int(raw_payer),
-        receipt_path=receipt_path,
-        created_by=user.id,
-    )
-    db.session.add(expense)
-    _set_shares(expense, covered)
-    db.session.commit()
+    with media_services.removed_if_not_committed(receipt_path):
+        expense = FoodExpense(
+            game_night_id=game_night.id,
+            description=description,
+            amount_cents=amount,
+            paid_by=int(raw_payer),
+            receipt_path=receipt_path,
+            created_by=user.id,
+        )
+        db.session.add(expense)
+        _set_shares(expense, covered)
+        db.session.commit()
     return True, f"Logged {money(amount)} for {description}, split {len(covered)} ways."
 
 
@@ -271,10 +272,11 @@ def delete_expense(game_night, expense, user):
         return False, "This game night is finalized."
     if not can_edit_expense(expense, user):
         return False, "Only whoever logged it or an admin can remove it."
-    media_services.delete(expense.receipt_path)
+    receipt, description = expense.receipt_path, expense.description
     db.session.delete(expense)
     db.session.commit()
-    return True, f"Removed {expense.description}."
+    media_services.delete(receipt)  # only once the row is gone
+    return True, f"Removed {description}."
 
 
 def set_paid(share, user, paid=True):

@@ -86,8 +86,7 @@ def remove_user(user_id, current_user_id):
         user.email = None
         user.password = None
         user.admin = False
-        user.temp_pass = False
-        user.temp_pass_expires_at = None
+        user.rotate_session_token()  # restoring them later mustn't revive old sessions
         db.session.commit()
         return (
             True,
@@ -107,13 +106,10 @@ def restore_user(user_id):
         return False, "User not found."
     user.active = True
     db.session.commit()
-    return True, f"{user.first_name} {user.last_name} is back; they can sign up again by name."
-
-
-def add_person(first_name, last_name):
-    """Add a new person to the system. Returns (success, message)."""
-    success, message, _ = create_person(first_name, last_name)
-    return success, message
+    return (
+        True,
+        f"{user.first_name} {user.last_name} is back; copy their invite link to let them sign up again.",
+    )
 
 
 def create_person(first_name, last_name):
@@ -122,7 +118,7 @@ def create_person(first_name, last_name):
     if not first_name or not last_name:
         return False, "Both first name and last name are required.", None
 
-    # Signup claims an account by exact name, so names must be unique.
+    # Names stay unique so people can tell each other apart in pickers.
     existing = Person.query.filter(
         db.func.lower(Person.first_name) == first_name.lower(),
         db.func.lower(Person.last_name) == last_name.lower(),
@@ -136,4 +132,8 @@ def create_person(first_name, last_name):
     db.session.add(person)
     db.session.commit()
 
-    return True, f"{first_name} {last_name} added. They can now sign up with that name.", person
+    return (
+        True,
+        f"{first_name} {last_name} added. Send them their invite link so they can sign up.",
+        person,
+    )

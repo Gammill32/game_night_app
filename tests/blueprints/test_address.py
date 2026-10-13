@@ -30,9 +30,9 @@ def test_address_is_private_and_deleted_on_finalize(admin_client, client, make_p
         as_text=True
     )
 
-    from app.services.game_night_services import toggle_game_night_field
+    from app.services.game_night_services import finalize
 
-    toggle_game_night_field(gn.id, "final")
+    finalize(gn.id)
     _db.session.refresh(gn)
     assert gn.final and gn.address is None
     recap = client.get(f"/game_night/{gn.id}/recap").get_data(as_text=True)

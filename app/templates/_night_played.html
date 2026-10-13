@@ -96,5 +96,13 @@
       </li>
       {% endfor %}
     </ul>
+    {% if can_manage and ready_to_finalize %}
+    <form action="{{ url_for('game_night.finalize_game_night', game_night_id=game_night.id) }}" method="POST"
+          data-confirm="Finalize this night? This awards badges and closes the night’s polls."
+          class="mt-5 flex flex-wrap items-center justify-end gap-3 border-t border-stone-100 pt-4">
+      <span class="text-xs text-stone-500">All games logged?</span>
+      <button class="rounded-lg bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700">Finalize night · awards badges</button>
+    </form>
+    {% endif %}
   </div>
   {% endif %}

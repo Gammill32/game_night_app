@@ -78,6 +78,7 @@
       {{ session.mode | capitalize }} &middot;
       Score: {{ player_fields | selectattr('is_score_field') | map(attribute='label') | first | default('—') }}
     </span>
+    {% if can_manage %}
     <div class="flex gap-3">
       <form action="{{ url_for('tracker.discard_tracker', session_id=session.id) }}" method="POST"
             data-confirm="Discard this tracker session? All tracked data will be permanently lost.">
@@ -88,6 +89,9 @@
         End Game &rarr;
       </a>
     </div>
+    {% else %}
+    <span class="text-stone-400 text-sm">The host saves the results.</span>
+    {% endif %}
   </div>
 
 </div>

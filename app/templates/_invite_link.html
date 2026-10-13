@@ -1,0 +1,42 @@
+{# Invite link for someone who hasn't signed up: a readonly field (select and
+   copy by hand if the clipboard isn't available) plus a Copy button.
+   Pages using it include invite_link_script() once. #}
+{% macro invite_link(person, url) %}
+<div class="flex items-center gap-2">
+  <input type="text" readonly value="{{ url }}" id="invite-{{ person.id }}"
+         aria-label="Invite link for {{ person.full_name }}"
+         class="min-w-0 flex-1 rounded border border-stone-200 bg-stone-50 px-2 py-1 font-mono text-xs text-stone-600"
+         onfocus="this.select()">
+  <button type="button" data-invite-copy="invite-{{ person.id }}"
+          class="shrink-0 rounded-lg border border-stone-300 px-2.5 py-1 text-xs font-medium text-stone-700 hover:bg-stone-50">
+    Copy invite link
+  </button>
+</div>
+{% endmacro %}
+
+{% macro invite_link_script() %}
+<script>
+  document.addEventListener('click', function (e) {
+    const btn = e.target.closest('[data-invite-copy]');
+    if (!btn) return;
+    const input = document.getElementById(btn.dataset.inviteCopy);
+    const label = btn.textContent;
+    const done = function (text) {
+      btn.textContent = text;
+      setTimeout(function () { btn.textContent = label; }, 2000);
+    };
+    const fallback = function () {
+      input.focus();
+      input.select();
+      let ok = false;
+      try { ok = document.execCommand('copy'); } catch (err) { ok = false; }
+      done(ok ? 'Copied' : 'Press Ctrl+C to copy');
+    };
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(input.value).then(function () { done('Copied'); }, fallback);
+    } else {
+      fallback();
+    }
+  });
+</script>
+{% endmacro %}

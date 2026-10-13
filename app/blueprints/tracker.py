@@ -12,6 +12,7 @@ from flask import (
 )
 from flask_login import current_user, login_required
 
+from app.extensions import db
 from app.models import (  # noqa: F401
     GameNightGame,
     Player,
@@ -19,13 +20,13 @@ from app.models import (  # noqa: F401
     TrackerSession,
     TrackerValue,
 )
-from app.services import tracker_services
+from app.services import night_policy, tracker_services
 
 tracker_bp = Blueprint("tracker", __name__)
 
 
 def _get_session_or_404(session_id):
-    session = TrackerSession.query.get(session_id)
+    session = db.session.get(TrackerSession, session_id)
     if session is None:
         abort(404)
     return session
@@ -43,6 +44,19 @@ def _assert_participant_or_admin(session):
         abort(403)
 
 
+def _assert_manager(session):
+    """Abort 403 unless current user hosts this session's night (or is an admin)."""
+    if not night_policy.can_manage(session.game_night_game.game_night, current_user):
+        abort(403)
+
+
+def _int_or_none(raw):
+    try:
+        return int(raw)
+    except (TypeError, ValueError):
+        return None
+
+
 def _assert_gng_participant_or_admin(gng):
     """Abort 403 if current user is not a participant of this game night or admin."""
     if gng.game_night.managed_by(current_user):
@@ -57,7 +71,7 @@ def _assert_gng_participant_or_admin(gng):
 @tracker_bp.route("/game_night/<int:gng_id>/tracker/new")
 @login_required
 def setup_tracker(gng_id):
-    gng = GameNightGame.query.get_or_404(gng_id)
+    gng = db.get_or_404(GameNightGame, gng_id)
     gn = gng.game_night
     _assert_gng_participant_or_admin(gng)
     if gn.final:
@@ -92,27 +106,35 @@ def setup_tracker(gng_id):
         players=players,
         playing=playing,
         fields=fields,
+        can_manage=night_policy.can_manage(gn, current_user),
     )
 
 
 @tracker_bp.route("/game_night/<int:gng_id>/tracker", methods=["POST"])
 @login_required
 def launch_tracker(gng_id):
-    gng = GameNightGame.query.get_or_404(gng_id)
+    gng = db.get_or_404(GameNightGame, gng_id)
     _assert_gng_participant_or_admin(gng)
 
-    session_id = int(request.form["session_id"])
+    session_id = _int_or_none(request.form.get("session_id"))
+    if session_id is None:
+        abort(400, "Invalid session for this game.")
     # Verify session belongs to this gng — prevents IDOR
     session = TrackerSession.query.filter_by(id=session_id, game_night_game_id=gng_id).first()
     if session is None:
         abort(400, "Invalid session for this game.")
 
     mode = request.form.get("mode", "individual")
-    player_ids = [int(pid) for pid in request.form.getlist("player_ids")]
-    field_order_str = request.form.get("field_order", "").strip()
-    field_order = (
-        [int(fid) for fid in field_order_str.split(",") if fid.strip()] if field_order_str else None
-    )
+    try:
+        player_ids = [int(pid) for pid in request.form.getlist("player_ids")]
+        field_order_str = request.form.get("field_order", "").strip()
+        field_order = (
+            [int(fid) for fid in field_order_str.split(",") if fid.strip()]
+            if field_order_str
+            else None
+        )
+    except ValueError:
+        abort(400, "Invalid player or field.")
 
     teams_data = []
     if mode == "teams":
@@ -124,7 +146,9 @@ def launch_tracker(gng_id):
             if key.startswith("team_of_") and value.isdigit() and int(value) < len(teams_data):
                 teams_data[int(value)]["player_ids"].append(int(key[len("team_of_") :]))
         for i, team in enumerate(teams_data):
-            team["player_ids"] += [int(pid) for pid in request.form.getlist(f"team_{i}_player_ids")]
+            team["player_ids"] += [
+                int(pid) for pid in request.form.getlist(f"team_{i}_player_ids") if pid.isdigit()
+            ]
         teams_data = [t for t in teams_data if t["player_ids"]]
         if len(teams_data) < 2:
             flash("Put players on at least two teams.", "error")
@@ -179,6 +203,7 @@ def live_tracker(session_id):
         global_fields=global_fields,
         player_fields=player_fields,
         value_map=value_map,
+        can_manage=night_policy.can_manage(gn, current_user),
     )
 
 
@@ -189,7 +214,9 @@ def add_field(session_id):
     _assert_participant_or_admin(session)
     field_type = request.form.get("type", "")
     label = request.form.get("label", "")
-    starting_value = int(request.form.get("starting_value", 0))
+    starting_value = _int_or_none(request.form.get("starting_value") or 0)
+    if starting_value is None:
+        return "Starting value must be a whole number.", 400
     is_score_field = request.form.get("is_score_field", "false").lower() == "true"
     try:
         field = tracker_services.add_field(
@@ -214,10 +241,16 @@ def add_field(session_id):
 def update_value(session_id):
     session = _get_session_or_404(session_id)
     _assert_participant_or_admin(session)
-    field_id = int(request.form["field_id"])
-    entity_type = request.form["entity_type"]
-    entity_id = int(request.form["entity_id"]) if request.form.get("entity_id") else None
-    delta = int(request.form["delta"]) if request.form.get("delta") else None
+    field_id = _int_or_none(request.form.get("field_id"))
+    entity_type = request.form.get("entity_type", "")
+    entity_id = _int_or_none(request.form.get("entity_id"))
+    delta = _int_or_none(request.form.get("delta"))
+    if (
+        field_id is None
+        or (request.form.get("entity_id") and entity_id is None)
+        or (request.form.get("delta") and delta is None)
+    ):
+        return "Field, player and change must be whole numbers.", 400
     value = request.form.get("value")
     if request.form.get("kind") == "checkbox":
         value = "true" if value == "true" else "false"
@@ -232,7 +265,7 @@ def update_value(session_id):
         )
     except ValueError as e:
         return str(e), 400
-    field = TrackerField.query.get(field_id)
+    field = db.session.get(TrackerField, field_id)
     return render_template(
         "_tracker_cell.html",
         tv=tv,
@@ -247,7 +280,7 @@ def update_value(session_id):
 @login_required
 def end_game(session_id):
     session = _get_session_or_404(session_id)
-    _assert_participant_or_admin(session)
+    _assert_manager(session)
     if session.status == "completed":
         return redirect(
             url_for(
@@ -275,24 +308,20 @@ def end_game(session_id):
 @tracker_bp.route("/tracker/<int:session_id>/save", methods=["POST"])
 @login_required
 def save_results(session_id):
+    """Results are official, so only the night's host or an admin saves them.
+    Scores are taken from the tracker; the form can only change places."""
     session = _get_session_or_404(session_id)
-    _assert_participant_or_admin(session)
-    rankings = []
+    _assert_manager(session)
+    positions = {}
     for key, pos in request.form.items():
-        if key.startswith("position_p_"):
-            player_id = int(key[len("position_p_") :])
-            score = int(request.form.get(f"score_p_{player_id}", 0))
-            rankings.append(
-                {"player_id": player_id, "team_id": None, "position": int(pos), "score": score}
-            )
-        elif key.startswith("position_t_"):
-            team_id = int(key[len("position_t_") :])
-            score = int(request.form.get(f"score_t_{team_id}", 0))
-            rankings.append(
-                {"player_id": None, "team_id": team_id, "position": int(pos), "score": score}
-            )
+        for prefix, kind in (("position_p_", "player"), ("position_t_", "team")):
+            if key.startswith(prefix):
+                entity_id = _int_or_none(key[len(prefix) :])
+                if entity_id is None:
+                    abort(400)
+                positions[(kind, entity_id)] = _int_or_none(pos)
     try:
-        tracker_services.save_results(session_id, rankings)
+        tracker_services.save_results(session_id, positions)
     except ValueError as e:
         flash(str(e), "error")
         return redirect(url_for("tracker.end_game", session_id=session_id))
@@ -304,7 +333,7 @@ def save_results(session_id):
 @login_required
 def discard_tracker(session_id):
     session = _get_session_or_404(session_id)
-    _assert_participant_or_admin(session)
+    _assert_manager(session)
     gn_id = session.game_night_game.game_night_id
     tracker_services.discard_session(session_id)
     return redirect(url_for("game_night.view_game_night", game_night_id=gn_id))
